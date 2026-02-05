@@ -1,0 +1,337 @@
+/* =========================================
+   1. GLOBAL & RESET
+   ========================================= */
+body {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+    color: #333;
+    margin: 0;
+    padding: 0;
+}
+
+/* =========================================
+   2. TRANG CHỦ (HOME PAGE)
+   ========================================= */
+.hero-section {
+    position: relative;
+    background-image: url('https://images.unsplash.com/photo-1571003123894-1f0594d2b5d9?q=80&w=1920&auto=format&fit=crop');
+    background-size: cover;
+    background-position: center;
+    height: 600px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: white;
+    text-align: center;
+}
+
+.hero-overlay {
+    position: absolute;
+    top: 0; left: 0; right: 0; bottom: 0;
+    background: rgba(0, 0, 0, 0.4);
+}
+
+.hero-content {
+    position: relative;
+    z-index: 1;
+    max-width: 800px;
+    padding: 20px;
+}
+
+.hero-title {
+    font-size: 3.5rem;
+    font-weight: 700;
+    margin-bottom: 20px;
+    text-shadow: 2px 2px 4px rgba(0,0,0,0.5);
+}
+
+.hero-subtitle {
+    font-size: 1.5rem;
+    margin-bottom: 40px;
+    text-shadow: 1px 1px 2px rgba(0,0,0,0.5);
+}
+
+.btn-hero {
+    padding: 15px 40px;
+    font-size: 1.2rem;
+    border-radius: 50px;
+    font-weight: bold;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    transition: transform 0.3s;
+}
+
+.btn-hero:hover {
+    transform: scale(1.05);
+}
+
+.features-section {
+    padding: 60px 0;
+    background: #f8f9fa;
+}
+
+.feature-box {
+    text-align: center;
+    padding: 30px;
+    background: white;
+    border-radius: 10px;
+    box-shadow: 0 5px 15px rgba(0,0,0,0.05);
+    transition: transform 0.3s;
+    height: 100%;
+}
+
+.feature-box:hover {
+    transform: translateY(-10px);
+}
+
+.feature-icon {
+    font-size: 3rem;
+    color: #007bff;
+    margin-bottom: 20px;
+}
+
+/* =========================================
+   3. TRANG BẢN ĐỒ (MAP PAGE)
+   ========================================= */
+.main-container {
+    display: flex;
+    height: calc(100vh - 56px); 
+    width: 100%;
+    position: relative;
+    overflow: hidden;
+}
+
+/* Cột bên trái (Danh sách) */
+.sidebar-panel {
+    width: 400px; /* Mặc định cho Desktop */
+    background: #fff;
+    border-right: 1px solid #e0e0e0;
+    display: flex;
+    flex-direction: column;
+    position: relative;
+    box-shadow: 2px 0 5px rgba(0,0,0,0.1);
+    z-index: 1000;
+}
+
+/* Map Wrapper */
+.map-wrapper { 
+    flex: 1; 
+    position: relative; 
+}
+#map { 
+    height: 100%; 
+    width: 100%; 
+}
+.leaflet-routing-container { 
+    display: none !important; 
+}
+
+/* Thẻ Căn Hộ */
+.scrollable-content {
+    flex: 1;
+    overflow-y: auto;
+    padding: 15px;
+}
+
+.apt-card {
+    display: flex;
+    flex-direction: column;
+    border: 1px solid #ddd;
+    border-radius: 12px;
+    overflow: hidden;
+    margin-bottom: 20px;
+    transition: transform 0.2s, box-shadow 0.2s;
+    cursor: pointer;
+    background: white;
+}
+
+.apt-card:hover {
+    transform: translateY(-3px);
+    box-shadow: 0 10px 20px rgba(0,0,0,0.1);
+}
+
+.apt-img {
+    height: 180px;
+    width: 100%;
+    object-fit: cover;
+}
+
+.apt-details {
+    padding: 15px;
+}
+
+.apt-price {
+    font-size: 1.2rem;
+    font-weight: bold;
+    color: #2c3e50;
+}
+
+.apt-name {
+    font-size: 1rem;
+    font-weight: 600;
+    margin: 5px 0;
+    color: #333;
+}
+
+.apt-address {
+    font-size: 0.85rem;
+    color: #666;
+    margin-bottom: 10px;
+}
+
+.apt-actions {
+    display: flex;
+    gap: 10px;
+    margin-top: 10px;
+}
+
+/* Panel Chỉ Đường */
+#direction-panel {
+    position: absolute;
+    top: 0; left: 0; right: 0; bottom: 0;
+    background: white;
+    z-index: 1001;
+    padding: 15px;
+    display: none;
+    flex-direction: column;
+}
+
+.back-btn {
+    background: none;
+    border: none;
+    color: #007bff;
+    font-weight: bold;
+    cursor: pointer;
+    margin-bottom: 15px;
+    text-align: left;
+}
+
+.transport-options {
+    display: flex;
+    background: #f1f3f4;
+    border-radius: 8px;
+    padding: 4px;
+    margin-bottom: 15px;
+}
+
+.t-btn {
+    flex: 1;
+    border: none;
+    background: none;
+    padding: 8px;
+    border-radius: 6px;
+    font-size: 0.9rem;
+    font-weight: 600;
+    color: #555;
+}
+
+.t-btn.active { 
+    background: white; 
+    box-shadow: 0 1px 3px rgba(0,0,0,0.1); 
+    color: #007bff; 
+}
+
+.result-box {
+    background: #e8f0fe;
+    border-radius: 8px;
+    padding: 15px;
+    text-align: center;
+    margin-bottom: 15px;
+}
+
+/* =========================================
+   4. ICON VỊ TRÍ (USER PULSE)
+   ========================================= */
+
+/* Chấm tròn chính giữa */
+.user-pulse-icon {
+    background-color: #4285F4; /* Màu xanh Google Maps */
+    width: 18px;
+    height: 18px;
+    border-radius: 50%;
+    border: 3px solid white;
+    box-shadow: 0 0 5px rgba(0,0,0,0.3);
+    position: relative;
+    z-index: 2;
+}
+
+/* Vòng tròn lan tỏa (Radar effect) */
+.user-pulse-icon::after {
+    content: "";
+    position: absolute;
+    top: 50%; left: 50%;
+    transform: translate(-50%, -50%);
+    width: 100%; height: 100%;
+    border-radius: 50%;
+    background-color: rgba(66, 133, 244, 0.6);
+    animation: pulse-ring 2s infinite; /* Chạy lặp lại mãi mãi */
+    z-index: -1;
+}
+
+/* Định nghĩa chuyển động: Phình to ra và mờ dần đi */
+@keyframes pulse-ring {
+    0% {
+        width: 100%; height: 100%;
+        opacity: 0.8;
+    }
+    100% {
+        width: 400%; height: 400%; /* Lan rộng gấp 4 lần */
+        opacity: 0;
+    }
+}
+
+/* QUAN TRỌNG: Xóa khung viền trắng hình vuông mặc định của Leaflet */
+.leaflet-div-icon.custom-div-icon {
+    background: transparent !important;
+    border: none !important;
+}
+
+/* Xóa khung viền mặc định của Leaflet DivIcon */
+.leaflet-div-icon.custom-div-icon {
+    background: transparent !important;
+    border: none !important;
+}
+
+/* =========================================
+   5. RESPONSIVE (MOBILE)
+   ========================================= */
+@media (max-width: 768px) {
+    .main-container {
+        flex-direction: column-reverse; /* Đưa bản đồ lên trên, danh sách xuống dưới */
+    }
+    .sidebar-panel {
+        width: 100%; /* Full màn hình */
+        height: 50%; /* Chia đôi màn hình */
+    }
+    .map-wrapper {
+        height: 50%;
+    }
+}
+/* 1. Nhãn khoảng cách dính trên đường đi (Tooltip) */
+    .distance-tooltip {
+        background-color: #ffffff;
+        border: 2px solid #dc3545; /* Viền đỏ nổi bật */
+        color: #dc3545;            /* Chữ đỏ */
+        font-weight: bold;
+        font-size: 14px;
+        padding: 5px 10px;
+        border-radius: 20px;       /* Bo tròn */
+        box-shadow: 0 2px 5px rgba(0,0,0,0.3); /* Đổ bóng */
+    }
+    
+    /* Xóa mũi tên tam giác mặc định của Leaflet tooltip cho đẹp */
+    .leaflet-tooltip-left:before, .leaflet-tooltip-right:before {
+        border: none !important;
+    }
+
+    /* 2. Hộp nổi hiển thị thông tin ở góc bản đồ (Floating Box) */
+    .info-floating-box {
+        background: white;
+        padding: 10px 15px;
+        border-radius: 8px;
+        box-shadow: 0 0 10px rgba(0,0,0,0.2);
+        font-family: Arial, sans-serif;
+        text-align: center;
+        border-left: 5px solid #4285F4; /* Viền xanh bên trái */
+    }
+    .info-dist { font-size: 18px; font-weight: bold; color: #d93025; } /* Số km to màu đỏ */
+    .info-time { font-size: 14px; color: #555; }
