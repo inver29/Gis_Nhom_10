@@ -1,0 +1,230 @@
+{% extends "base.html" %}
+{% block title %} Cửa hàng dược phẩm trực tuyến {% endblock %}
+{% block content %}
+
+<style>
+/* ===== HERO ===== */
+.hero {
+    background: linear-gradient(135deg, #198754, #20c997);
+    color: white;
+    padding: 100px 0 120px;
+    position: relative;
+    overflow: hidden;
+}
+
+.hero::after {
+    content: "";
+    position: absolute;
+    right: -150px;
+    top: -150px;
+    width: 500px;
+    height: 500px;
+    background: rgba(255,255,255,0.08);
+    border-radius: 50%;
+}
+
+.hero h1 {
+    font-size: 3.2rem;
+    font-weight: 800;
+    line-height: 1.25;
+}
+
+.hero p {
+    font-size: 1.25rem;
+    opacity: 0.95;
+    margin: 20px 0 30px;
+}
+
+.hero-btns .btn {
+    padding: 14px 28px;
+    font-size: 1.05rem;
+    border-radius: 50px;
+    margin-right: 10px;
+}
+
+/* ===== STATS ===== */
+.stats {
+    margin-top: -70px;
+    z-index: 10;
+    position: relative;
+}
+
+.stat-box {
+    background: white;
+    border-radius: 18px;
+    padding: 30px;
+    box-shadow: 0 12px 30px rgba(0,0,0,0.1);
+    text-align: center;
+}
+
+.stat-box h3 {
+    font-size: 2.2rem;
+    color: #198754;
+    font-weight: 800;
+}
+
+.stat-box p {
+    margin: 0;
+    font-weight: 500;
+}
+
+/* ===== FEATURES ===== */
+.features {
+    padding: 100px 0;
+}
+
+.feature-card {
+    background: white;
+    border-radius: 18px;
+    padding: 40px 30px;
+    box-shadow: 0 10px 30px rgba(0,0,0,0.08);
+    height: 100%;
+    transition: 0.3s;
+}
+
+.feature-card:hover {
+    transform: translateY(-8px);
+}
+
+.feature-icon {
+    font-size: 3.2rem;
+    color: #198754;
+    margin-bottom: 20px;
+}
+
+.feature-card h4 {
+    font-weight: 700;
+    margin-bottom: 10px;
+}
+
+/* ===== CTA ===== */
+.cta {
+    background: linear-gradient(135deg, #0d6efd, #20c997);
+    padding: 90px 20px;
+    color: white;
+    text-align: center;
+}
+
+.cta h2 {
+    font-size: 2.6rem;
+    font-weight: 800;
+}
+
+.cta p {
+    font-size: 1.15rem;
+    opacity: 0.95;
+    margin: 20px 0 30px;
+}
+</style>
+
+<!-- HERO -->
+<section class="hero">
+    <div class="container">
+        <div class="row align-items-center">
+            <div class="col-md-6">
+                <h1>
+                    Nền tảng Nhà thuốc <br>
+                    Thông minh & Gần bạn
+                </h1>
+                <p>
+                    Tra cứu chi nhánh · Tính phí giao hàng ·
+                    Đặt thuốc & nhận tận nơi chỉ trong vài phút
+                </p>
+                <div class="hero-btns">
+                    <a href="{% url 'map_view' %}" class="btn btn-light text-success fw-bold">
+                        <i class="fas fa-map-marked-alt"></i> Tìm nhà thuốc
+                    </a>
+                    <a href="{% url 'product_list' %}" class="btn btn-outline-light fw-bold">
+                        <i class="fas fa-pills"></i> Danh sách thuốc
+                    </a>
+                </div>
+            </div>
+
+            <div class="col-md-6 text-center">
+                <img src="https://images.gofreedownload.net/pills-241279.jpg"
+                     class="img-fluid rounded-4 shadow-lg"
+                     alt="pharmacy">
+            </div>
+        </div>
+    </div>
+</section>
+
+<!-- STATS -->
+<section class="stats">
+    <div class="container">
+        <div class="row g-4">
+            <div class="col-md-4">
+                <div class="stat-box">
+                    <h3>20+</h3>
+                    <p>Chi nhánh nhà thuốc</p>
+                </div>
+            </div>
+            <div class="col-md-4">
+                <div class="stat-box">
+                    <h3>5–30p</h3>
+                    <p>Thời gian giao hàng</p>
+                </div>
+            </div>
+            <div class="col-md-4">
+                <div class="stat-box">
+                    <h3>100%</h3>
+                    <p>Kiểm tra tồn kho thực tế</p>
+                </div>
+            </div>
+        </div>
+    </div>
+</section>
+
+<!-- FEATURES -->
+<section class="features">
+    <div class="container">
+        <div class="row g-4">
+            <div class="col-md-4">
+                <div class="feature-card">
+                    <i class="fas fa-map-location-dot feature-icon"></i>
+                    <h4>Bản đồ nhà thuốc</h4>
+                    <p>
+                        Hiển thị chi nhánh theo vị trí thực tế,
+                        sắp xếp theo khoảng cách gần nhất.
+                    </p>
+                </div>
+            </div>
+
+            <div class="col-md-4">
+                <div class="feature-card">
+                    <i class="fas fa-route feature-icon"></i>
+                    <h4>Tuyến đường tối ưu</h4>
+                    <p>
+                        So sánh tuyến ngắn nhất & ít kẹt xe,
+                        hiển thị rõ khoảng cách và thời gian.
+                    </p>
+                </div>
+            </div>
+
+            <div class="col-md-4">
+                <div class="feature-card">
+                    <i class="fas fa-cart-shopping feature-icon"></i>
+                    <h4>Đặt thuốc nhanh</h4>
+                    <p>
+                        Chọn chi nhánh → xem giá → thanh toán khi nhận,
+                        không rườm rà.
+                    </p>
+                </div>
+            </div>
+        </div>
+    </div>
+</section>
+
+<!-- CTA -->
+<section class="cta">
+    <h2>Cần mua thuốc ngay bây giờ?</h2>
+    <p>
+        Chỉ cần chọn chi nhánh gần bạn nhất
+        và đặt thuốc trong vài giây.
+    </p>
+    <a href="{% url 'map_view' %}" class="btn btn-light text-success fw-bold px-4 py-2">
+        <i class="fas fa-location-crosshairs"></i> Bắt đầu ngay
+    </a>
+</section>
+
+{% endblock %}

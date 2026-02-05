@@ -1,0 +1,484 @@
+{% extends "base.html" %}
+{% block title %} Bản đồ Mạng lưới Nhà thuốc {% endblock %}
+
+{% block content_wrapper %}
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.css" />
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.js"></script>
+
+    <style>
+        .sidebar-panel { width: 450px; background: #f8f9fa; }
+        .pharmacy-card { border-left: 5px solid #28a745; margin-bottom: 15px; background: white; cursor: pointer; transition: 0.3s; }
+        .pharmacy-card:hover { transform: scale(1.02); box-shadow: 0 5px 15px rgba(0,0,0,0.1); }
+        .distance-badge { font-size: 0.85rem; background: #6c757d; color: white; padding: 2px 8px; border-radius: 4px; display: none; }
+        .distance-badge.road-dist { background: #007bff; } /* Màu xanh khi là đường bộ */
+        
+        .user-pulse-icon { background-color: #007bff; width: 20px; height: 20px; border-radius: 50%; border: 3px solid white; position: relative; }
+        .user-pulse-icon::after { content: ""; position: absolute; top: -10px; left: -10px; width: 40px; height: 40px; background: rgba(0, 123, 255, 0.4); border-radius: 50%; animation: pulse 2s infinite; }
+        @keyframes pulse { 0% { transform: scale(0.5); opacity: 1; } 100% { transform: scale(1.5); opacity: 0; } }
+        
+        .route-item { cursor: pointer; border-left: 4px solid transparent; }
+        .route-item:hover { background-color: #e9ecef; }
+        .route-item.active-route { background-color: #e2e6ea; border-left: 4px solid #007bff; }
+
+        /* Style cho popup bản đồ đẹp hơn */
+        .leaflet-popup-content { text-align: center; margin: 10px; width: 200px; }
+        .popup-btn { margin-top: 8px; width: 100%; }
+    </style>
+
+    <div class="main-container">
+        <div class="sidebar-panel">
+            <div style="padding: 15px; background: #28a745; color: white;">
+                <h5 class="mb-0"><i class="fas fa-clinic-medical"></i> Danh Sách Nhà Thuốc</h5>
+                <div id="status-area">
+                    <small id="status-msg"><i class="fas fa-spinner fa-spin"></i> Đang định vị...</small>
+                    <div id="calc-progress" class="progress mt-2" style="height: 5px; display: none;">
+                        <div class="progress-bar bg-warning" role="progressbar" style="width: 0%"></div>
+                    </div>
+                </div>
+            </div>
+
+            <div id="radius-box" style="padding: 10px;">
+                <label class="font-weight-bold">Tìm trong bán kính:</label>
+                <select id="radius-select" class="form-control" onchange="filterByRadius()">
+                    <option value="0">Tất cả</option>
+                    <option value="0.5">Dưới 500m</option>
+                    <option value="1.0">Dưới 1km</option>
+                    <option value="2.0">Dưới 2km</option>
+                    <option value="5.0">Dưới 5km</option>
+                    <option value="10.0">Dưới 10km</option>
+                    <option value="15.0">Dưới 15km</option>
+                </select>
+            </div>
+
+            <div id="listing-panel" class="scrollable-content" style="padding: 10px;">
+                <div id="pharmacy-list-container">
+                    {% if pharmacies %}
+                        {% for item in pharmacies %}
+                        <div class="card pharmacy-card p-3" 
+                             id="card-{{ item.id }}" 
+                             data-lat="{{ item.lat|stringformat:'.6f' }}" 
+                             data-lng="{{ item.lng|stringformat:'.6f' }}" 
+                             data-id="{{ item.id }}"
+                             onclick="handleCardClick(this)">
+                            <div class="d-flex">
+                                <img src="{{ item.image }}" style="width: 80px; height: 80px; object-fit: cover; border-radius: 5px; margin-right: 10px;">
+                                <div style="width: 100%;">
+                                    <div class="d-flex justify-content-between">
+                                        <h6 class="font-weight-bold mb-1">{{ item.name }}</h6>
+                                        <span id="dist-badge-{{ item.id }}" class="distance-badge">...</span>
+                                    </div>
+                                    <small class="text-muted"><i class="fas fa-map-marker-alt"></i> {{ item.address }}</small><br>
+                                    <div class="mt-2">
+                                        <button class="btn btn-sm btn-outline-success" type="button"
+                                            data-lat="{{ item.lat|stringformat:'.6f' }}" 
+                                            data-lng="{{ item.lng|stringformat:'.6f' }}" 
+                                            data-name="{{ item.name }}"
+                                            onclick="handleRouteClick(event, this)">
+                                            <i class="fas fa-route"></i> Đường đi
+                                        </button>
+                                        <a href="{% url 'pharmacy_detail' item.id %}" class="btn btn-sm btn-outline-success"></i>Chi tiết</a>
+                                        <button class="btn btn-sm btn-outline-success" type="button"
+                                            onclick="openSelectBranch(event, parseInt('{{ item.id }}'), '{{ item.name }}')">
+                                            Chọn chi nhánh
+                                        </button>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        {% endfor %}
+                    {% else %}
+                        <div class="alert alert-warning">Chưa có dữ liệu nhà thuốc.</div>
+                    {% endif %}
+                </div>
+            </div>
+
+            <div id="select-branch-panel" style="display:none; flex-direction: column; padding: 15px; height: 100%;">
+                <button class="btn btn-sm btn-outline-success" onclick="closeSelectBranch()"><i class="fas fa-arrow-left"></i> Quay lại </button>
+                <h5 class="text-success">
+                    Đến: <span id="select-branch-name"></span>
+                </h5>
+                <div id="select-branch-info" class="mt-3"></div>
+            </div>
+
+            <div id="direction-panel" style="display:none; flex-direction: column; padding: 15px; height: 100%;">
+                <button class="btn btn-sm btn-outline-success" onclick="closeDirectionPanel()"><i class="fas fa-arrow-left"></i> Quay lại</button>
+                <h5 class="text-success">Đến: <span id="dest-title">...</span></h5>
+                <div id="loading-box" class="text-center" style="display:none"><div class="spinner-border text-success"></div> Đang vẽ đường...</div>
+                <div id="routes-list" class="list-group overflow-auto"></div>
+            </div>
+        </div>
+
+        <div class="map-wrapper"><div id="map"></div></div>
+    </div>
+
+    {{ pharmacies|json_script:"pharmacies-data" }}
+
+    <script>
+        var map = L.map('map').setView([10.7721, 106.6983], 13);
+        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(map);
+
+        var pharmacies = [];
+        try { pharmacies = JSON.parse(document.getElementById('pharmacies-data').textContent); } catch(e) {}
+
+        var userLocation = null;
+        var markers = {}; 
+        var currentRouteLayers = [];
+
+        var pharmacyIcon = new L.Icon({
+            iconUrl: 'https://cdn-icons-png.flaticon.com/512/169/169869.png',
+            iconSize: [32, 32], iconAnchor: [16, 32], popupAnchor: [0, -32]
+        });
+
+        // --- CẬP NHẬT: TẠO MARKER VỚI POPUP CÓ NÚT CHỈ ĐƯỜNG ---
+        pharmacies.forEach(p => {
+            if(p.lat && p.lng) {
+                // Xử lý tên an toàn (tránh lỗi nếu có dấu nháy đơn ' )
+                var safeName = p.name.replace(/'/g, "\\'").replace(/"/g, '&quot;');
+                
+                // Nội dung HTML trong Popup
+                var popupContent = `
+                    <div style="text-align:center;">
+                        <h6 style="font-weight:bold; margin-bottom:5px;">${p.name}</h6>
+                        <small style="color:#666;">${p.address}</small>
+                        <br>
+                        <button class="btn btn-sm btn-success popup-btn" 
+                                onclick="prepareRoute(${p.lat}, ${p.lng}, '${safeName}')">
+                            <i class="fas fa-directions"></i> Chỉ đường ngay
+                        </button>
+                    </div>
+                `;
+
+                var m = L.marker([p.lat, p.lng], {icon: pharmacyIcon}).addTo(map)
+                    .bindPopup(popupContent); // Gán nội dung mới vào popup
+                
+                markers[p.id] = m;
+                p.distance = 9999; 
+                p.isRoadDist = false; 
+            }
+        });
+
+        // ĐỊNH VỊ
+        navigator.geolocation.getCurrentPosition(
+            pos => {
+                userLocation = {
+                    lat: pos.coords.latitude,
+                    lng: pos.coords.longitude
+                };
+
+                console.log("Vị trí người dùng:", userLocation);
+
+                const userIcon = L.divIcon({
+                    className: 'custom',
+                    html: "<div class='user-pulse-icon'></div>"
+                });
+
+                L.marker([userLocation.lat, userLocation.lng], { icon: userIcon })
+                    .addTo(map)
+                    .bindPopup("Vị trí của bạn")
+                    .openPopup();
+
+                map.setView([userLocation.lat, userLocation.lng], 14);
+
+                calculateHaversineAll();
+                calculateRoadDistanceAll();
+            },
+            err => {
+                console.error(err);
+                alert("Không xác định được vị trí, dùng vị trí mặc định (TP.HCM)");
+
+                // fallback – vị trí mặc định
+                userLocation = { lat: 10.7721, lng: 106.6983 };
+                map.setView([userLocation.lat, userLocation.lng], 13);
+
+                calculateHaversineAll();
+                calculateRoadDistanceAll();
+            },
+            {
+                enableHighAccuracy: false, // ❌ KHÔNG GPS
+                timeout: 5000,             // ⏱ tối đa 5 giây
+                maximumAge: 60000          // ♻ dùng vị trí cũ nếu có
+            }
+        );
+
+
+
+        function calculateHaversineAll() {
+            pharmacies.forEach(p => {
+                p.distance = getDistanceFromLatLonInKm(userLocation.lat, userLocation.lng, p.lat, p.lng);
+                updateBadge(p, false);
+            });
+            sortAndFilter();
+        }
+
+        // --- HÀM TÍNH ĐƯỜNG BỘ TỰ ĐỘNG ---
+        async function calculateRoadDistanceAll() {
+            var progressBar = document.querySelector('.progress-bar');
+            document.getElementById('calc-progress').style.display = 'flex';
+            
+            var sortedList = [...pharmacies].sort((a, b) => a.distance - b.distance);
+            
+            var count = 0;
+            for (let p of sortedList) {
+                count++;
+                var percent = (count / sortedList.length) * 100;
+                progressBar.style.width = percent + '%';
+
+                try {
+                    var url = `/api/route/?start_lat=${userLocation.lat}&start_lng=${userLocation.lng}&end_lat=${p.lat}&end_lng=${p.lng}&mode=driving`;
+                    let response = await fetch(url);
+                    let data = await response.json();
+
+                    if (data.routes && data.routes.length > 0) {
+                        // Lấy đường ngắn nhất
+                        let minDistance = Math.min(...data.routes.map(r => r.distance_km));
+                        p.distance = minDistance; 
+                        p.isRoadDist = true; 
+                        updateBadge(p, true);
+                    }
+                } catch (err) {
+                    console.log("Lỗi tính: " + p.name);
+                }
+
+                sortAndFilter(); 
+                await new Promise(r => setTimeout(r, 200));
+            }
+
+            document.getElementById('status-msg').innerHTML = '<i class="fas fa-check"></i> Định vị thành công!';
+            setTimeout(() => { document.getElementById('calc-progress').style.display = 'none'; }, 2000);
+        }
+
+        function updateBadge(p, isRoad) {
+            var badge = document.getElementById(`dist-badge-${p.id}`);
+            if(badge) {
+                badge.innerText = `${p.distance.toFixed(1)} km`;
+                badge.style.display = 'inline-block';
+                if(isRoad) {
+                    badge.classList.add('road-dist');
+                    badge.title = "Khoảng cách thực tế ngắn nhất";
+                } else {
+                    badge.classList.remove('road-dist');
+                    badge.title = "Đường chim bay";
+                }
+            }
+        }
+
+        function sortAndFilter() {
+            var container = document.getElementById('pharmacy-list-container');
+            var cards = Array.from(container.children);
+            
+            cards.sort(function(a, b) {
+                var idA = a.getAttribute('data-id');
+                var idB = b.getAttribute('data-id');
+                var distA = pharmacies.find(p => p.id == idA)?.distance || 9999;
+                var distB = pharmacies.find(p => p.id == idB)?.distance || 9999;
+                return distA - distB;
+            });
+            cards.forEach(card => container.appendChild(card));
+            filterByRadius();
+        }
+
+        function filterByRadius() {
+            if (!userLocation) return;
+            var radiusKm = parseFloat(document.getElementById('radius-select').value);
+            
+            pharmacies.forEach(p => {
+                var card = document.getElementById(`card-${p.id}`);
+                var marker = markers[p.id];
+                
+                if (radiusKm === 0 || p.distance <= radiusKm) {
+                    if(card) card.style.display = 'block';
+                    if (marker && !map.hasLayer(marker)) map.addLayer(marker);
+                } else {
+                    if(card) card.style.display = 'none';
+                    if (marker && map.hasLayer(marker)) map.removeLayer(marker);
+                }
+            });
+        }
+
+        function handleCardClick(element) {
+            var lat = element.getAttribute('data-lat');
+            var lng = element.getAttribute('data-lng');
+            map.flyTo([lat, lng], 16);
+            // Có thể thêm dòng này nếu muốn tự động mở popup khi bấm vào thẻ
+            // markers[element.getAttribute('data-id')].openPopup();
+        }
+
+        function handleRouteClick(event, element) {
+            event.stopPropagation();
+            var lat = element.getAttribute('data-lat');
+            var lng = element.getAttribute('data-lng');
+            var name = element.getAttribute('data-name');
+            if (!userLocation) return alert("Chưa có vị trí.");
+            prepareRoute(lat, lng, name);
+        }
+
+        function getDistanceFromLatLonInKm(lat1,lon1,lat2,lon2) {
+            var R = 6371; var dLat = deg2rad(lat2-lat1); var dLon = deg2rad(lon2-lon1); 
+            var a = Math.sin(dLat/2) * Math.sin(dLat/2) + Math.cos(deg2rad(lat1)) * Math.cos(deg2rad(lat2)) * Math.sin(dLon/2) * Math.sin(dLon/2); 
+            return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a)); 
+        }
+        function deg2rad(deg) { return deg * (Math.PI/180); }
+
+        function prepareRoute(destLat, destLng, name) {
+            document.getElementById('listing-panel').style.display = 'none';
+            document.getElementById('direction-panel').style.display = 'flex';
+            document.getElementById('dest-title').innerText = name;
+            callApiWithShipping(destLat, destLng);
+        }
+
+        function callApiWithShipping(destLat, destLng) {
+            document.getElementById('loading-box').style.display = 'block';
+            document.getElementById('routes-list').innerHTML = '';
+            currentRouteLayers.forEach(l => map.removeLayer(l)); currentRouteLayers = [];
+
+            var url = `/api/route/?start_lat=${userLocation.lat}&start_lng=${userLocation.lng}&end_lat=${destLat}&end_lng=${destLng}&mode=driving`;
+            fetch(url).then(r => r.json()).then(data => {
+                document.getElementById('loading-box').style.display = 'none';
+                if(data.routes && data.routes.length > 0) {
+                    
+                    // Sắp xếp các tuyến theo khoảng cách tăng dần
+                    data.routes.sort((a, b) => a.distance_km - b.distance_km);
+
+                    data.routes.forEach((route, index) => {
+                        var isFirst = index === 0;
+                        
+                        var poly = L.polyline(route.route_points, { 
+                            color: isFirst ? '#007bff' : '#6c757d', 
+                            weight: isFirst ? 7 : 5, 
+                            opacity: isFirst ? 1.0 : 0.6 
+                        }).addTo(map);
+
+                        poly.on('click', () => highlightRoute(index));
+                        if(isFirst) poly.bringToFront();
+                        currentRouteLayers.push(poly);
+                        
+                        var activeClass = isFirst ? 'active-route' : '';
+                        var html = `<div class="list-group-item list-group-item-action route-item ${activeClass}" onclick="highlightRoute(${index})" id="route-item-${index}">
+                            <div class="d-flex justify-content-between"><strong>Cách ${index + 1}</strong><span class="shipping-fee-badge">Ship: ${route.shipping_fee}</span></div>
+                            <small>${route.summary}</small><div class="mt-1"><i class="fas fa-road"></i> ${route.distance_km} km | <i class="fas fa-clock"></i> ${route.duration_min} phút</div></div>`;
+                        document.getElementById('routes-list').insertAdjacentHTML('beforeend', html);
+                    });
+                    map.fitBounds(currentRouteLayers[0].getBounds(), {padding: [50, 50]});
+                } else {
+                    document.getElementById('routes-list').innerHTML = '<div class="text-danger p-2">Không tìm thấy đường.</div>';
+                }
+            }).catch(err => {
+                 document.getElementById('loading-box').style.display = 'none';
+                 document.getElementById('routes-list').innerHTML = `<div class="text-danger p-2">Lỗi kết nối.</div>`;
+            });
+        }
+
+        function highlightRoute(selectedIndex) {
+            currentRouteLayers.forEach((layer, index) => {
+                if (index === selectedIndex) { layer.setStyle({color: '#007bff', weight: 7, opacity: 1}); layer.bringToFront(); }
+                else { layer.setStyle({color: '#6c757d', weight: 4, opacity: 0.5}); }
+            });
+            document.querySelectorAll('.route-item').forEach(item => item.classList.remove('active-route'));
+            var selectedItem = document.getElementById(`route-item-${selectedIndex}`);
+            if(selectedItem) { selectedItem.classList.add('active-route'); selectedItem.scrollIntoView({ behavior: 'smooth', block: 'nearest' }); }
+        }
+
+        function closeDirectionPanel() {
+            document.getElementById('direction-panel').style.display = 'none';
+            document.getElementById('listing-panel').style.display = 'block';
+            currentRouteLayers.forEach(l => map.removeLayer(l));
+            map.setView([userLocation.lat, userLocation.lng], 14);
+        }
+        function selectBranch(pharmacyId, distance) {
+            const shippingFee = Math.max(15000, Math.round(distance * 5000));
+
+            const ok = confirm(
+                `Khoảng cách: ${distance} km\nPhí ship: ${shippingFee.toLocaleString()} VNĐ\n\nChọn chi nhánh này?`
+            );
+
+            if (ok) {
+                window.location.href =
+                    `/order/?pharmacy_id=${pharmacyId}&distance=${distance}&shipping_fee=${shippingFee}`;
+            }
+        }
+        function openSelectBranch(event, pharmacyId, pharmacyName) {
+            event.stopPropagation();
+
+            if (!userLocation) {
+                alert("Chưa xác định được vị trí của bạn");
+                return;
+            }
+
+            const pharmacy = pharmacies.find(p => p.id === pharmacyId);
+            if (!pharmacy) return;
+
+            // Ẩn / hiện panel
+            document.getElementById('listing-panel').style.display = 'block';
+            document.getElementById('radius-box').style.display = 'none';
+            document.getElementById('direction-panel').style.display = 'none';
+            document.getElementById('select-branch-panel').style.display = 'block';
+            document.getElementById('select-branch-name').innerText = pharmacyName;
+
+            // ❌ XÓA route cũ nếu có
+            currentRouteLayers.forEach(l => map.removeLayer(l));
+            currentRouteLayers = [];
+
+            const url = `/api/route/?start_lat=${userLocation.lat}&start_lng=${userLocation.lng}` +
+                        `&end_lat=${pharmacy.lat}&end_lng=${pharmacy.lng}&mode=driving`;
+
+            fetch(url)
+                .then(res => res.json())
+                .then(data => {
+                    if (!data.routes || data.routes.length === 0) {
+                        document.getElementById('select-branch-info').innerHTML =
+                            `<div class="text-danger">Không tính được khoảng cách</div>`;
+                        return;
+                    }
+
+                    // ✅ LẤY ROUTE NGẮN NHẤT
+                    data.routes.sort((a, b) => a.distance_km - b.distance_km);
+                    const r = data.routes[0];
+
+                    const distance = r.distance_km;
+                    const duration = r.duration_min;
+                    const shipping = Math.max(15000, Math.round(distance * 5000));
+
+                    // ✅ VẼ ĐƯỜNG ĐI NGẮN NHẤT LÊN MAP
+                    const poly = L.polyline(r.route_points, {
+                        color: '#0099FF',
+                        weight: 7,
+                        opacity: 0.9
+                    }).addTo(map);
+
+                    currentRouteLayers.push(poly);
+
+                    // Zoom map theo tuyến đường
+                    map.fitBounds(poly.getBounds(), { padding: [50, 50] });
+
+                    // Hiển thị thông tin
+                    document.getElementById('select-branch-info').innerHTML = `
+                        <div class="card p-3">
+                            <p><strong>Khoảng cách:</strong> ${distance} km</p>
+                            <p><strong>Thời gian giao:</strong> ${duration + 5} phút</p>
+                            <p><strong>Phí ship:</strong> ${shipping.toLocaleString()} VNĐ</p>
+
+                            <button class="btn btn-success w-100"
+                                onclick="confirmSelectBranch(${pharmacyId}, ${distance}, ${shipping})">
+                                Đồng ý chọn chi nhánh
+                            </button>
+                        </div>
+                    `;
+                });
+        }
+
+
+        function closeSelectBranch() {
+        document.getElementById('select-branch-panel').style.display = 'none';
+        document.getElementById('listing-panel').style.display = 'block';
+        document.getElementById('radius-box').style.display = 'block';
+
+        currentRouteLayers.forEach(l => map.removeLayer(l));
+        currentRouteLayers = [];
+    }
+
+        function confirmSelectBranch(pharmacyId, distance, shippingFee) {
+            window.location.href =
+                `/order/?pharmacy_id=${pharmacyId}&distance=${distance}&shipping_fee=${shippingFee}`;
+        }
+    </script>
+{% endblock %}
