@@ -35,10 +35,7 @@ def map_view(request):
 
 def pharmacy_detail(request, pharmacy_id):
     pharmacy = get_object_or_404(Pharmacy, pk=pharmacy_id)
-
-    # ✅ ĐÚNG MODEL: Medicine → pharmacy
     medicines = Medicine.objects.filter(pharmacy=pharmacy)
-
     return render(request, 'pharmacy_detail.html', {
         'pharmacy': pharmacy,
         'medicines': medicines
@@ -50,20 +47,24 @@ def get_route_api(request):
     start_lng = request.GET.get('start_lng')
     end_lat = request.GET.get('end_lat')
     end_lng = request.GET.get('end_lng')
-    mode = request.GET.get('mode', 'driving')
+    
+    # Lấy mode và thời gian
+    mode = request.GET.get('mode', 'motorbike') 
+    dept_time = request.GET.get('dept_time', None)
 
     if not all([start_lat, start_lng, end_lat, end_lng]):
         return JsonResponse({'error': 'Thiếu tọa độ'}, status=400)
 
     try:
         tool = RoutingTool()
-        result = tool.get_route(start_lat, start_lng, end_lat, end_lng, mode=mode)
+        result = tool.get_route(start_lat, start_lng, end_lat, end_lng, mode=mode, departure_time_str=dept_time)
 
-        # ✅ Đẩy tính phí ship về tool.py
         if 'routes' in result:
             for route in result['routes']:
                 dist = route.get('distance_km', 0)
-                fee_value, fee_text = calc_shipping_fee(dist)
+                # Tính phí ship theo Mode
+                fee_value, fee_text = calc_shipping_fee(dist, mode)
+                
                 route['shipping_fee'] = fee_text
                 route['shipping_fee_value'] = fee_value
 
@@ -74,10 +75,6 @@ def get_route_api(request):
 
 
 def get_nearby_api(request):
-    """
-    API lọc nhà thuốc trong bán kính (tool chạy ở backend):
-    /api/nearby/?user_lat=...&user_lng=...&radius_km=...
-    """
     user_lat = request.GET.get('user_lat')
     user_lng = request.GET.get('user_lng')
     radius_km = request.GET.get('radius_km', 0)
@@ -88,7 +85,6 @@ def get_nearby_api(request):
     pharmacies_db = Pharmacy.objects.filter(has_stock=True)
     filtered = filter_pharmacies_in_radius(pharmacies_db, user_lat, user_lng, radius_km)
 
-    # Trả về đúng các trường cần thiết để map.html cập nhật UI
     return JsonResponse({
         'user': {
             'lat': float(user_lat),
@@ -101,7 +97,6 @@ def get_nearby_api(request):
 
 def product_list(request):
     medicines = Medicine.objects.select_related('pharmacy')
-
     return render(request, 'products.html', {
         'medicines': medicines
     })
@@ -115,12 +110,10 @@ def order_create(request):
     pharmacy = None
     medicines = Medicine.objects.none()
 
-    # ====== GET: từ map qua ======
     if pharmacy_id:
         pharmacy = get_object_or_404(Pharmacy, id=pharmacy_id)
         medicines = pharmacy.medicines.all()
 
-    # ====== POST: đặt hàng ======
     if request.method == 'POST':
         medicine_id = request.POST.get('medicine')
         quantity = int(request.POST.get('quantity'))
@@ -128,7 +121,6 @@ def order_create(request):
 
         medicine = get_object_or_404(Medicine, id=medicine_id)
 
-        # ❗ Kiểm tra tồn kho
         if quantity > medicine.quantity:
             return render(request, 'order.html', {
                 'pharmacy': pharmacy,
@@ -140,15 +132,13 @@ def order_create(request):
 
         total_price = medicine.price * quantity + shipping_fee
 
-        # ✅ LƯU ĐƠN
         Order.objects.create(
-            pharmacy=pharmacy,     # ← QUAN TRỌNG
+            pharmacy=pharmacy,
             medicine=medicine,
             quantity=quantity,
             total_price=total_price
         )
 
-        # Trừ kho
         medicine.quantity -= quantity
         medicine.save()
 
