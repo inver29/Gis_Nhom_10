@@ -1,0 +1,127 @@
+{% extends "base.html" %}
+{% block title %} {{ pharmacy.name }} {% endblock %}
+
+{% block content_wrapper %}
+
+<style>
+.pharmacy-detail {
+    padding: 40px 0;
+}
+
+.pharmacy-card {
+    background: #ffffff;
+    border-radius: 18px;
+    box-shadow: 0 12px 30px rgba(0,0,0,0.08);
+    overflow: hidden;
+}
+
+.pharmacy-image {
+    width: 100%;
+    height: 420px;
+    object-fit: cover;
+}
+
+.pharmacy-info {
+    padding: 30px;
+}
+
+.pharmacy-name {
+    font-weight: 800;
+    color: #198754;
+}
+
+.pharmacy-meta p {
+    margin-bottom: 8px;
+    font-size: 1rem;
+}
+
+.pharmacy-meta i {
+    color: #28a745;
+    width: 22px;
+}
+
+.service-box {
+    background: #f8f9fa;
+    border-left: 5px solid #28a745;
+    padding: 18px 20px;
+    border-radius: 10px;
+    margin-top: 20px;
+}
+
+.service-box h5 {
+    font-weight: 700;
+    margin-bottom: 8px;
+}
+
+.action-box {
+    margin-top: 30px;
+}
+
+.action-box .btn {
+    padding: 14px;
+    font-size: 1.05rem;
+    font-weight: 700;
+    border-radius: 50px;
+}
+
+.back-link {
+    margin-bottom: 20px;
+    display: inline-block;
+}
+</style>
+
+<div class="container pharmacy-detail">
+
+    <a href="{% url 'map_view' %}" class="btn btn-outline-success back-link">
+        <i class="fas fa-arrow-left"></i> Quay lại bản đồ
+    </a>
+
+    <div class="pharmacy-card">
+        <div class="row g-0">
+            <!-- IMAGE -->
+            <div class="col-md-6">
+                {% if pharmacy.image %}
+                    <img src="{{ pharmacy.image.url }}" class="pharmacy-image">
+                {% else %}
+                    <img src="https://cdn.hpdecor.vn/wp-content/uploads/2022/02/nha-thuoc-minh-chau-02.jpg" class="pharmacy-image">
+                {% endif %}
+            </div>
+
+            <!-- INFO -->
+            <div class="col-md-6">
+                <div class="pharmacy-info">
+                    <h2 class="pharmacy-name">{{ pharmacy.name }}</h2>
+
+                    <div class="pharmacy-meta mt-3">
+                        <p><i class="fas fa-map-marker-alt"></i> {{ pharmacy.address }}</p>
+                        <p><i class="fas fa-phone"></i> {{ pharmacy.phone }}</p>
+                        <p><i class="fas fa-clock"></i> {{ pharmacy.opening_hours }}</p>
+                    </div>
+
+                    <div class="service-box">
+                        <h5><i class="fas fa-info-circle"></i> Thông tin & dịch vụ</h5>
+                        <p class="mb-0">
+                            {{ pharmacy.desc|default:"Nhà thuốc đạt chuẩn GPP, cung cấp thuốc chính hãng và tư vấn tận tình." }}
+                        </p>
+                    </div>
+
+                    <div class="action-box">
+                        {% if pharmacy.has_stock %}
+                            <a href="{% url 'product_list' %}" class="btn btn-success btn-block">
+                                <i class="fas fa-cart-plus"></i> Đặt thuốc online
+                            </a>
+                        {% else %}
+                            <button class="btn btn-secondary btn-block" disabled>
+                                <i class="fas fa-ban"></i> Tạm hết thuốc
+                            </button>
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+
+        </div>
+    </div>
+
+</div>
+
+{% endblock %}

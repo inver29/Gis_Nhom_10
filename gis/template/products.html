@@ -1,0 +1,39 @@
+{% extends "base.html" %}
+{% block title %}Danh sách sản phẩm{% endblock %}
+
+{% block content_wrapper %}
+<div class="container mt-4">
+    <h3>Danh sách thuốc theo nhà thuốc</h3>
+
+    <table class="table table-bordered mt-3">
+        <thead class="table-success">
+            <tr>
+                <th>Chi nhánh</th>
+                <th>Tên thuốc</th>
+                <th>Số lượng</th>
+                <th>Đơn giá (VNĐ)</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for m in medicines %}
+            <tr>
+                <td>{{ m.pharmacy.name }}</td>
+                <td>{{ m.name }}</td>
+                <td>{{ m.quantity }}</td>
+                <td>{{ m.price }}</td>
+            </tr>
+            {% empty %}
+            <tr>
+                <td colspan="4" class="text-center text-muted">
+                    Chưa có dữ liệu thuốc
+                </td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+
+    <a href="{% url 'order_create' %}" class="btn btn-success"><i class="fas fa-shopping-cart"></i>
+        Tạo đơn đặt hàng
+    </a>
+</div>
+{% endblock %}
