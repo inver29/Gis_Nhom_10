@@ -1,0 +1,39 @@
+{% extends "base.html" %}
+{% block title %}Đăng nhập{% endblock %}
+
+{% block content_wrapper %}
+<div class="container mt-5">
+    <div class="row justify-content-center">
+        <div class="col-md-5">
+            <div class="card shadow-sm">
+                <div class="card-header bg-success text-white text-center">
+                    <h4>ĐĂNG NHẬP</h4>
+                </div>
+                <div class="card-body">
+                    {% if messages %}
+                        {% for message in messages %}
+                            <div class="alert alert-danger">{{ message }}</div>
+                        {% endfor %}
+                    {% endif %}
+                    
+                    <form method="post" autocomplete="off">
+                        {% csrf_token %}
+                        <div class="form-group">
+                            <label>Tên đăng nhập</label>
+                            {{ form.username }}
+                        </div>
+                        <div class="form-group">
+                            <label>Mật khẩu</label>
+                            {{ form.password }}
+                        </div>
+                        <button type="submit" class="btn btn-success btn-block font-weight-bold">Đăng nhập</button>
+                    </form>
+                </div>
+                <div class="card-footer text-center">
+                    <small>Chưa có tài khoản? <a href="{% url 'register' %}">Đăng ký ngay</a></small>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

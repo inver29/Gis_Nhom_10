@@ -1,0 +1,41 @@
+{% extends "base.html" %}
+{% block title %}Lịch sử đơn hàng{% endblock %}
+
+{% block content_wrapper %}
+<div class="container mt-4">
+    <h3 class="text-success mb-4"><i class="fas fa-history"></i> Lịch sử đơn hàng</h3>
+    {% if orders %}
+        <table class="table table-hover table-bordered">
+            <thead class="thead-light">
+                <tr><th>Mã đơn</th><th>Ngày đặt</th><th>Tổng tiền</th><th>Trạng thái</th><th>Chi tiết</th></tr>
+            </thead>
+            <tbody>
+                {% for order in orders %}
+                <tr>
+                    <td>#{{ order.id }}</td>
+                    <td>{{ order.created_at|date:"d/m/Y H:i" }}</td>
+                    <td class="font-weight-bold text-danger">{{ order.final_total_price }} đ</td>
+                    <td>{{ order.get_status_display }}</td>
+                    <td>
+                        <button class="btn btn-sm btn-outline-primary" data-toggle="collapse" data-target="#detail-{{ order.id }}">Xem</button>
+                    </td>
+                </tr>
+                <tr class="collapse" id="detail-{{ order.id }}">
+                    <td colspan="5" class="bg-light p-3">
+                        <p><strong>Giao đến:</strong> {{ order.address_text }} ({{ order.full_name }} - {{ order.phone }})</p>
+                        <p><strong>Chi nhánh:</strong> {{ order.pharmacy.name }} - Ship: {{ order.shipping_fee }}đ</p>
+                        <ul>
+                            {% for item in order.items.all %}
+                                <li>{{ item.medicine_name }} (x{{ item.quantity }})</li>
+                            {% endfor %}
+                        </ul>
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    {% else %}
+        <div class="alert alert-info">Bạn chưa có đơn hàng nào.</div>
+    {% endif %}
+</div>
+{% endblock %}

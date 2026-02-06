@@ -40,8 +40,26 @@
                     <li class="nav-item">
                         <a class="nav-link" href="{% url 'map_view' %}"><i class="fas fa-map-marked-alt"></i> Bản đồ Nhà thuốc</a>
                     </li>
+                    
+                    {% if user.is_authenticated and user.is_staff %}
                     <li class="nav-item">
                         <a class="nav-link" href="/admin" target="_blank"><i class="fas fa-user-shield"></i> Quản trị viên</a>
+                    </li>
+                    {% endif %}
+
+                    {% if user.is_authenticated %}
+                        <li class="nav-item"><a class="nav-link" href="#">Xin chào, {{ user.username }}</a></li>
+                        <li class="nav-item"><a class="nav-link" href="{% url 'order_history' %}">Lịch sử đơn</a></li>
+                        <li class="nav-item"><a class="nav-link" href="{% url 'logout' %}">Đăng xuất</a></li>
+                    {% else %}
+                        <li class="nav-item"><a class="nav-link" href="{% url 'login' %}">Đăng nhập</a></li>
+                        <li class="nav-item"><a class="nav-link" href="{% url 'register' %}">Đăng ký</a></li>
+                    {% endif %}
+                    
+                    <li class="nav-item">
+                        <a class="nav-link btn btn-warning text-dark" href="{% url 'cart_detail' %}">
+                            <i class="fas fa-shopping-cart"></i> Giỏ hàng
+                        </a>
                     </li>
                 </ul>
             </div>

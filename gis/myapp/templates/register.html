@@ -1,0 +1,26 @@
+{% extends "base.html" %}
+{% block title %}Đăng ký{% endblock %}
+
+{% block content_wrapper %}
+<div class="container mt-5">
+    <div class="row justify-content-center">
+        <div class="col-md-6">
+            <div class="card shadow-sm">
+                <div class="card-header bg-primary text-white text-center">
+                    <h4>ĐĂNG KÝ TÀI KHOẢN</h4>
+                </div>
+                <div class="card-body">
+                    <form method="post" autocomplete="off">
+                        {% csrf_token %}
+                        {{ form.as_p }}
+                        <button type="submit" class="btn btn-primary btn-block font-weight-bold">Đăng ký</button>
+                    </form>
+                </div>
+                <div class="card-footer text-center">
+                    <small>Đã có tài khoản? <a href="{% url 'login' %}">Đăng nhập</a></small>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

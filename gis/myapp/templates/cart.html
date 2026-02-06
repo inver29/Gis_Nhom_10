@@ -1,0 +1,30 @@
+{% extends "base.html" %}
+{% block title %}Giỏ hàng{% endblock %}
+
+{% block content_wrapper %}
+<div class="container mt-4">
+    <h3><i class="fas fa-shopping-cart"></i> Giỏ hàng của bạn</h3>
+    {% if cart.items.exists %}
+        <table class="table mt-3">
+            <thead class="thead-light"><tr><th>Sản phẩm</th><th>Giá</th><th>SL</th><th>Tổng</th><th></th></tr></thead>
+            <tbody>
+                {% for item in cart.items.all %}
+                <tr>
+                    <td>{{ item.medicine.name }}</td>
+                    <td>{{ item.medicine.price }}</td>
+                    <td>{{ item.quantity }}</td>
+                    <td>{{ item.total_price }}</td>
+                    <td><a href="{% url 'remove_from_cart' item.id %}" class="text-danger"><i class="fas fa-trash"></i></a></td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+        <div class="text-right">
+            <h4>Tổng tiền: <span class="text-danger">{{ cart.total_price }} VNĐ</span></h4>
+            <a href="{% url 'checkout' %}" class="btn btn-success btn-lg mt-2">Tiến hành đặt hàng</a>
+        </div>
+    {% else %}
+        <div class="alert alert-warning mt-3">Giỏ hàng trống. <a href="{% url 'product_list' %}">Mua ngay</a></div>
+    {% endif %}
+</div>
+{% endblock %}

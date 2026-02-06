@@ -1,39 +1,35 @@
 {% extends "base.html" %}
-{% block title %}Danh sách sản phẩm{% endblock %}
+{% block title %}Danh sách Thuốc{% endblock %}
 
 {% block content_wrapper %}
 <div class="container mt-4">
-    <h3>Danh sách thuốc theo nhà thuốc</h3>
-
-    <table class="table table-bordered mt-3">
-        <thead class="table-success">
-            <tr>
-                <th>Chi nhánh</th>
-                <th>Tên thuốc</th>
-                <th>Số lượng</th>
-                <th>Đơn giá (VNĐ)</th>
-            </tr>
-        </thead>
-        <tbody>
-            {% for m in medicines %}
-            <tr>
-                <td>{{ m.pharmacy.name }}</td>
-                <td>{{ m.name }}</td>
-                <td>{{ m.quantity }}</td>
-                <td>{{ m.price }}</td>
-            </tr>
-            {% empty %}
-            <tr>
-                <td colspan="4" class="text-center text-muted">
-                    Chưa có dữ liệu thuốc
-                </td>
-            </tr>
-            {% endfor %}
-        </tbody>
-    </table>
-
-    <a href="{% url 'order_create' %}" class="btn btn-success"><i class="fas fa-shopping-cart"></i>
-        Tạo đơn đặt hàng
-    </a>
+    <h3 class="text-success mb-3"><i class="fas fa-capsules"></i> Danh mục Thuốc</h3>
+    <div class="row">
+        {% for m in medicines %}
+        <div class="col-md-3 mb-4">
+            <div class="card h-100 shadow-sm">
+                <div class="card-body text-center">
+                    {% if m.image %}
+                        <img src="{{ m.image.url }}" class="img-fluid mb-2" style="height: 150px; object-fit: contain;">
+                    {% else %}
+                        <div style="height: 150px; background: #eee; display: flex; align-items: center; justify-content: center;">
+                            <i class="fas fa-pills fa-3x text-secondary"></i>
+                        </div>
+                    {% endif %}
+                    <h5 class="card-title text-truncate">{{ m.name }}</h5>
+                    <p class="text-danger font-weight-bold">{{ m.price }} VNĐ</p>
+                    <small class="text-muted">{{ m.pharmacy.name }}</small>
+                </div>
+                <div class="card-footer bg-white border-0">
+                    <a href="{% url 'add_to_cart' m.id %}" class="btn btn-outline-success btn-block">
+                        <i class="fas fa-cart-plus"></i> Thêm vào giỏ
+                    </a>
+                </div>
+            </div>
+        </div>
+        {% empty %}
+        <div class="col-12"><div class="alert alert-info">Chưa có sản phẩm nào.</div></div>
+        {% endfor %}
+    </div>
 </div>
 {% endblock %}
