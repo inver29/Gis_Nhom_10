@@ -62,7 +62,7 @@ DATABASES = {
         'ENGINE': 'django.db.backends.postgresql',
         'NAME': 'gis_db',
         'USER': 'postgres',
-        'PASSWORD': '12345',  # Mật khẩu của bạn
+        'PASSWORD': '2906',  # Mật khẩu của bạn
         'HOST': 'localhost',
         'PORT': '5432',
     }
@@ -124,7 +124,6 @@ JAZZMIN_SETTINGS = {
         "myapp.Order",          # 1. Đơn hàng (Quan trọng nhất)
         "myapp.Medicine",       # 2. Thuốc
         "myapp.Pharmacy",       # 3. Chi nhánh
-        "myapp.StaffProfile",   # 4. Nhân viên
         "auth.User"             # 5. Tài khoản
     ],
 

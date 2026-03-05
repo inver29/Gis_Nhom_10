@@ -19,7 +19,7 @@ class Pharmacy(models.Model):
     class Meta:
         # [ĐỔI TÊN]
         verbose_name = "Chi nhánh"
-        verbose_name_plural = "1. Quản lý Chi nhánh" # Số 1 để xếp đầu tiên nếu muốn
+        verbose_name_plural = "Quản lý Chi nhánh" # Số 1 để xếp đầu tiên nếu muốn
 
 # --- 2. THUỐC ---
 class Medicine(models.Model):
@@ -36,7 +36,7 @@ class Medicine(models.Model):
     class Meta:
         # [ĐỔI TÊN]
         verbose_name = "Sản phẩm thuốc"
-        verbose_name_plural = "2. Kho Thuốc & Sản phẩm"
+        verbose_name_plural = "Kho Thuốc & Sản phẩm"
 
 # --- 3. GIỎ HÀNG (Giữ nguyên hoặc ẩn trong admin) ---
 class Cart(models.Model):
@@ -96,7 +96,7 @@ class Order(models.Model):
     class Meta:
         # [ĐỔI TÊN]
         verbose_name = "Đơn hàng"
-        verbose_name_plural = "3. Xử lý Đơn hàng"
+        verbose_name_plural = "Xử lý Đơn hàng"
 
 class OrderItem(models.Model):
     order = models.ForeignKey(Order, on_delete=models.CASCADE, related_name='items')
@@ -111,16 +111,3 @@ class OrderItem(models.Model):
     class Meta:
         verbose_name = "Chi tiết sản phẩm"
         verbose_name_plural = "Chi tiết sản phẩm"
-
-# --- 5. HỒ SƠ NHÂN VIÊN ---
-class StaffProfile(models.Model):
-    user = models.OneToOneField(User, on_delete=models.CASCADE, verbose_name="Tài khoản nhân viên")
-    pharmacy = models.ForeignKey(Pharmacy, on_delete=models.CASCADE, verbose_name="Làm việc tại chi nhánh")
-
-    def __str__(self):
-        return f"{self.user.username} - {self.pharmacy.name}"
-
-    class Meta:
-        # [ĐỔI TÊN]
-        verbose_name = "Nhân viên"
-        verbose_name_plural = "4. Phân công Nhân viên"

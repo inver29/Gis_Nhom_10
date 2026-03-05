@@ -2,7 +2,7 @@ from django.contrib import admin
 from django.contrib.auth.models import User, Group
 from django.utils.html import format_html
 from django.utils.safestring import mark_safe 
-from .models import Pharmacy, Medicine, Order, OrderItem, StaffProfile
+from .models import Pharmacy, Medicine, Order, OrderItem
 
 # --- CẤU HÌNH TIÊU ĐỀ TRANG ADMIN ---
 admin.site.site_header = "HỆ THỐNG QUẢN TRỊ NHÀ THUỐC"
@@ -100,12 +100,3 @@ class OrderAdmin(admin.ModelAdmin):
         if request.user.is_superuser: return qs
         try: return qs.filter(pharmacy=request.user.staffprofile.pharmacy)
         except: return qs.none()
-
-# --- 4. NHÂN VIÊN ---
-@admin.register(StaffProfile)
-class StaffProfileAdmin(admin.ModelAdmin):
-    list_display = ('user', 'pharmacy_name')
-    search_fields = ('user__username', 'pharmacy__name')
-
-    def pharmacy_name(self, obj): return obj.pharmacy.name
-    pharmacy_name.short_description = "Chi nhánh phụ trách"

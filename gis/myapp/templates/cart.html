@@ -21,7 +21,7 @@
         </table>
         <div class="text-right">
             <h4>Tổng tiền: <span class="text-danger">{{ cart.total_price }} VNĐ</span></h4>
-            <a href="{% url 'checkout' %}" class="btn btn-success btn-lg mt-2">Tiến hành đặt hàng</a>
+            <a href="{% url 'checkout' %}" class="btn btn-success btn-lg mt-2">Đặt hàng</a>
         </div>
     {% else %}
         <div class="alert alert-warning mt-3">Giỏ hàng trống. <a href="{% url 'product_list' %}">Mua ngay</a></div>
