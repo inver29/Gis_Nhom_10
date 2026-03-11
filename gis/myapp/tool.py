@@ -1,160 +1,216 @@
-import requests
-import polyline
 import math
-from datetime import datetime
+import polyline
+import requests
+
 
 TRAFFIC_CONFIG = {
-    'rush_hour': {
-        'morning': (7, 9),
-        'evening': (17, 19)
-    },
-    'penalty': {
-        'motorbike': 1.2,
-        'car': 2.5,
-        'walking': 1.0
-    },
-    'speed': {
+    'average_speed': {
         'motorbike': 35,
         'car': 30,
-        'walking': 4.5
-    }
+        'walking': 4.5,
+    },
+    'road_distance_factor': {
+        'motorbike': 1.2,
+        'car': 1.3,
+        'walking': 1.05,
+    },
 }
 
-def haversine_km(lat1, lng1, lat2, lng2):
-    """Tính khoảng cách đường chim bay (km)."""
-    R = 6371.0
-    lat1 = float(lat1)
-    lng1 = float(lng1)
-    lat2 = float(lat2)
-    lng2 = float(lng2)
-    dlat = math.radians(lat2 - lat1)
-    dlng = math.radians(lng2 - lng1)
-    a = math.sin(dlat / 2) ** 2 + math.cos(math.radians(lat1)) * math.cos(math.radians(lat2)) * math.sin(dlng / 2) ** 2
+
+def calculate_air_distance_km(start_lat, start_lng, end_lat, end_lng):
+    """
+    Tính khoảng cách đường chim bay giữa 2 tọa độ bằng công thức Haversine.
+    """
+    earth_radius_km = 6371.0
+
+    start_lat = float(start_lat)
+    start_lng = float(start_lng)
+    end_lat = float(end_lat)
+    end_lng = float(end_lng)
+
+    delta_lat = math.radians(end_lat - start_lat)
+    delta_lng = math.radians(end_lng - start_lng)
+
+    a = (
+        math.sin(delta_lat / 2) ** 2
+        + math.cos(math.radians(start_lat))
+        * math.cos(math.radians(end_lat))
+        * math.sin(delta_lng / 2) ** 2
+    )
     c = 2 * math.atan2(math.sqrt(a), math.sqrt(1 - a))
-    return R * c
+    return earth_radius_km * c
 
-def calc_shipping_fee(distance_km, mode='motorbike'):
+
+def estimate_road_distance_km(air_distance_km, delivery_mode='motorbike'):
+    """
+    Ước lượng quãng đường di chuyển thực tế từ khoảng cách đường chim bay.
+    """
+    road_factor = TRAFFIC_CONFIG['road_distance_factor'].get(delivery_mode, 1.2)
+    return air_distance_km * road_factor
+
+
+def calculate_shipping_fee(estimated_distance_km):
+    """
+    Tính phí giao hàng dựa trên quãng đường ước lượng.
+    """
     try:
-        dist = float(distance_km)
-    except Exception:
-        dist = 0.0
-    fee = max(15000, dist * 5000)
-    fee_value = int(round(fee, -3))
-    fee_text = f"{fee_value:,} đ".replace(',', '.')
-    return fee_value, fee_text
+        distance_value = float(estimated_distance_km)
+    except (TypeError, ValueError):
+        distance_value = 0.0
 
-def filter_pharmacies_in_radius(pharmacies, user_lat, user_lng, radius_km):
-    try:
-        r = float(radius_km or 0)
-    except Exception:
-        r = 0.0
-    results = []
-    for p in pharmacies:
-        if p.lat is None or p.lng is None:
-            continue
-        dist = haversine_km(user_lat, user_lng, p.lat, p.lng)
-        if r <= 0 or dist <= r:
-            results.append({
-                "id": p.id,
-                "distance_km": round(dist, 2),
-            })
-    results.sort(key=lambda x: x["distance_km"])
-    return results
+    if distance_value <= 3:
+        shipping_fee_value = 15000
+    else:
+        shipping_fee_value = 15000 + int((distance_value - 3) * 5000)
 
-class RoutingTool:
-    OSRM_URL = "http://router.project-osrm.org/route/v1"
+    shipping_fee_value = int(round(shipping_fee_value, -3))
+    shipping_fee_text = f"{shipping_fee_value:,} đ".replace(",", ".")
+    return shipping_fee_value, shipping_fee_text
 
-    def __init__(self):
-        pass
-    def get_traffic_status(self, check_time, vehicle):
-        if vehicle == 'walking':
-            return 1.0, ""
 
-        hour = check_time.hour
-        morning = TRAFFIC_CONFIG['rush_hour']['morning']
-        evening = TRAFFIC_CONFIG['rush_hour']['evening']
+class DeliveryRoutingService:
+    """
+    Service trung tâm xử lý định tuyến giao hàng.
+    """
 
-        is_rush = (morning[0] <= hour < morning[1]) or (evening[0] <= hour < evening[1])
+    OSRM_BASE_URL = "http://router.project-osrm.org/route/v1"
 
-        if is_rush:
-            factor = TRAFFIC_CONFIG['penalty'].get(vehicle, 1.0)
-            note = "Giờ cao điểm (Tắc đường)"
-            return factor, note
-        return 1.0, ""
+    def get_osrm_route_points(self, start_lat, start_lng, end_lat, end_lng, delivery_mode='motorbike'):
+        """
+        Gọi OSRM để lấy tuyến đường đẹp hiển thị trên bản đồ.
+        """
+        osrm_profile = 'foot' if delivery_mode == 'walking' else 'driving'
+        route_coordinates = f"{start_lng},{start_lat};{end_lng},{end_lat}"
+        request_url = f"{self.OSRM_BASE_URL}/{osrm_profile}/{route_coordinates}"
 
-    def get_route(self, start_lat, start_lng, end_lat, end_lng, mode='motorbike', departure_time_str=None):
+        query_params = {
+            'overview': 'full',
+            'geometries': 'polyline',
+            'steps': 'true',
+            'alternatives': 'false',
+        }
+
+        request_headers = {
+            'User-Agent': 'Mozilla/5.0',
+        }
+
+        response = requests.get(
+            request_url,
+            params=query_params,
+            headers=request_headers,
+            timeout=10,
+        )
+        response_data = response.json()
+
+        if response.status_code == 200 and response_data.get('code') == 'Ok':
+            route_list = response_data.get('routes', [])
+            if route_list:
+                encoded_geometry = route_list[0].get('geometry')
+                if encoded_geometry:
+                    return polyline.decode(encoded_geometry)
+
+        return [
+            [float(start_lat), float(start_lng)],
+            [float(end_lat), float(end_lng)],
+        ]
+
+    def estimate_travel_time_minutes(self, estimated_distance_km, delivery_mode):
+        """
+        Tính thời gian di chuyển dự kiến theo quãng đường và vận tốc trung bình.
+        """
+        average_speed = TRAFFIC_CONFIG['average_speed'].get(delivery_mode, 30)
+
+        if average_speed <= 0:
+            return 1
+
+        estimated_minutes = int(round((estimated_distance_km / average_speed) * 60))
+        return max(estimated_minutes, 1)
+
+    def estimate_route(self, start_lat, start_lng, end_lat, end_lng, delivery_mode='motorbike'):
+        """
+        Ước lượng tuyến giao hàng giữa 2 điểm.
+        """
         try:
-            s_lat, s_lng = float(start_lat), float(start_lng)
-            e_lat, e_lng = float(end_lat), float(end_lng)
-        except ValueError:
+            start_lat = float(start_lat)
+            start_lng = float(start_lng)
+            end_lat = float(end_lat)
+            end_lng = float(end_lng)
+        except (TypeError, ValueError):
             return {'error': 'Tọa độ lỗi.'}
 
-        check_time = datetime.now()
-        if departure_time_str:
-            try:
-                h, m = map(int, departure_time_str.split(':'))
-                check_time = check_time.replace(hour=h, minute=m)
-            except:
-                pass 
+        if delivery_mode not in TRAFFIC_CONFIG['average_speed']:
+            delivery_mode = 'motorbike'
 
-        traffic_factor, traffic_note = self.get_traffic_status(check_time, mode)
-
-        osrm_profile = 'foot' if mode == 'walking' else 'driving'
-        
-        coords = f"{s_lng},{s_lat};{e_lng},{e_lat}"
-        url = f"{self.OSRM_URL}/{osrm_profile}/{coords}"
-        params = {'overview': 'full', 'geometries': 'polyline', 'steps': 'true', 'alternatives': 'true'}
-        headers = {'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) Chrome/91.0.4472.124 Safari/537.36'}
+        air_distance_km = calculate_air_distance_km(start_lat, start_lng, end_lat, end_lng)
+        estimated_distance_km = estimate_road_distance_km(air_distance_km, delivery_mode)
+        estimated_duration_min = self.estimate_travel_time_minutes(estimated_distance_km, delivery_mode)
+        shipping_fee_value, shipping_fee_text = calculate_shipping_fee(estimated_distance_km)
 
         try:
-            response = requests.get(url, params=params, headers=headers, timeout=10)
-            data = response.json()
+            route_points = self.get_osrm_route_points(
+                start_lat,
+                start_lng,
+                end_lat,
+                end_lng,
+                delivery_mode,
+            )
+        except Exception:
+            route_points = [
+                [start_lat, start_lng],
+                [end_lat, end_lng],
+            ]
 
-            if response.status_code == 200 and data.get('code') == 'Ok':
-                routes_result = []
-                for index, route in enumerate(data['routes']):
-                    distance_km = route['distance'] / 1000
+        route_result = {
+            'id': 0,
+            'distance_km': round(estimated_distance_km, 2),
+            'duration_min': estimated_duration_min,
+            'route_points': route_points,
+            'shipping_fee': shipping_fee_text,
+            'shipping_fee_value': shipping_fee_value,
+        }
 
-                    if mode == 'walking':
-                        speed = TRAFFIC_CONFIG['speed']['walking']
-                        base_duration_min = (distance_km / speed) * 60
-                    else:
-                        osrm_sec = route.get('duration')
-                        if osrm_sec:
-                            base_duration_min = osrm_sec / 60
-                        else:
-                            speed = TRAFFIC_CONFIG['speed'].get(mode, 30)
-                            base_duration_min = (distance_km / speed) * 60
+        return {
+            'routes': [route_result],
+            'mode': delivery_mode,
+        }
 
-                    final_duration_min = base_duration_min * traffic_factor
-                    
-                    final_duration_min = int(round(final_duration_min))
-                    if final_duration_min < 1: final_duration_min = 1
+    def choose_best_pharmacy(self, pharmacies, delivery_lat, delivery_lng, delivery_mode='motorbike'):
+        """
+        Chọn chi nhánh phù hợp nhất cho vị trí giao hàng.
+        """
+        if not pharmacies:
+            return {'error': 'Không có nhà thuốc khả dụng.'}
 
-                    summary = route['legs'][0].get('summary', '') if route.get('legs') else f"Tuyến đường {index+1}"
-                    if not summary: summary = f"Tuyến đường {index+1}"
+        best_result = None
+        shortest_distance_km = None
 
-                    display_note = ""
-                    if traffic_factor > 1.0:
-                        percent = int((traffic_factor - 1) * 100)
-                        display_note = f"{traffic_note} (+{percent}% thời gian)"
+        for pharmacy in pharmacies:
+            if pharmacy.lat is None or pharmacy.lng is None:
+                continue
 
-                    routes_result.append({
-                        'id': index,
-                        'summary': summary,
-                        'distance_km': round(distance_km, 2),
-                        'duration_min': final_duration_min,
-                        'route_points': polyline.decode(route['geometry']),
-                        'traffic_note': display_note,
-                        'traffic_factor': traffic_factor
-                    })
+            route_result = self.estimate_route(
+                start_lat=pharmacy.lat,
+                start_lng=pharmacy.lng,
+                end_lat=delivery_lat,
+                end_lng=delivery_lng,
+                delivery_mode=delivery_mode,
+            )
 
-                return {
-                    'routes': routes_result,
-                    'mode': mode,
-                    'check_time': check_time.strftime("%H:%M")
+            if 'routes' not in route_result or not route_result['routes']:
+                continue
+
+            selected_route = route_result['routes'][0]
+            current_distance_km = selected_route['distance_km']
+
+            if shortest_distance_km is None or current_distance_km < shortest_distance_km:
+                shortest_distance_km = current_distance_km
+                best_result = {
+                    'pharmacy': pharmacy,
+                    'route': selected_route,
+                    'mode': route_result.get('mode', delivery_mode),
                 }
-            else:
-                return {'error': 'Không tìm thấy đường.'}
-        except Exception as e:
-            return {'error': str(e)}
+
+        if best_result is None:
+            return {'error': 'Không tìm được chi nhánh phù hợp.'}
+
+        return best_result

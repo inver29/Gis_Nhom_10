@@ -62,7 +62,7 @@ DATABASES = {
         'ENGINE': 'django.db.backends.postgresql',
         'NAME': 'gis_db',
         'USER': 'postgres',
-        'PASSWORD': '2906',  # Mật khẩu của bạn
+        'PASSWORD': '12345',  # Mật khẩu của bạn
         'HOST': 'localhost',
         'PORT': '5432',
     }

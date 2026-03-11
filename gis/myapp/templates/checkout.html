@@ -15,6 +15,7 @@
                 <div class="card-body">
                     <form method="POST" id="checkout-form">
                         {% csrf_token %}
+
                         {% if messages %}
                             {% for message in messages %}
                                 <div class="alert alert-danger">{{ message }}</div>
@@ -25,43 +26,47 @@
                             <label class="font-weight-bold">Họ tên:</label>
                             {{ form.full_name }}
                         </div>
+
                         <div class="form-group">
                             <label class="font-weight-bold">Số điện thoại:</label>
                             {{ form.phone }}
                         </div>
-                        
+
                         <div class="form-group">
                             <label class="font-weight-bold">Địa chỉ cụ thể:</label>
                             {{ form.address_text }}
-                            <small class="text-muted">Nhập tay nếu bạn không muốn dùng bản đồ.</small>
+                            <small class="text-muted">
+                                Chọn vị trí trên bản đồ để hệ thống tự chọn chi nhánh gần nhất và tính phí giao hàng.
+                            </small>
                         </div>
-                        
+
                         <div class="form-group">
                             <label class="font-weight-bold">Ghi chú:</label>
                             {{ form.note }}
                         </div>
-                        
-                        <input type="hidden" name="delivery_lat" id="d_lat">
-                        <input type="hidden" name="delivery_lng" id="d_lng">
-                        <input type="hidden" name="distance_value" id="dist_val">
-                        <input type="hidden" name="shipping_fee_value" id="ship_val">
-                        <input type="hidden" name="pharmacy_id" id="pharm_id">
+
+                        <input type="hidden" name="delivery_lat" id="delivery-latitude">
+                        <input type="hidden" name="delivery_lng" id="delivery-longitude">
+                        <input type="hidden" name="pharmacy_id" id="selected-pharmacy-id">
 
                         <hr>
+
                         <div class="d-flex justify-content-between">
-                            <span>Tiền hàng:</span> <strong>{{ cart.total_price }} đ</strong>
-                        </div>
-                        <div class="d-flex justify-content-between align-items-center mt-2">
-                            <span>Phí ship:</span> 
-                            <strong class="text-danger" id="display-ship">Chưa tính</strong>
-                        </div>
-                        
-                        <div class="d-flex justify-content-between mt-3 pt-3 border-top">
-                            <h5>Tổng thanh toán:</h5>
-                            <h4 class="text-success font-weight-bold" id="display-total">{{ cart.total_price }} đ</h4>
+                            <span>Tiền hàng:</span>
+                            <strong>{{ cart.total_price }} đ</strong>
                         </div>
 
-                        <button type="submit" class="btn btn-success btn-lg w-100 mt-3 shadow" id="btn-submit">
+                        <div class="d-flex justify-content-between align-items-center mt-2">
+                            <span>Phí ship:</span>
+                            <strong class="text-danger" id="shipping-fee-text">Chưa tính</strong>
+                        </div>
+
+                        <div class="d-flex justify-content-between mt-3 pt-3 border-top">
+                            <h5>Tổng thanh toán:</h5>
+                            <h4 class="text-success font-weight-bold" id="grand-total-text">{{ cart.total_price }} đ</h4>
+                        </div>
+
+                        <button type="submit" class="btn btn-success btn-lg w-100 mt-3 shadow" id="submit-order-button">
                             <i class="fas fa-check-circle"></i> XÁC NHẬN ĐẶT HÀNG
                         </button>
                     </form>
@@ -72,20 +77,44 @@
         <div class="col-md-7">
             <div class="card h-100 shadow-sm">
                 <div class="card-header bg-primary text-white d-flex justify-content-between align-items-center">
-                    <h5 class="mb-0"><i class="fas fa-map-marked-alt"></i> Chọn vị trí (GIS)</h5>
-                    <button type="button" class="btn btn-warning btn-sm font-weight-bold text-dark" onclick="getCurrentLocation()">
+                    <h5 class="mb-0"><i class="fas fa-map-marked-alt"></i> Chọn vị trí giao hàng</h5>
+                    <button
+                        type="button"
+                        class="btn btn-warning btn-sm font-weight-bold text-dark"
+                        onclick="findMyLocation()"
+                    >
                         <i class="fas fa-crosshairs"></i> Vị trí của tôi
                     </button>
                 </div>
+
                 <div class="card-body p-0 position-relative">
-                    <div id="map" style="height: 100%; min-height: 600px;"></div>
-                    
-                    <div id="loading-overlay" style="display:none; position: absolute; top:0; left:0; width:100%; height:100%; background:rgba(255,255,255,0.9); z-index:9999; flex-direction: column; justify-content: center; align-items: center;">
+                    <div id="checkout-map" style="height: 100%; min-height: 600px;"></div>
+
+                    <div
+                        id="checkout-loading-overlay"
+                        style="
+                            display:none;
+                            position:absolute;
+                            top:0;
+                            left:0;
+                            width:100%;
+                            height:100%;
+                            background:rgba(255,255,255,0.9);
+                            z-index:9999;
+                            flex-direction:column;
+                            justify-content:center;
+                            align-items:center;
+                        "
+                    >
                         <div class="spinner-border text-primary" style="width: 3rem; height: 3rem;" role="status"></div>
-                        <h5 class="mt-3 text-primary">Đang định vị & tìm thuốc...</h5>
+                        <h5 class="mt-3 text-primary">Đang chọn chi nhánh phù hợp...</h5>
                     </div>
 
-                    <div id="route-info" class="alert alert-success m-3 shadow" style="display:none; position: absolute; bottom: 10px; left: 10px; right: 10px; z-index: 1000;"></div>
+                    <div
+                        id="selected-route-info"
+                        class="alert alert-success m-3 shadow"
+                        style="display:none; position:absolute; bottom:10px; left:10px; right:10px; z-index:1000;"
+                    ></div>
                 </div>
             </div>
         </div>
@@ -95,123 +124,139 @@
 {{ pharmacies|json_script:"pharmacies-data" }}
 
 <script>
-    var map = L.map('map').setView([10.7721, 106.6983], 13);
-    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(map);
+    const checkoutMap = L.map('checkout-map').setView([10.7721, 106.6983], 13);
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(checkoutMap);
 
-    var pharmacies = JSON.parse(document.getElementById('pharmacies-data').textContent);
-    var cartTotal = Number("{{ cart.total_price|stringformat:'d' }}");
-    var userMarker = null;
-    var routeLayer = null;
+    const pharmacyList = JSON.parse(document.getElementById('pharmacies-data').textContent);
+    const cartTotalValue = Number("{{ cart.total_price|stringformat:'d' }}");
 
-    // Icon nhà thuốc
-    var pharmacyIcon = new L.Icon({
+    let deliveryMarker = null;
+    let deliveryRouteLayer = null;
+
+    const pharmacyIcon = new L.Icon({
         iconUrl: 'https://cdn-icons-png.flaticon.com/512/169/169869.png',
-        iconSize: [30, 30], popupAnchor: [0, -15]
-    });
-    
-    pharmacies.forEach(p => {
-        L.marker([p.lat, p.lng], {icon: pharmacyIcon}).addTo(map).bindPopup(`<b>${p.name}</b>`);
+        iconSize: [30, 30],
+        popupAnchor: [0, -15]
     });
 
-    // --- HÀM 1: LẤY VỊ TRÍ HIỆN TẠI (AUTO) ---
-    function getCurrentLocation() {
-        if (navigator.geolocation) {
-            document.getElementById('loading-overlay').style.display = 'flex'; // Hiện loading
-            navigator.geolocation.getCurrentPosition(
-                (position) => {
-                    var lat = position.coords.latitude;
-                    var lng = position.coords.longitude;
-                    
-                    // Tự động xử lý như khi click
-                    handleLocationSelect(lat, lng);
-                },
-                (error) => {
-                    document.getElementById('loading-overlay').style.display = 'none';
-                    alert("Không thể lấy vị trí: " + error.message + ". Hãy kiểm tra quyền truy cập vị trí.");
-                }
-            );
-        } else {
-            alert("Trình duyệt không hỗ trợ định vị.");
+    pharmacyList.forEach(pharmacy => {
+        L.marker([pharmacy.lat, pharmacy.lng], { icon: pharmacyIcon })
+            .addTo(checkoutMap)
+            .bindPopup(`<b>${pharmacy.name}</b>`);
+    });
+
+    function showCheckoutLoading() {
+        document.getElementById('checkout-loading-overlay').style.display = 'flex';
+    }
+
+    function hideCheckoutLoading() {
+        document.getElementById('checkout-loading-overlay').style.display = 'none';
+    }
+
+    function updateDeliverySummary(bestResult) {
+        const selectedPharmacy = bestResult.pharmacy;
+        const route = bestResult.route;
+
+        document.getElementById('selected-pharmacy-id').value = selectedPharmacy.id;
+        document.getElementById('shipping-fee-text').innerText = route.shipping_fee;
+        document.getElementById('grand-total-text').innerText =
+            (cartTotalValue + route.shipping_fee_value).toLocaleString('vi-VN') + ' đ';
+
+        const routeInfoBox = document.getElementById('selected-route-info');
+        routeInfoBox.style.display = 'block';
+        routeInfoBox.innerHTML = `
+            <h6><i class="fas fa-check-circle"></i> Chi nhánh được chọn: <strong>${selectedPharmacy.name}</strong></h6>
+            <div>Khoảng cách ước lượng: ${route.distance_km} km</div>
+            <div>Thời gian dự kiến: ${route.duration_min} phút</div>
+            <div>Phí ship: ${route.shipping_fee}</div>
+            <div class="small text-muted mt-1">Tuyến đường lấy từ OSRM để hiển thị, còn khoảng cách và thời gian được hệ thống ước lượng nội bộ.</div>
+        `;
+    }
+
+    function drawSelectedRoute(routePoints) {
+        if (deliveryRouteLayer) {
+            checkoutMap.removeLayer(deliveryRouteLayer);
         }
+
+        deliveryRouteLayer = L.polyline(routePoints, {
+            color: '#007bff',
+            weight: 6
+        }).addTo(checkoutMap);
+
+        checkoutMap.fitBounds(deliveryRouteLayer.getBounds(), { padding: [50, 50] });
     }
 
-    // --- HÀM 2: XỬ LÝ KHI CÓ TỌA ĐỘ (Dùng chung cho Click & Auto) ---
-    function handleLocationSelect(lat, lng) {
-        // Zoom map tới chỗ đó
-        map.setView([lat, lng], 15);
-
-        // Đặt marker
-        if (userMarker) map.removeLayer(userMarker);
-        userMarker = L.marker([lat, lng], {draggable: true}).addTo(map)
-            .bindPopup("Vị trí nhận hàng").openPopup();
-
-        // Điền form
-        document.getElementById('d_lat').value = lat;
-        document.getElementById('d_lng').value = lng;
-
-        // Gọi GIS tính toán
-        findNearestPharmacyAndCalcShip(lat, lng);
-    }
-
-    // Sự kiện click tay (Fallback)
-    map.on('click', function(e) {
-        handleLocationSelect(e.latlng.lat, e.latlng.lng);
-    });
-
-    // --- HÀM 3: TÍNH TOÁN GIS ---
-    async function findNearestPharmacyAndCalcShip(userLat, userLng) {
-        document.getElementById('loading-overlay').style.display = 'flex';
-        document.getElementById('route-info').style.display = 'none';
+    async function loadBestPharmacy(deliveryLat, deliveryLng) {
+        showCheckoutLoading();
+        document.getElementById('selected-route-info').style.display = 'none';
 
         try {
-            const promises = pharmacies.map(p => {
-                let url = `/api/route/?start_lat=${p.lat}&start_lng=${p.lng}&end_lat=${userLat}&end_lng=${userLng}&mode=motorbike`;
-                return fetch(url).then(res => res.json()).then(data => ({ pharmacy: p, data: data })).catch(err => null);
-            });
+            const response = await fetch(
+                `/api/nearest-pharmacy/?delivery_lat=${deliveryLat}&delivery_lng=${deliveryLng}&mode=motorbike`
+            );
 
-            const results = await Promise.all(promises);
-            let bestOption = null;
-            let minDistance = Infinity;
+            const data = await response.json();
 
-            results.forEach(item => {
-                if (item && item.data && item.data.routes && item.data.routes.length > 0) {
-                    let r = item.data.routes[0];
-                    if (r.distance_km < minDistance) {
-                        minDistance = r.distance_km;
-                        bestOption = { pharmacy: item.pharmacy, route: r };
-                    }
-                }
-            });
-
-            if (bestOption) {
-                if (routeLayer) map.removeLayer(routeLayer);
-                routeLayer = L.polyline(bestOption.route.route_points, {color: '#007bff', weight: 6}).addTo(map);
-                map.fitBounds(routeLayer.getBounds(), {padding: [50, 50]});
-
-                let shipFee = bestOption.route.shipping_fee_value;
-                let finalTotal = cartTotal + shipFee;
-
-                document.getElementById('display-ship').innerText = shipFee.toLocaleString('vi-VN') + " đ";
-                document.getElementById('display-total').innerText = finalTotal.toLocaleString('vi-VN') + " đ";
-                
-                document.getElementById('dist_val').value = bestOption.route.distance_km;
-                document.getElementById('ship_val').value = shipFee;
-                document.getElementById('pharm_id').value = bestOption.pharmacy.id;
-
-                let infoDiv = document.getElementById('route-info');
-                infoDiv.style.display = 'block';
-                infoDiv.innerHTML = `
-                    <h6><i class="fas fa-check-circle"></i> Đã chọn: <strong>${bestOption.pharmacy.name}</strong></h6>
-                    <div>Khoảng cách: ${bestOption.route.distance_km} km | Ship: ${bestOption.route.shipping_fee}</div>
-                `;
-            } else {
-                alert("Không tìm được đường đi!");
+            if (!response.ok) {
+                throw new Error(data.error || 'Không thể tìm chi nhánh phù hợp.');
             }
+
+            updateDeliverySummary(data);
+            drawSelectedRoute(data.route.route_points);
         } catch (error) {
             console.error(error);
+            alert(error.message || 'Có lỗi khi tính khoảng cách và phí giao hàng.');
         } finally {
-            document.getElementById('loading-overlay').style.display = 'none';
+            hideCheckoutLoading();
         }
     }
+
+    function setDeliveryLocation(lat, lng) {
+        checkoutMap.setView([lat, lng], 15);
+
+        if (deliveryMarker) {
+            checkoutMap.removeLayer(deliveryMarker);
+        }
+
+        deliveryMarker = L.marker([lat, lng], { draggable: true })
+            .addTo(checkoutMap)
+            .bindPopup('Vị trí nhận hàng')
+            .openPopup();
+
+        document.getElementById('delivery-latitude').value = lat;
+        document.getElementById('delivery-longitude').value = lng;
+
+        deliveryMarker.on('dragend', function () {
+            const draggedLocation = deliveryMarker.getLatLng();
+            document.getElementById('delivery-latitude').value = draggedLocation.lat;
+            document.getElementById('delivery-longitude').value = draggedLocation.lng;
+            loadBestPharmacy(draggedLocation.lat, draggedLocation.lng);
+        });
+
+        loadBestPharmacy(lat, lng);
+    }
+
+    function findMyLocation() {
+        if (!navigator.geolocation) {
+            alert('Trình duyệt không hỗ trợ định vị.');
+            return;
+        }
+
+        showCheckoutLoading();
+
+        navigator.geolocation.getCurrentPosition(
+            function (position) {
+                setDeliveryLocation(position.coords.latitude, position.coords.longitude);
+            },
+            function (error) {
+                hideCheckoutLoading();
+                alert('Không thể lấy vị trí: ' + error.message);
+            }
+        );
+    }
+
+    checkoutMap.on('click', function (event) {
+        setDeliveryLocation(event.latlng.lat, event.latlng.lng);
+    });
 </script>
 {% endblock %}
