@@ -1,0 +1,636 @@
+{% extends "admin_panel/base.html" %}
+
+{% block extra_head %}
+{% if model_key == 'pharmacy' %}
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.css">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.js"></script>
+{% endif %}
+<style>
+    .admin-media-preview--live,
+    .admin-gallery-preview,
+    .admin-location-map-shell {
+        margin-bottom: 14px;
+        padding: 14px;
+        border-radius: 18px;
+        background: #fff;
+        border: 1px solid rgba(17, 70, 184, 0.08);
+    }
+
+    .admin-media-preview--live img {
+        width: 100%;
+        max-width: 320px;
+        height: 210px;
+        object-fit: cover;
+        border-radius: 16px;
+        border: 1px solid rgba(17, 70, 184, 0.08);
+    }
+
+    .admin-gallery-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fill, minmax(110px, 1fr));
+        gap: 12px;
+        margin-top: 12px;
+    }
+
+    .admin-gallery-thumb {
+        overflow: hidden;
+        border-radius: 16px;
+        border: 1px solid rgba(17, 70, 184, 0.08);
+        background: #f8fbff;
+        box-shadow: inset 0 1px 2px rgba(15, 23, 42, 0.03);
+    }
+
+    .admin-gallery-thumb img {
+        display: block;
+        width: 100%;
+        height: 110px;
+        object-fit: cover;
+    }
+
+    .admin-gallery-thumb__caption {
+        display: block;
+        padding: 8px 10px;
+        font-size: 0.8rem;
+        color: #5d7090;
+        line-height: 1.35;
+        word-break: break-word;
+    }
+
+    .admin-location-map {
+        width: 100%;
+        height: 320px;
+        border-radius: 18px;
+        overflow: hidden;
+        border: 1px solid rgba(17, 70, 184, 0.1);
+    }
+
+    .admin-map-status {
+        margin-top: 12px;
+        padding: 10px 12px;
+        border-radius: 14px;
+        background: #eef4ff;
+        color: #33507c;
+        font-size: 0.92rem;
+        line-height: 1.45;
+    }
+
+    .admin-map-status.is-error {
+        background: #fff1f1;
+        color: #b03030;
+    }
+
+    .admin-map-status.is-success {
+        background: #eefbf2;
+        color: #1f7a46;
+    }
+
+    .btn-admin.btn-admin-soft {
+        min-height: 40px;
+        padding: 0 14px;
+        background: #eef4ff;
+        color: var(--admin-blue);
+    }
+</style>
+{% endblock %}
+
+{% block admin_content %}
+<section class="admin-surface admin-section">
+    <div class="admin-section-head">
+        <div>
+            <h2>{% if is_create %}Thêm {{ title }}{% else %}Cập nhật {{ title }}{% endif %}</h2>
+            <p>
+                {% if model_key == 'pharmacy' %}
+                Điền đầy đủ thông tin chi nhánh, tọa độ và ảnh để phần bản đồ hiển thị chính xác hơn.
+                {% elif model_key == 'medicine' %}
+                Cập nhật thông tin bán hàng, tồn kho, mô tả và thư viện ảnh cho sản phẩm thuốc.
+                {% elif model_key == 'user' %}
+                Quản lý tài khoản theo đúng vai trò và mức truy cập của từng người dùng.
+                {% else %}
+                Hoàn tất biểu mẫu rồi lưu để cập nhật dữ liệu.
+                {% endif %}
+            </p>
+        </div>
+    </div>
+
+    <form method="post" enctype="multipart/form-data" id="admin-main-form">
+        {% csrf_token %}
+        {% for hidden in form.hidden_fields %}
+            {{ hidden }}
+        {% endfor %}
+
+        {% if form.non_field_errors %}
+        <div class="alert alert-danger">{{ form.non_field_errors }}</div>
+        {% endif %}
+
+        <div class="admin-form-grid">
+            {% for section in form_sections %}
+            <section class="admin-form-section">
+                <div class="admin-form-section__head">
+                    <span class="admin-form-section__icon"><i class="{{ section.icon }}"></i></span>
+                    <h3>{{ section.title }}</h3>
+                </div>
+
+                <div class="row">
+                    {% for item in section.normal_fields %}
+                    <div class="{% if item.full_width %}col-12{% else %}col-md-6{% endif %}">
+                        <div class="admin-field">
+                            <label for="{{ item.field.id_for_label }}">{{ item.field.label }}</label>
+
+                            {% if item.field.name == 'image' and object and object.image %}
+                            <div class="admin-media-preview">
+                                <span class="admin-media-preview__label">Ảnh hiện tại</span>
+                                <img src="{{ object.image.url }}" alt="Ảnh hiện tại">
+                            </div>
+                            {% endif %}
+
+                            {% if item.field.name == 'image' %}
+                            <div class="admin-media-preview admin-media-preview--live d-none" id="{{ item.field.id_for_label }}-live-preview">
+                                <span class="admin-media-preview__label">Ảnh vừa chọn</span>
+                                <img src="" alt="Xem trước ảnh vừa chọn">
+                            </div>
+                            {% endif %}
+
+                            {% if item.field.name == 'gallery_images' and object and object.gallery_only_image_list %}
+                            <div class="admin-gallery-preview" id="existing-gallery-block">
+                                <span class="admin-media-preview__label">Thư viện ảnh hiện tại</span>
+                                <div class="admin-gallery-grid">
+                                    {% for gallery_url in object.gallery_only_image_list %}
+                                    <div class="admin-gallery-thumb">
+                                        <img src="{{ gallery_url }}" alt="Ảnh thư viện {{ forloop.counter }}">
+                                        <span class="admin-gallery-thumb__caption">Ảnh {{ forloop.counter }}</span>
+                                    </div>
+                                    {% endfor %}
+                                </div>
+                            </div>
+                            {% endif %}
+
+                            {% if item.field.name == 'gallery_images' %}
+                            <div class="admin-gallery-preview d-none" id="{{ item.field.id_for_label }}-live-preview">
+                                <span class="admin-media-preview__label">Các ảnh vừa chọn</span>
+                                <div class="admin-gallery-grid" data-gallery-grid></div>
+                            </div>
+                            {% endif %}
+
+                            {{ item.field }}
+
+                            {% if item.field.name == 'gallery_images' %}
+                            <span class="admin-inline-help">Chọn nhiều ảnh trực tiếp từ máy. Khi lưu, thư viện ảnh cũ sẽ được thay bằng bộ ảnh vừa chọn.</span>
+
+                            {% if object and object.gallery_only_image_list and 'delete_gallery' in form.fields %}
+                            <div class="mt-3">
+                                <button type="button" class="btn-admin btn-admin-soft" onclick="markCurrentGalleryForRemoval()">
+                                    <i class="fas fa-images"></i>
+                                    <span>Xóa thư viện ảnh hiện tại</span>
+                                </button>
+                                <div class="admin-inline-help d-none" id="gallery-delete-note">Thư viện ảnh hiện tại sẽ bị xóa khi bấm Lưu thay đổi.</div>
+                            </div>
+                            {% endif %}
+                            {% elif item.field.help_text %}
+                            <span class="admin-inline-help">{{ item.field.help_text }}</span>
+                            {% endif %}
+
+                            {% if item.field.name == 'image' and object and object.image and 'delete_image' in form.fields %}
+                            <div class="mt-3">
+                                <button type="button" class="btn-admin btn-admin-danger" onclick="confirmDeleteCurrentImage()">
+                                    <i class="fas fa-trash"></i>
+                                    <span>Xóa ảnh hiện tại</span>
+                                </button>
+                            </div>
+                            {% endif %}
+
+                            {% if item.field.name == 'role' %}
+                            <div class="admin-form-note-list">
+                                <div class="admin-form-note">
+                                    <strong>Khách hàng</strong>
+                                    Chỉ dùng website để mua thuốc, quản lý giỏ hàng, địa chỉ và đơn hàng cá nhân.
+                                </div>
+                                <div class="admin-form-note">
+                                    <strong>Nhân viên quản trị</strong>
+                                    Được xử lý đơn hàng và quản lý thuốc nhưng không có toàn quyền hệ thống.
+                                </div>
+                                <div class="admin-form-note">
+                                    <strong>Quản trị viên</strong>
+                                    Có quyền quản lý chi nhánh, tài khoản và toàn bộ dữ liệu quản trị.
+                                </div>
+                            </div>
+                            {% endif %}
+
+                            {% if item.field.errors %}
+                            <div class="admin-field-error">{{ item.field.errors }}</div>
+                            {% endif %}
+                        </div>
+                    </div>
+                    {% endfor %}
+
+                    {% if model_key == 'pharmacy' and section.title == 'Thời gian hoạt động và bản đồ' %}
+                    <div class="col-12">
+                        <div class="admin-field">
+                            <label for="admin-pharmacy-map">Bản đồ vị trí chi nhánh</label>
+                            <div class="admin-inline-help">Nhập địa chỉ, nhập tay tọa độ hoặc chấm trực tiếp lên bản đồ. Ba phần sẽ tự đồng bộ với nhau.</div>
+                            <div class="admin-location-map-shell">
+                                <div id="admin-pharmacy-map" class="admin-location-map"></div>
+                                <div class="admin-map-status" id="admin-pharmacy-map-status">Bản đồ sẽ tự cập nhật khi có địa chỉ hoặc tọa độ hợp lệ.</div>
+                            </div>
+                        </div>
+                    </div>
+                    {% endif %}
+                </div>
+
+                {% if section.checkbox_fields %}
+                <div class="admin-checkbox-stack mt-2">
+                    {% for item in section.checkbox_fields %}
+                    <div>
+                        <div class="admin-checkbox-card">
+                            <label class="admin-toggle" for="{{ item.field.id_for_label }}">
+                                <input
+                                    type="checkbox"
+                                    name="{{ item.field.html_name }}"
+                                    id="{{ item.field.id_for_label }}"
+                                    class="admin-toggle__input"
+                                    {% if item.field.value %}checked{% endif %}
+                                >
+                                <span class="admin-toggle__visual" aria-hidden="true">
+                                    <span class="admin-toggle__thumb"></span>
+                                </span>
+                                <span class="admin-toggle__content">
+                                    <span class="admin-toggle__text">{{ item.field.label }}</span>
+                                    <span class="admin-toggle__hint">
+                                        {% if item.field.name == 'prescription_required' %}
+                                        Bật nếu sản phẩm chỉ được bán khi có đơn hợp lệ từ bác sĩ.
+                                        {% elif item.field.name == 'is_active' %}
+                                        Bật để cho phép tài khoản đăng nhập và sử dụng hệ thống bình thường.
+                                        {% else %}
+                                        Chọn nếu muốn áp dụng tùy chọn này cho bản ghi hiện tại.
+                                        {% endif %}
+                                    </span>
+                                </span>
+                            </label>
+                        </div>
+                        {% if item.field.errors %}
+                        <div class="admin-field-error">{{ item.field.errors }}</div>
+                        {% endif %}
+                    </div>
+                    {% endfor %}
+                </div>
+                {% endif %}
+            </section>
+            {% endfor %}
+        </div>
+
+        <div class="admin-sticky-actions">
+            <button type="submit" class="btn-admin btn-admin-primary">
+                <i class="fas fa-save"></i>
+                <span>Lưu thay đổi</span>
+            </button>
+            <a href="{% url 'custom_admin_list' model_key %}" class="btn-admin btn-admin-light">
+                <i class="fas fa-times"></i>
+                <span>Hủy</span>
+            </a>
+        </div>
+    </form>
+</section>
+
+<input type="hidden" id="delete-image-action-input" form="admin-main-form" name="delete_image_action" value="0">
+{% endblock %}
+
+{% block extra_scripts %}
+<script>
+function confirmDeleteCurrentImage() {
+    const ok = confirm("Bạn có chắc muốn xóa ảnh hiện tại không?");
+    if (!ok) return;
+
+    const deleteInput = document.getElementById("id_delete_image");
+    const actionInput = document.getElementById("delete-image-action-input");
+    if (deleteInput) {
+        deleteInput.value = "on";
+    }
+    if (actionInput) {
+        actionInput.value = "1";
+    }
+    document.getElementById("admin-main-form").submit();
+}
+
+function markCurrentGalleryForRemoval() {
+    const deleteInput = document.getElementById("id_delete_gallery");
+    const existingBlock = document.getElementById("existing-gallery-block");
+    const note = document.getElementById("gallery-delete-note");
+
+    if (deleteInput) {
+        deleteInput.value = "on";
+    }
+    if (existingBlock) {
+        existingBlock.classList.add("d-none");
+    }
+    if (note) {
+        note.classList.remove("d-none");
+    }
+}
+
+function bindSingleImagePreview(inputId) {
+    const input = document.getElementById(inputId);
+    const previewBox = document.getElementById(inputId + '-live-preview');
+    if (!input || !previewBox) {
+        return;
+    }
+
+    const image = previewBox.querySelector('img');
+    input.addEventListener('change', function () {
+        const file = input.files && input.files[0];
+        if (!file) {
+            previewBox.classList.add('d-none');
+            image.removeAttribute('src');
+            return;
+        }
+
+        image.src = URL.createObjectURL(file);
+        previewBox.classList.remove('d-none');
+    });
+}
+
+function bindGalleryPreview(inputId) {
+    const input = document.getElementById(inputId);
+    const previewBox = document.getElementById(inputId + '-live-preview');
+    if (!input || !previewBox) {
+        return;
+    }
+
+    const grid = previewBox.querySelector('[data-gallery-grid]');
+    input.addEventListener('change', function () {
+        const files = Array.from(input.files || []);
+        grid.innerHTML = '';
+
+        if (!files.length) {
+            previewBox.classList.add('d-none');
+            return;
+        }
+
+        const deleteInput = document.getElementById('id_delete_gallery');
+        const note = document.getElementById('gallery-delete-note');
+        if (deleteInput) {
+            deleteInput.value = '';
+        }
+        if (note) {
+            note.classList.add('d-none');
+        }
+
+        files.forEach(function (file, index) {
+            const wrapper = document.createElement('div');
+            wrapper.className = 'admin-gallery-thumb';
+
+            const image = document.createElement('img');
+            image.src = URL.createObjectURL(file);
+            image.alt = file.name || ('Ảnh ' + (index + 1));
+
+            const caption = document.createElement('span');
+            caption.className = 'admin-gallery-thumb__caption';
+            caption.textContent = file.name || ('Ảnh ' + (index + 1));
+
+            wrapper.appendChild(image);
+            wrapper.appendChild(caption);
+            grid.appendChild(wrapper);
+        });
+
+        previewBox.classList.remove('d-none');
+    });
+}
+
+function initPharmacyLocationSync() {
+    const mapElement = document.getElementById('admin-pharmacy-map');
+    if (!mapElement || typeof L === 'undefined') {
+        return;
+    }
+
+    const addressInput = document.getElementById('id_address');
+    const latInput = document.getElementById('id_lat');
+    const lngInput = document.getElementById('id_lng');
+    const statusBox = document.getElementById('admin-pharmacy-map-status');
+
+    if (!addressInput || !latInput || !lngInput) {
+        return;
+    }
+
+    const defaultLat = 10.776889;
+    const defaultLng = 106.700806;
+    const map = L.map(mapElement, { scrollWheelZoom: false }).setView([defaultLat, defaultLng], 13);
+    L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png', {
+        attribution: '&copy; OpenStreetMap contributors &copy; CARTO',
+        subdomains: 'abcd',
+        maxZoom: 20
+    }).addTo(map);
+
+    let marker = null;
+    let reverseRequestId = 0;
+    let forwardRequestId = 0;
+    let addressLookupTimer = null;
+
+    function setStatus(message, tone) {
+        if (!statusBox) {
+            return;
+        }
+        statusBox.textContent = message || '';
+        statusBox.classList.remove('is-error', 'is-success');
+        if (tone === 'error') {
+            statusBox.classList.add('is-error');
+        } else if (tone === 'success') {
+            statusBox.classList.add('is-success');
+        }
+    }
+
+    function parseCoordinate(value) {
+        const normalized = String(value || '').trim().replace(',', '.');
+        if (!normalized) {
+            return null;
+        }
+        const number = Number(normalized);
+        return Number.isFinite(number) ? number : null;
+    }
+
+    function updateCoordinateInputs(lat, lng) {
+        latInput.value = Number(lat).toFixed(6);
+        lngInput.value = Number(lng).toFixed(6);
+    }
+
+    function ensureMarker(lat, lng) {
+        if (!marker) {
+            marker = L.marker([lat, lng], { draggable: true }).addTo(map);
+            marker.on('dragend', function () {
+                const point = marker.getLatLng();
+                applyCoordinates(point.lat, point.lng, {
+                    lookupAddress: true,
+                    recenter: false,
+                    statusMessage: 'Đã cập nhật vị trí từ điểm kéo trên bản đồ.'
+                });
+            });
+        } else {
+            marker.setLatLng([lat, lng]);
+        }
+        return marker;
+    }
+
+    async function reverseLookup(lat, lng) {
+        const requestId = ++reverseRequestId;
+        setStatus('Đang cập nhật địa chỉ từ tọa độ...');
+
+        try {
+            const response = await fetch(`/api/reverse-address/?lat=${encodeURIComponent(lat)}&lng=${encodeURIComponent(lng)}`);
+            const data = await response.json();
+            if (requestId !== reverseRequestId) {
+                return;
+            }
+            if (!response.ok) {
+                throw new Error(data.error || 'Không thể lấy địa chỉ từ tọa độ.');
+            }
+
+            const addressText = (data.address || '').trim();
+            if (addressText) {
+                addressInput.value = addressText;
+                addressInput.dataset.syncedAddress = addressText;
+            }
+            setStatus('Đã đồng bộ địa chỉ từ tọa độ.', 'success');
+        } catch (error) {
+            setStatus(error.message || 'Không thể cập nhật địa chỉ từ tọa độ.', 'error');
+        }
+    }
+
+    async function forwardLookup(addressText) {
+        const keyword = String(addressText || '').trim();
+        if (!keyword) {
+            return;
+        }
+
+        const requestId = ++forwardRequestId;
+        setStatus('Đang tìm vị trí theo địa chỉ...');
+
+        try {
+            const response = await fetch(`/api/search-address/?q=${encodeURIComponent(keyword)}`);
+            const data = await response.json();
+            if (requestId !== forwardRequestId) {
+                return;
+            }
+            if (!response.ok) {
+                throw new Error(data.error || 'Không thể tìm vị trí từ địa chỉ.');
+            }
+            if (!data.results || !data.results.length) {
+                throw new Error('Không tìm thấy vị trí phù hợp cho địa chỉ này.');
+            }
+
+            const first = data.results[0];
+            applyCoordinates(first.lat, first.lng, {
+                recenter: true,
+                zoom: 16,
+                lookupAddress: false,
+                addressText: first.display_name || keyword,
+                statusMessage: 'Đã đồng bộ tọa độ từ địa chỉ.',
+                statusTone: 'success'
+            });
+        } catch (error) {
+            setStatus(error.message || 'Không thể tìm vị trí theo địa chỉ.', 'error');
+        }
+    }
+
+    function applyCoordinates(lat, lng, options) {
+        const numericLat = Number(lat);
+        const numericLng = Number(lng);
+        if (!Number.isFinite(numericLat) || !Number.isFinite(numericLng)) {
+            setStatus('Tọa độ không hợp lệ.', 'error');
+            return;
+        }
+
+        options = options || {};
+        updateCoordinateInputs(numericLat, numericLng);
+        ensureMarker(numericLat, numericLng);
+
+        if (options.addressText) {
+            addressInput.value = options.addressText;
+            addressInput.dataset.syncedAddress = options.addressText;
+        }
+
+        if (options.recenter !== false) {
+            map.stop();
+            map.setView([numericLat, numericLng], options.zoom || 16);
+        }
+
+        if (options.lookupAddress) {
+            reverseLookup(numericLat, numericLng);
+        } else if (options.statusMessage) {
+            setStatus(options.statusMessage, options.statusTone || 'success');
+        }
+    }
+
+    function syncFromCoordinateInputs() {
+        const lat = parseCoordinate(latInput.value);
+        const lng = parseCoordinate(lngInput.value);
+        if (lat === null || lng === null) {
+            return;
+        }
+        applyCoordinates(lat, lng, {
+            lookupAddress: true,
+            recenter: true,
+            zoom: 16,
+            statusMessage: 'Đang cập nhật từ tọa độ...'
+        });
+    }
+
+    function queueAddressLookup() {
+        const currentAddress = String(addressInput.value || '').trim();
+        if (!currentAddress) {
+            return;
+        }
+        if (currentAddress === String(addressInput.dataset.syncedAddress || '').trim()) {
+            return;
+        }
+
+        if (addressLookupTimer) {
+            window.clearTimeout(addressLookupTimer);
+        }
+        addressLookupTimer = window.setTimeout(function () {
+            forwardLookup(currentAddress);
+        }, 250);
+    }
+
+    map.on('click', function (event) {
+        applyCoordinates(event.latlng.lat, event.latlng.lng, {
+            lookupAddress: true,
+            recenter: false,
+            statusMessage: 'Đã cập nhật vị trí từ điểm bạn chọn trên bản đồ.'
+        });
+    });
+
+    latInput.addEventListener('change', syncFromCoordinateInputs);
+    lngInput.addEventListener('change', syncFromCoordinateInputs);
+    latInput.addEventListener('blur', syncFromCoordinateInputs);
+    lngInput.addEventListener('blur', syncFromCoordinateInputs);
+    addressInput.addEventListener('change', queueAddressLookup);
+    addressInput.addEventListener('blur', queueAddressLookup);
+
+    const initialLat = parseCoordinate(latInput.value);
+    const initialLng = parseCoordinate(lngInput.value);
+    const initialAddress = String(addressInput.value || '').trim();
+
+    if (initialLat !== null && initialLng !== null) {
+        applyCoordinates(initialLat, initialLng, {
+            lookupAddress: !initialAddress,
+            recenter: true,
+            zoom: 16,
+            addressText: initialAddress || null,
+            statusMessage: initialAddress ? 'Đã hiển thị vị trí hiện tại của chi nhánh.' : 'Đang tìm địa chỉ từ tọa độ hiện tại.',
+            statusTone: initialAddress ? 'success' : null
+        });
+    } else if (initialAddress) {
+        forwardLookup(initialAddress);
+    } else {
+        setStatus('Nhập địa chỉ, nhập tọa độ hoặc chấm trực tiếp lên bản đồ để xác định vị trí chi nhánh.');
+    }
+
+    window.setTimeout(function () {
+        map.invalidateSize();
+    }, 200);
+}
+
+document.addEventListener('DOMContentLoaded', function () {
+    bindSingleImagePreview('id_image');
+    bindGalleryPreview('id_gallery_images');
+    initPharmacyLocationSync();
+});
+</script>
+{% endblock %}

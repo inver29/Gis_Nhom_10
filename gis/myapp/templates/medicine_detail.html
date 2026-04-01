@@ -1,0 +1,307 @@
+{% extends "base.html" %}
+{% load currency_filters %}
+{% block title %}{{ medicine.name }}{% endblock %}
+{% block header_search %}{% endblock %}
+{% block body_class %}site-page medicine-detail-page{% endblock %}
+
+{% block content_wrapper %}
+<div class="detail-layout">
+    <div class="container">
+        <div class="section-heading mb-4">
+            <div>
+                <div class="section-heading__eyebrow"><i class="fas fa-pills"></i> Chi tiết sản phẩm</div>
+                <h1>{{ medicine.name }}</h1>
+            </div>
+            <a href="{% url 'product_list' %}" class="section-link">Quay lại danh sách <i class="fas fa-arrow-right"></i></a>
+        </div>
+
+        <div class="content-card detail-showcase mb-4">
+            <div class="detail-grid">
+                <div class="detail-media">
+                    {% if medicine_gallery %}
+                    <div class="site-gallery" data-site-gallery data-product-gallery data-modal-target="#medicine-gallery-modal">
+                        <div class="splide site-gallery-main">
+                            <div class="splide__track">
+                                <ul class="splide__list">
+                                    {% for image_url in medicine_gallery %}
+                                    <li class="splide__slide">
+                                        <div class="site-gallery__slide">
+                                            <button type="button" class="site-gallery__open" data-gallery-open aria-label="Xem lớn ảnh {{ forloop.counter }} của {{ medicine.name }}">
+                                                <img src="{{ image_url }}" alt="{{ medicine.name }}" onerror="this.onerror=null;this.src='{{ medicine_fallback_image }}';">
+                                            </button>
+                                        </div>
+                                    </li>
+                                    {% endfor %}
+                                </ul>
+                            </div>
+                        </div>
+                        {% if medicine_gallery|length > 1 %}
+                        <div class="splide site-gallery-thumbs">
+                            <div class="splide__track">
+                                <ul class="splide__list">
+                                    {% for image_url in medicine_gallery %}
+                                    <li class="splide__slide">
+                                        <div class="site-gallery__thumb">
+                                            <img src="{{ image_url }}" alt="{{ medicine.name }}" onerror="this.onerror=null;this.src='{{ medicine_fallback_image }}';">
+                                        </div>
+                                    </li>
+                                    {% endfor %}
+                                </ul>
+                            </div>
+                        </div>
+                        {% endif %}
+                    </div>
+{% else %}
+                    <i class="fas fa-pills fa-7x text-secondary"></i>
+                    {% endif %}
+                </div>
+
+                <div class="detail-copy">
+                    <div class="d-flex flex-wrap mb-3">
+                        <span class="product-badge mr-2 mb-2">{{ medicine.category|default:"Thuốc / Dược phẩm" }}</span>
+                        {% if medicine.prescription_required %}
+                            <span class="product-badge product-badge--danger mr-2 mb-2">Cần kê đơn</span>
+                        {% else %}
+                            <span class="product-badge product-badge--success mr-2 mb-2">Không bắt buộc kê đơn</span>
+                        {% endif %}
+                        <span class="product-badge {% if medicine.is_in_stock %}product-badge--success{% else %}product-badge--danger{% endif %} mb-2">
+                            {% if medicine.is_in_stock %}Còn {{ medicine.quantity }} {{ medicine.unit|lower }}{% else %}Hết hàng{% endif %}
+                        </span>
+                    </div>
+
+                    <h1>{{ medicine.name }}</h1>
+                    <div class="mb-2 text-muted">
+                        Bán tại:
+                        <a href="{% url 'pharmacy_detail' medicine.pharmacy.id %}">{{ medicine.pharmacy.name }}</a>
+                    </div>
+
+                    <div class="detail-price-wrap">
+                        <div class="price-stack__value">
+                            {{ availability_summary.system_price_value|vnd }}
+                            <span class="price-stack__unit">/ {{ medicine.unit|default:"Hộp" }}</span>
+                        </div>
+                    </div>
+
+                    <div class="detail-meta-grid">
+                        <div class="detail-meta-item">
+                            <small>Đơn vị tính</small>
+                            <strong>{{ medicine.unit|default:"Hộp" }}</strong>
+                        </div>
+                        <div class="detail-meta-item">
+                            <small>Nhà sản xuất</small>
+                            <strong>{{ medicine.manufacturer|default:"Đang cập nhật" }}</strong>
+                        </div>
+                        <div class="detail-meta-item">
+                            <small>Xuất xứ</small>
+                            <strong>{{ medicine.origin|default:"Đang cập nhật" }}</strong>
+                        </div>
+                        <div class="detail-meta-item">
+                            <small>Tồn kho</small>
+                            <strong>{{ availability_summary.total_stock }} {{ medicine.unit|lower }}</strong>
+                        </div>
+                    </div>
+
+                    <div class="product-availability detail-availability-card">
+                        <div class="product-availability__head">
+                            <strong>Còn hàng ở {{ availability_summary.in_stock_branch_total }}/{{ availability_summary.branch_total }} chi nhánh</strong>
+                            <span>Tổng tồn: {{ availability_summary.total_stock }}</span>
+                        </div>
+
+                        {% if availability_summary.rows %}
+                            {% for branch in availability_summary.rows %}
+                            <div class="product-availability__item">
+                                <span>{{ branch.pharmacy_name }}</span>
+                                <strong>{{ branch.quantity }} {{ medicine.unit|lower }}</strong>
+                            </div>
+                            {% endfor %}
+                            {% if availability_summary.extra_branch_count %}
+                            <div class="product-availability__more">+{{ availability_summary.extra_branch_count }} chi nhánh khác còn hàng</div>
+                            {% endif %}
+                        {% else %}
+                            <div class="product-availability__empty">Sản phẩm hiện chưa còn hàng ở các chi nhánh trong hệ thống.</div>
+                        {% endif %}
+
+                        <div class="detail-availability-actions">
+                            <a href="{% url 'map_view' %}?pharmacy_id={{ medicine.pharmacy.id }}" class="pharma-outline-btn">
+                                <i class="fas fa-map-marked-alt"></i>
+                                <span>Xem trên bản đồ</span>
+                            </a>
+                            <a href="{% url 'pharmacy_detail' medicine.pharmacy.id %}" class="pharma-btn">
+                                <i class="fas fa-store"></i>
+                                <span>Xem chi nhánh</span>
+                            </a>
+                        </div>
+                    </div>
+
+                    <div class="buy-panel">
+                        <h3 class="font-weight-bold mb-2">Mô tả sản phẩm</h3>
+                        <p class="text-muted mb-4">
+                            {{ medicine.description|default:"Thông tin mô tả đang được cập nhật." }}
+                        </p>
+
+                        {% if medicine.is_in_stock %}
+                        <form method="post" action="{% url 'add_to_cart' medicine.id %}" class="buy-form">
+                            {% csrf_token %}
+                            <div class="row">
+                                <div class="col-md-4 mb-3">
+                                    <label class="font-weight-bold">Số lượng</label>
+                                    <input type="number" name="quantity" min="1" max="{{ medicine.quantity }}" value="1" class="form-control">
+                                    {% if cart_item %}
+                                        <small class="text-muted d-block mt-2">Hiện trong giỏ: {{ cart_item.quantity }} sản phẩm</small>
+                                    {% endif %}
+                                </div>
+                                <div class="col-md-8 mb-3 d-flex align-items-end">
+                                    <div class="w-100">
+                                        <button type="submit" class="pharma-outline-btn mb-2">
+                                            <i class="fas fa-cart-plus"></i>
+                                            <span>Thêm vào giỏ hàng</span>
+                                        </button>
+                                        <button type="submit" name="buy_now" value="1" class="pharma-btn">
+                                            <i class="fas fa-bolt"></i>
+                                            <span>Mua ngay</span>
+                                        </button>
+                                    </div>
+                                </div>
+                            </div>
+                        </form>
+                        {% else %}
+                        <button class="pharma-btn" disabled>
+                            <i class="fas fa-ban"></i>
+                            <span>Sản phẩm hiện đang hết hàng</span>
+                        </button>
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="detail-section-grid mb-4">
+            <div class="detail-section-card">
+                <h3><i class="fas fa-briefcase-medical"></i> Công dụng</h3>
+                <p class="mb-0 text-muted">{{ medicine.usage|default:"Chưa cập nhật công dụng chi tiết cho sản phẩm này."|linebreaksbr }}</p>
+            </div>
+            <div class="detail-section-card">
+                <h3><i class="fas fa-flask"></i> Thành phần</h3>
+                <p class="mb-0 text-muted">{{ medicine.ingredients|default:"Chưa cập nhật thành phần."|linebreaksbr }}</p>
+            </div>
+            <div class="detail-section-card">
+                <h3><i class="fas fa-notes-medical"></i> Cách dùng</h3>
+                <p class="mb-0 text-muted">{{ medicine.dosage|default:"Chưa cập nhật hướng dẫn sử dụng."|linebreaksbr }}</p>
+            </div>
+        </div>
+
+        {% if related_medicines %}
+        <section class="section-shell">
+            <div class="section-heading">
+                <div>
+                    <div class="section-heading__eyebrow"><i class="fas fa-star"></i> Sản phẩm liên quan</div>
+                    <h2>Gợi ý thêm cho bạn</h2>
+                </div>
+            </div>
+
+            <div class="splide site-splide" data-site-splide data-per-page="3" data-gap="18px">
+                <div class="splide__track">
+                    <ul class="splide__list">
+                        {% for item in related_medicines %}
+                        <li class="splide__slide carousel-slide">
+                            <div class="product-card">
+                                <div class="product-card__image">
+                                    {% if item.primary_image_url %}
+                                        <img src="{{ item.primary_image_url }}" alt="{{ item.name }}">
+                                    {% else %}
+                                        <i class="fas fa-pills fa-4x text-secondary"></i>
+                                    {% endif %}
+                                    <div class="product-badge-row">
+                                        <span class="product-badge">{{ item.category|default:"Thuốc" }}</span>
+                                        <span class="product-badge {% if item.is_in_stock %}product-badge--success{% else %}product-badge--danger{% endif %}">
+                                            {% if item.is_in_stock %}Còn hàng{% else %}Hết hàng{% endif %}
+                                        </span>
+                                    </div>
+                                </div>
+                                <div class="product-card__body">
+                                    <div class="product-card__title">
+                                        <a href="{% url 'medicine_detail' item.id %}">{{ item.name }}</a>
+                                    </div>
+                                    <div class="price-stack">
+                                        <div class="price-stack__value">
+                                            {{ item.price|vnd }}
+                                            <span class="price-stack__unit">/ {{ item.unit|default:"Hộp" }}</span>
+                                        </div>
+                                        <span class="price-stack__meta">{{ item.pharmacy.name }}</span>
+                                    </div>
+                                    <div class="product-card__actions">
+                                        <a href="{% url 'medicine_detail' item.id %}" class="pharma-outline-btn">
+                                            <i class="fas fa-eye"></i>
+                                            <span>Xem chi tiết</span>
+                                        </a>
+                                        {% if item.is_in_stock %}
+                                        <form method="post" action="{% url 'add_to_cart' item.id %}" class="js-add-to-cart-form">
+                                            {% csrf_token %}
+                                            <input type="hidden" name="quantity" value="1">
+                                            <button type="submit" class="pharma-btn">
+                                                <i class="fas fa-cart-plus"></i>
+                                                <span>Thêm giỏ</span>
+                                            </button>
+                                        </form>
+                                        {% else %}
+                                        <button class="pharma-btn" disabled>
+                                            <i class="fas fa-ban"></i>
+                                            <span>Hết hàng</span>
+                                        </button>
+                                        {% endif %}
+                                    </div>
+                                </div>
+                            </div>
+                        </li>
+                        {% endfor %}
+                    </ul>
+                </div>
+            </div>
+        </section>
+        {% endif %}
+
+        {% if medicine_gallery %}
+        <div class="product-gallery-modal" id="medicine-gallery-modal" aria-hidden="true">
+            <div class="product-gallery-modal__backdrop" data-gallery-close></div>
+            <div class="product-gallery-modal__dialog" role="dialog" aria-modal="true" aria-label="Xem ảnh sản phẩm toàn màn hình">
+                <button type="button" class="product-gallery-modal__close" data-gallery-close aria-label="Đóng">
+                    <i class="fas fa-times"></i>
+                </button>
+                <div class="product-gallery-modal__body">
+                    <div class="site-gallery" data-site-gallery>
+                        <div class="splide site-gallery-main">
+                            <div class="splide__track">
+                                <ul class="splide__list">
+                                    {% for image_url in medicine_gallery %}
+                                    <li class="splide__slide">
+                                        <div class="site-gallery__slide">
+                                            <img src="{{ image_url }}" alt="{{ medicine.name }}" onerror="this.onerror=null;this.src='{{ medicine_fallback_image }}';">
+                                        </div>
+                                    </li>
+                                    {% endfor %}
+                                </ul>
+                            </div>
+                        </div>
+                        {% if medicine_gallery|length > 1 %}
+                        <div class="splide site-gallery-thumbs">
+                            <div class="splide__track">
+                                <ul class="splide__list">
+                                    {% for image_url in medicine_gallery %}
+                                    <li class="splide__slide">
+                                        <div class="site-gallery__thumb">
+                                            <img src="{{ image_url }}" alt="{{ medicine.name }}" onerror="this.onerror=null;this.src='{{ medicine_fallback_image }}';">
+                                        </div>
+                                    </li>
+                                    {% endfor %}
+                                </ul>
+                            </div>
+                        </div>
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+        </div>
+        {% endif %}
+    </div>
+</div>
+{% endblock %}

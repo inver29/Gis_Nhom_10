@@ -2,7 +2,15 @@
 Django settings for gis project.
 """
 
+import os
 from pathlib import Path
+
+try:
+    import jazzmin  # noqa: F401
+except ImportError:
+    JAZZMIN_INSTALLED = False
+else:
+    JAZZMIN_INSTALLED = True
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
@@ -17,7 +25,6 @@ ALLOWED_HOSTS = []
 
 # Application definition
 INSTALLED_APPS = [
-    'jazzmin',
     'django.contrib.admin',
     'django.contrib.auth',
     'django.contrib.contenttypes',
@@ -27,10 +34,14 @@ INSTALLED_APPS = [
     'myapp',
 ]
 
+if JAZZMIN_INSTALLED:
+    INSTALLED_APPS.insert(0, 'jazzmin')
+
 MIDDLEWARE = [
     'django.middleware.security.SecurityMiddleware',
     'django.contrib.sessions.middleware.SessionMiddleware',
     'django.middleware.common.CommonMiddleware',
+    'myapp.middleware.FriendlyNotFoundMiddleware',
     'django.middleware.csrf.CsrfViewMiddleware',
     'django.contrib.auth.middleware.AuthenticationMiddleware',
     'django.contrib.messages.middleware.MessageMiddleware',
@@ -49,6 +60,7 @@ TEMPLATES = [
                 'django.template.context_processors.request',
                 'django.contrib.auth.context_processors.auth',
                 'django.contrib.messages.context_processors.messages',
+                'myapp.context_processors.site_chrome',
             ],
         },
     },
@@ -62,7 +74,7 @@ DATABASES = {
         'ENGINE': 'django.db.backends.postgresql',
         'NAME': 'gis_db',
         'USER': 'postgres',
-        'PASSWORD': '12345',  # Mật khẩu của bạn
+        'PASSWORD': '2906',  # Mật khẩu của bạn
         'HOST': 'localhost',
         'PORT': '5432',
     }
@@ -84,11 +96,34 @@ USE_L10N = True
 USE_TZ = True
 
 # Static files
-STATIC_URL = 'static/'
+STATIC_URL = '/static/'
 MEDIA_URL = '/media/'
 MEDIA_ROOT = BASE_DIR / 'media'
 
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
+
+SITE_NAME = os.getenv('SITE_NAME', 'GIS Pharma')
+SITE_SUPPORT_EMAIL = os.getenv('SITE_SUPPORT_EMAIL', 'support@gispharma.local')
+
+MAILTRAP_HOST = os.getenv('MAILTRAP_HOST', 'sandbox.smtp.mailtrap.io')
+MAILTRAP_PORT = int(os.getenv('MAILTRAP_PORT', '2525'))
+MAILTRAP_USERNAME = os.getenv('MAILTRAP_USERNAME', os.getenv('EMAIL_HOST_USER', ''))
+MAILTRAP_PASSWORD = os.getenv('MAILTRAP_PASSWORD', os.getenv('EMAIL_HOST_PASSWORD', ''))
+MAILTRAP_USE_TLS = os.getenv('MAILTRAP_USE_TLS', 'true').lower() in {'1', 'true', 'yes'}
+
+if MAILTRAP_USERNAME and MAILTRAP_PASSWORD:
+    EMAIL_BACKEND = 'django.core.mail.backends.smtp.EmailBackend'
+else:
+    EMAIL_BACKEND = os.getenv('EMAIL_BACKEND', 'django.core.mail.backends.console.EmailBackend')
+
+EMAIL_HOST = MAILTRAP_HOST
+EMAIL_PORT = MAILTRAP_PORT
+EMAIL_HOST_USER = MAILTRAP_USERNAME
+EMAIL_HOST_PASSWORD = MAILTRAP_PASSWORD
+EMAIL_USE_TLS = MAILTRAP_USE_TLS
+DEFAULT_FROM_EMAIL = os.getenv('DEFAULT_FROM_EMAIL', 'GIS Pharma <no-reply@gispharma.local>')
+SERVER_EMAIL = DEFAULT_FROM_EMAIL
+PASSWORD_RESET_TIMEOUT = 60 * 60
 
 # --- CẤU HÌNH GIAO DIỆN ADMIN (JAZZMIN) TỐI GIẢN ---
 JAZZMIN_SETTINGS = {
@@ -134,9 +169,9 @@ JAZZMIN_SETTINGS = {
         "myapp.Pharmacy": "fas fa-hospital",
         "myapp.Medicine": "fas fa-capsules",
         "myapp.Order": "fas fa-file-invoice-dollar",
-        "myapp.StaffProfile": "fas fa-id-badge",
+        "myapp.UserProfile": "fas fa-id-badge",
     },
-    
+    "custom_css": "css/admin-jazzmin.css",
     "use_google_fonts_cdn": True,
     "show_ui_builder": False, # Tắt nút chỉnh sửa giao diện thừa thãi
 }

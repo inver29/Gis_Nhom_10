@@ -1,0 +1,93 @@
+{% load static %}
+<div class="support-widget" data-support-widget>
+    <button
+        type="button"
+        class="support-widget__fab"
+        aria-label="Mở hỗ trợ khách hàng"
+        aria-expanded="false"
+        aria-controls="supportPanel"
+        data-support-open
+    >
+        <span class="support-widget__fab-ring"></span>
+        <span class="support-widget__fab-core">
+            <i class="fas fa-headset"></i>
+        </span>
+        <span class="support-widget__fab-tooltip">Hỗ trợ khách hàng</span>
+    </button>
+
+    <div class="support-widget__backdrop" data-support-backdrop hidden></div>
+
+    <aside
+        id="supportPanel"
+        class="support-widget__panel"
+        aria-hidden="true"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="supportPanelTitle"
+    >
+        <button type="button" class="support-widget__close" aria-label="Đóng hỗ trợ" data-support-close>
+            <i class="fas fa-times"></i>
+        </button>
+
+        <div class="support-widget__header">
+            <div class="support-widget__brand">
+                <img src="{% static 'images/support-agent-logo.svg' %}" alt="GIS Pharma" class="support-widget__brand-logo">
+                <div>
+                    <div class="support-widget__eyebrow">GIS Pharma Care</div>
+                    <h3 id="supportPanelTitle" class="support-widget__title">Hỗ trợ khách hàng</h3>
+                    <p class="support-widget__subtitle">Tư vấn mua thuốc, hỗ trợ đơn hàng và kết nối nhanh với chi nhánh gần bạn.</p>
+                </div>
+            </div>
+        </div>
+
+        <div class="support-widget__body">
+            <div class="support-widget__info-grid">
+                <div class="support-widget__info-card">
+                    <span class="support-widget__info-icon"><i class="fas fa-phone-alt"></i></span>
+                    <div>
+                        <small>Hotline</small>
+                        <strong>1800 6928</strong>
+                    </div>
+                </div>
+                <div class="support-widget__info-card">
+                    <span class="support-widget__info-icon"><i class="far fa-clock"></i></span>
+                    <div>
+                        <small>Giờ hoạt động</small>
+                        <strong>08:00 - 22:00</strong>
+                    </div>
+                </div>
+            </div>
+
+            <div class="support-widget__actions">
+                <a href="tel:18006928" class="support-widget__cta support-widget__cta--primary">
+                    <i class="fas fa-phone-alt"></i>
+                    <span>Gọi ngay</span>
+                </a>
+                <a href="https://zalo.me/18006928" target="_blank" rel="noopener noreferrer" class="support-widget__cta support-widget__cta--secondary">
+                    <span class="support-widget__zalo-badge">Z</span>
+                    <span>Nhắn Zalo</span>
+                </a>
+                <a href="mailto:support@gispharma.local?subject=Y%C3%AAu%20c%E1%BA%A7u%20h%E1%BB%97%20tr%E1%BB%A3%20GIS%20Pharma&body=Ch%C3%A0o%20GIS%20Pharma%2C%0A%0AT%C3%B4i%20c%E1%BA%A7n%20h%E1%BB%97%20tr%E1%BB%A3%20v%E1%BB%81%3A%20" class="support-widget__cta support-widget__cta--ghost">
+                    <i class="far fa-envelope"></i>
+                    <span>Gửi phản hồi / liên hệ</span>
+                </a>
+            </div>
+
+            <div class="support-widget__qr-card">
+                <div class="support-widget__qr-copy">
+                    <div class="support-widget__qr-title">Mã QR Zalo hỗ trợ</div>
+                    <p>Quét mã để mở nhanh kênh tư vấn trên điện thoại. Phù hợp khi khách đang xem web trên máy tính.</p>
+                    <ul class="support-widget__bullet-list">
+                        <li>Hỏi tình trạng đơn hàng</li>
+                        <li>Xin tư vấn sản phẩm gần nhất</li>
+                        <li>Nhận hướng dẫn liên hệ chi nhánh</li>
+                    </ul>
+                </div>
+                <div class="support-widget__qr-frame">
+                    <img src="{% static 'images/support-zalo-qr.png' %}" alt="Mã QR Zalo hỗ trợ khách hàng" class="support-widget__qr-image">
+                    <span class="support-widget__qr-note">Quét QR để nhắn Zalo</span>
+                </div>
+            </div>
+        </div>
+    </aside>
+</div>

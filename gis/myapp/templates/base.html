@@ -4,76 +4,622 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>{% block title %}Hệ thống Dược Phẩm GIS{% endblock %}</title>
-    
+    <title>{% block title %}Hệ thống Dược phẩm GIS{% endblock %}</title>
+
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@4.6.2/dist/css/bootstrap.min.css">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.4/css/all.min.css">
-    
-    <link rel="stylesheet" href="{% static 'css/style.css' %}">
-    
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@splidejs/splide@4.1.4/dist/css/splide.min.css">
+    <link rel="stylesheet" href="{% static 'css/style.css' %}?v=20260401-4">
+    <link rel="stylesheet" href="{% static 'css/pharma-refresh.css' %}?v=20260401-4">
+    <link rel="stylesheet" href="{% static 'css/support-widget.css' %}?v=20260401-support1">
+
     <style>
-        body { display: flex; flex-direction: column; min-height: 100vh; }
-        .navbar-custom { background-color: #28a745; box-shadow: 0 2px 4px rgba(0,0,0,0.1); } /* Màu xanh y tế */
-        .navbar-brand, .nav-link { color: white !important; font-weight: bold; }
-        .main-container { flex: 1; display: flex; height: calc(100vh - 56px); } /* Full height map */
-        .sidebar-panel { width: 350px; background: white; overflow-y: auto; border-right: 1px solid #ddd; display: flex; flex-direction: column; }
-        .map-wrapper { flex: 1; position: relative; }
-        #map { width: 100%; height: 100%; }
-        footer { background: #343a40; color: white; padding: 15px 0; margin-top: auto; text-align: center; }
+        .site-alerts {
+            position: sticky;
+            top: 0;
+            z-index: 1080;
+        }
+
+        .leaflet-address-search {
+            width: min(340px, calc(100vw - 32px));
+            background: rgba(255, 255, 255, 0.98);
+            border-radius: 18px;
+            box-shadow: 0 18px 38px rgba(18, 48, 108, 0.18);
+            padding: 10px;
+        }
+
+        .leaflet-address-search.is-collapsible {
+            width: auto;
+            padding: 0;
+            background: transparent;
+            box-shadow: none;
+        }
+
+        .leaflet-address-search__toggle {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            border: none;
+            border-radius: 999px;
+            background: rgba(255, 255, 255, 0.98);
+            box-shadow: 0 16px 36px rgba(18, 48, 108, 0.16);
+            color: #1a2f57;
+            font-weight: 800;
+            padding: 12px 16px;
+        }
+
+        .leaflet-address-search__toggle i {
+            color: #1f64e0;
+        }
+
+        .leaflet-address-search__panel {
+            background: rgba(255, 255, 255, 0.98);
+            border-radius: 18px;
+            box-shadow: 0 18px 38px rgba(18, 48, 108, 0.18);
+            padding: 10px;
+        }
+
+        .leaflet-address-search__panel.is-hidden {
+            display: none;
+        }
+
+        .leaflet-address-search__row {
+            display: flex;
+            gap: 8px;
+        }
+
+        .leaflet-address-search__close {
+            border: none;
+            border-radius: 50%;
+            background: #eef3ff;
+            color: #4c5c7c;
+            width: 38px;
+            height: 38px;
+            font-size: 18px;
+            line-height: 1;
+            flex: 0 0 38px;
+        }
+
+        .leaflet-address-search__input {
+            flex: 1;
+            border: 1px solid rgba(31, 100, 224, 0.18);
+            border-radius: 12px;
+            padding: 10px 12px;
+            font-size: 14px;
+            outline: none;
+        }
+
+        .leaflet-address-search__input:focus {
+            border-color: #1f64e0;
+            box-shadow: 0 0 0 4px rgba(31, 100, 224, 0.12);
+        }
+
+        .leaflet-address-search__button {
+            border: none;
+            border-radius: 12px;
+            background: linear-gradient(135deg, #1f64e0 0%, #1146b8 100%);
+            color: #fff;
+            font-weight: 700;
+            padding: 0 16px;
+            min-width: 74px;
+        }
+
+        .leaflet-address-search__status {
+            margin-top: 8px;
+            font-size: 13px;
+            color: #4a5875;
+        }
+
+        .leaflet-address-search__status.is-error {
+            color: #c62839;
+        }
+
+        .leaflet-address-search__status.is-warning {
+            color: #b7791f;
+        }
+
+        .leaflet-address-search__results {
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+            margin-top: 8px;
+            max-height: 240px;
+            overflow-y: auto;
+        }
+
+        .leaflet-address-search__result {
+            width: 100%;
+            text-align: left;
+            background: #fff;
+            border: 1px solid #e6ecfb;
+            border-radius: 12px;
+            padding: 10px 12px;
+            cursor: pointer;
+        }
+
+        .leaflet-address-search__result:hover {
+            border-color: #1f64e0;
+            background: #f4f8ff;
+        }
+
+        .leaflet-address-search__result strong,
+        .leaflet-address-search__result small {
+            display: block;
+        }
+
+        .leaflet-address-search__result strong {
+            color: #10213a;
+            font-size: 13px;
+            line-height: 1.35;
+        }
+
+        .leaflet-address-search__result small {
+            color: #66758c;
+            margin-top: 4px;
+            text-transform: capitalize;
+        }
     </style>
+
+    <script>
+        window.leafletBaseLayerConfig = {
+            url: "https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png",
+            options: {
+                attribution: "&copy; OpenStreetMap contributors &copy; CARTO",
+                subdomains: "abcd",
+                maxZoom: 20
+            }
+        };
+
+        window.attachLeafletBaseLayer = function (leafletMap) {
+            return L.tileLayer(
+                window.leafletBaseLayerConfig.url,
+                window.leafletBaseLayerConfig.options
+            ).addTo(leafletMap);
+        };
+
+        window.attachAddressSearchControl = function (leafletMap, options) {
+            options = options || {};
+
+            var searchControl = L.control({
+                position: options.position || "topleft"
+            });
+            var searchMarker = null;
+
+            searchControl.onAdd = function () {
+                var isCollapsible = options.collapsible === true;
+                var isOpen = !isCollapsible;
+                var containerClass = "leaflet-control leaflet-address-search";
+                if (isCollapsible) {
+                    containerClass += " is-collapsible";
+                }
+
+                var container = L.DomUtil.create("div", containerClass);
+                var placeholder = options.placeholder || "Tìm địa chỉ...";
+                var toggleLabel = options.toggleLabel || "Tìm địa chỉ";
+
+                if (isCollapsible) {
+                    container.innerHTML = `
+                        <button type="button" class="leaflet-address-search__toggle">
+                            <i class="fas fa-search-location"></i>
+                            <span>${toggleLabel}</span>
+                        </button>
+                        <div class="leaflet-address-search__panel is-hidden">
+                            <form class="leaflet-address-search__form">
+                                <div class="leaflet-address-search__row">
+                                    <input type="text" class="leaflet-address-search__input" placeholder="${placeholder}" autocomplete="off">
+                                    <button type="submit" class="leaflet-address-search__button">Tìm</button>
+                                    <button type="button" class="leaflet-address-search__close" aria-label="Đóng">&times;</button>
+                                </div>
+                                <div class="leaflet-address-search__status" style="display:none;"></div>
+                                <div class="leaflet-address-search__results"></div>
+                            </form>
+                        </div>
+                    `;
+                } else {
+                    container.innerHTML = `
+                        <div class="leaflet-address-search__panel">
+                            <form class="leaflet-address-search__form">
+                                <div class="leaflet-address-search__row">
+                                    <input type="text" class="leaflet-address-search__input" placeholder="${placeholder}" autocomplete="off">
+                                    <button type="submit" class="leaflet-address-search__button">Tìm</button>
+                                </div>
+                                <div class="leaflet-address-search__status" style="display:none;"></div>
+                                <div class="leaflet-address-search__results"></div>
+                            </form>
+                        </div>
+                    `;
+                }
+
+                L.DomEvent.disableClickPropagation(container);
+                L.DomEvent.disableScrollPropagation(container);
+
+                var toggleButton = container.querySelector(".leaflet-address-search__toggle");
+                var panel = container.querySelector(".leaflet-address-search__panel");
+                var form = container.querySelector(".leaflet-address-search__form");
+                var input = container.querySelector(".leaflet-address-search__input");
+                var closeButton = container.querySelector(".leaflet-address-search__close");
+                var statusBox = container.querySelector(".leaflet-address-search__status");
+                var resultsBox = container.querySelector(".leaflet-address-search__results");
+
+                function setOpen(nextOpen) {
+                    isOpen = nextOpen;
+                    if (!panel) {
+                        return;
+                    }
+
+                    panel.classList.toggle("is-hidden", !isOpen);
+                    if (isOpen && input) {
+                        window.setTimeout(function () {
+                            input.focus();
+                        }, 0);
+                    }
+                }
+
+                function clearResults() {
+                    resultsBox.innerHTML = "";
+                }
+
+                function setStatus(message, tone) {
+                    if (!message) {
+                        statusBox.style.display = "none";
+                        statusBox.textContent = "";
+                        statusBox.classList.remove("is-error", "is-warning");
+                        return;
+                    }
+
+                    statusBox.style.display = "block";
+                    statusBox.textContent = message;
+                    statusBox.classList.toggle("is-error", tone === "error");
+                    statusBox.classList.toggle("is-warning", tone === "warning");
+                }
+
+                function focusResult(result) {
+                    var lat = parseFloat(result.lat);
+                    var lng = parseFloat(result.lng);
+
+                    if (Number.isNaN(lat) || Number.isNaN(lng)) {
+                        return;
+                    }
+
+                    if (options.persistMarker !== false) {
+                        if (!searchMarker) {
+                            searchMarker = L.marker([lat, lng]).addTo(leafletMap);
+                        } else {
+                            searchMarker.setLatLng([lat, lng]);
+                            if (!leafletMap.hasLayer(searchMarker)) {
+                                searchMarker.addTo(leafletMap);
+                            }
+                        }
+
+                        searchMarker
+                            .bindPopup(result.display_name || "Địa điểm đã tìm")
+                            .openPopup();
+                    }
+
+                    leafletMap.stop();
+                    leafletMap.setView([lat, lng], options.zoom || 16);
+                    input.value = result.display_name || input.value;
+                    clearResults();
+                    setStatus("");
+
+                    if (isCollapsible && options.collapseOnSelect !== false) {
+                        setOpen(false);
+                    }
+
+                    if (typeof options.onSelect === "function") {
+                        options.onSelect(result, { lat: lat, lng: lng }, searchMarker);
+                    }
+                }
+
+                async function searchAddress(query) {
+                    var keyword = (query || "").trim();
+
+                    if (!keyword) {
+                        clearResults();
+                        setStatus("Nhập địa chỉ để tìm.", "warning");
+                        return;
+                    }
+
+                    clearResults();
+                    setStatus("Đang tìm địa chỉ...");
+
+                    try {
+                        var response = await fetch(`/api/search-address/?q=${encodeURIComponent(keyword)}`);
+                        var data = await response.json();
+
+                        if (!response.ok) {
+                            throw new Error(data.error || "Không thể tìm địa chỉ.");
+                        }
+
+                        if (!data.results || data.results.length === 0) {
+                            setStatus("Không tìm thấy kết quả phù hợp.", "warning");
+                            return;
+                        }
+
+                        setStatus("");
+
+                        data.results.forEach(function (result) {
+                            var item = document.createElement("button");
+                            item.type = "button";
+                            item.className = "leaflet-address-search__result";
+
+                            var title = document.createElement("strong");
+                            title.textContent = result.display_name || "Địa điểm không rõ tên";
+
+                            var meta = document.createElement("small");
+                            meta.textContent = result.type_label || "Địa điểm";
+
+                            item.appendChild(title);
+                            item.appendChild(meta);
+                            item.addEventListener("click", function () {
+                                focusResult(result);
+                            });
+
+                            resultsBox.appendChild(item);
+                        });
+                    } catch (error) {
+                        clearResults();
+                        setStatus(error.message || "Không thể tìm địa chỉ lúc này.", "error");
+                    }
+                }
+
+                if (toggleButton) {
+                    toggleButton.addEventListener("click", function () {
+                        setOpen(!isOpen);
+                    });
+                }
+
+                if (closeButton) {
+                    closeButton.addEventListener("click", function () {
+                        setOpen(false);
+                    });
+                }
+
+                form.addEventListener("submit", function (event) {
+                    event.preventDefault();
+                    searchAddress(input.value);
+                });
+
+                input.addEventListener("keydown", function (event) {
+                    if (event.key === "Escape") {
+                        clearResults();
+                        setStatus("");
+                        if (isCollapsible) {
+                            setOpen(false);
+                        }
+                    }
+                });
+
+                return container;
+            };
+
+            searchControl.addTo(leafletMap);
+            return searchControl;
+        };
+
+        window.siteSessionData = {
+            isAuthenticated: "{{ user.is_authenticated|yesno:'true,false' }}" === "true",
+            canPersistCustomerAddress:
+                "{{ user.is_authenticated|yesno:'true,false' }}" === "true" &&
+                "{{ user.is_staff|yesno:'true,false' }}" !== "true" &&
+                "{{ user.is_superuser|yesno:'true,false' }}" !== "true"
+        };
+    </script>
+
+    {% block extra_css %}{% endblock %}
 </head>
-<body>
+<body class="{% block body_class %}site-page{% endblock %}">
+    <header class="site-header-shell">
+        <div class="container site-header">
+            <div class="site-header__main site-header__main--compact">
+                <a class="site-brand" href="{% url 'home' %}">
+                    <span class="site-brand__mark"><i class="fas fa-clinic-medical"></i></span>
+                    <span class="site-brand__text">
+                        <span class="site-brand__eyebrow">GIS Pharma</span>
+                        <span class="site-brand__title">Cửa hàng Dược phẩm</span>
+                    </span>
+                </a>
 
-    <nav class="navbar navbar-expand-lg navbar-custom">
-        <div class="container-fluid">
-            <a class="navbar-brand" href="{% url 'home' %}">
-                <i class="fas fa-clinic-medical"></i> CỬA HÀNG DƯỢC PHẨM
-            </a>
-            <button class="navbar-toggler" type="button" data-toggle="collapse" data-target="#navbarNav">
-                <span class="navbar-toggler-icon"><i class="fas fa-bars text-white"></i></span>
-            </button>
-            <div class="collapse navbar-collapse" id="navbarNav">
-                <ul class="navbar-nav ml-auto">
-                    <li class="nav-item">
-                        <a class="nav-link" href="{% url 'home' %}"><i class="fas fa-home"></i> Trang chủ</a>
-                    </li>
-                    <li class="nav-item">
-                        <a class="nav-link" href="{% url 'map_view' %}"><i class="fas fa-map-marked-alt"></i> Bản đồ Nhà thuốc</a>
-                    </li>
-                    
-                    {% if user.is_authenticated and user.is_staff %}
-                    <li class="nav-item">
-                        <a class="nav-link" href="/admin" target="_blank"><i class="fas fa-user-shield"></i> Quản trị viên</a>
-                    </li>
-                    {% endif %}
+                {% block header_search %}
+                <form action="{% url 'product_list' %}" method="get" class="site-search">
+                    <i class="fas fa-search"></i>
+                    <input
+                        type="text"
+                        name="q"
+                        placeholder="Tìm tên thuốc, công dụng, thành phần..."
+                        value="{{ request.GET.q|default:'' }}"
+                    >
+                    <button type="submit">Tìm</button>
+                </form>
+                {% endblock %}
 
-                    {% if user.is_authenticated %}
-                        <li class="nav-item"><a class="nav-link" href="#">Xin chào, {{ user.username }}</a></li>
-                        <li class="nav-item"><a class="nav-link" href="{% url 'order_history' %}">Lịch sử đơn</a></li>
-                        <li class="nav-item"><a class="nav-link" href="{% url 'logout' %}">Đăng xuất</a></li>
-                    {% else %}
-                        <li class="nav-item"><a class="nav-link" href="{% url 'login' %}">Đăng nhập</a></li>
-                        <li class="nav-item"><a class="nav-link" href="{% url 'register' %}">Đăng ký</a></li>
-                    {% endif %}
-                    
-                    <li class="nav-item">
-                        <a class="nav-link btn btn-warning text-dark" href="{% url 'cart_detail' %}">
-                            <i class="fas fa-shopping-cart"></i> Giỏ hàng
-                        </a>
-                    </li>
-                </ul>
+                <div class="site-header__actions">
+                    <div class="dropdown account-menu">
+                        <button
+                            class="header-action account-trigger dropdown-toggle"
+                            type="button"
+                            id="accountMenuButton"
+                            data-toggle="dropdown"
+                            aria-haspopup="true"
+                            aria-expanded="false"
+                        >
+                            <span class="account-trigger__avatar">
+                                {% if user.is_authenticated %}
+                                    {{ user_display_name|default:user.username|first|upper }}
+                                {% else %}
+                                    <i class="fas fa-user"></i>
+                                {% endif %}
+                            </span>
+                            <span class="account-trigger__copy">
+                                <small>Tài khoản</small>
+                                {% if user.is_authenticated %}
+                                    <strong>Xin chào, {{ user_display_name|default:user.username }}</strong>
+                                {% else %}
+                                    <strong>Đăng nhập / Đăng ký</strong>
+                                {% endif %}
+                            </span>
+                        </button>
+
+                        <div class="dropdown-menu dropdown-menu-right account-dropdown" aria-labelledby="accountMenuButton">
+                            {% if user.is_authenticated %}
+                                <div class="account-dropdown__header">
+                                    <strong>{{ user_display_name|default:user.username }}</strong>
+                                    <span>{{ user.email|default:"Chưa cập nhật email" }}</span>
+                                    <div class="account-dropdown__role">
+                                        {% if user.is_superuser %}
+                                            Quản trị viên
+                                        {% elif user.is_staff %}
+                                            Nhân viên quản trị
+                                        {% else %}
+                                            Khách hàng
+                                        {% endif %}
+                                    </div>
+                                </div>
+                                <a class="dropdown-item" href="{% url 'account' %}">
+                                    <i class="fas fa-id-card"></i>
+                                    <span>Tài khoản cá nhân</span>
+                                </a>
+                                <a class="dropdown-item" href="{% url 'order_history' %}">
+                                    <i class="fas fa-receipt"></i>
+                                    <span>Lịch sử đơn hàng</span>
+                                </a>
+                                <a class="dropdown-item" href="{% url 'cart_detail' %}">
+                                    <i class="fas fa-shopping-cart"></i>
+                                    <span>Giỏ hàng của tôi</span>
+                                </a>
+                                {% if user.is_staff %}
+                                <a class="dropdown-item" href="{% url 'custom_admin_dashboard' %}">
+                                    <i class="fas fa-user-shield"></i>
+                                    <span>Quản trị hệ thống</span>
+                                </a>
+                                {% endif %}
+                                <a class="dropdown-item" href="{% url 'logout' %}">
+                                    <i class="fas fa-sign-out-alt"></i>
+                                    <span>Đăng xuất</span>
+                                </a>
+                            {% else %}
+                                <div class="account-dropdown__header">
+                                    <strong>Chào bạn</strong>
+                                    <span>Đăng nhập để lưu địa chỉ, theo dõi đơn hàng và tiếp tục mua thuốc thuận tiện hơn.</span>
+                                </div>
+                                <a class="dropdown-item" href="{% url 'login' %}?next={{ request.get_full_path|urlencode }}">
+                                    <i class="fas fa-sign-in-alt"></i>
+                                    <span>Đăng nhập</span>
+                                </a>
+                                <a class="dropdown-item" href="{% url 'register' %}?next={{ request.get_full_path|urlencode }}">
+                                    <i class="fas fa-user-plus"></i>
+                                    <span>Đăng ký</span>
+                                </a>
+                            {% endif %}
+                        </div>
+                    </div>
+
+                    <a class="header-action header-action--primary" href="{% url 'cart_detail' %}">
+                        <i class="fas fa-shopping-cart"></i>
+                        <span>Giỏ hàng</span>
+                        <span class="header-action__count" data-cart-count>{{ cart_items_count }}</span>
+                    </a>
+                </div>
             </div>
+
+            <nav class="site-nav site-nav--compact">
+                <div class="site-nav__links">
+                    <a class="site-chip-link {% if request.path == '/' %}is-active{% endif %}" href="{% url 'home' %}">
+                        <i class="fas fa-home"></i> Trang chủ
+                    </a>
+                    <a class="site-chip-link {% if '/products/' in request.path %}is-active{% endif %}" href="{% url 'product_list' %}">
+                        <i class="fas fa-capsules"></i> Sản phẩm
+                    </a>
+                    <a class="site-chip-link {% if '/map/' in request.path %}is-active{% endif %}" href="{% url 'map_view' %}">
+                        <i class="fas fa-map-marked-alt"></i> Bản đồ nhà thuốc
+                    </a>
+                </div>
+            </nav>
         </div>
-    </nav>
+    </header>
+
+    {% if messages %}
+    <div class="site-alerts">
+        <div class="container py-3">
+            {% for message in messages %}
+                <div class="alert {% if 'error' in message.tags %}alert-danger{% elif 'warning' in message.tags %}alert-warning{% else %}alert-success{% endif %} alert-dismissible fade show" role="alert">
+                    {{ message }}
+                    <button type="button" class="close" data-dismiss="alert">
+                        <span>&times;</span>
+                    </button>
+                </div>
+            {% endfor %}
+        </div>
+    </div>
+    {% endif %}
 
     {% block content_wrapper %}
         {% block content %}{% endblock %}
     {% endblock %}
 
-    {% if not request.path|slice:":4" == "/map" %} 
-    {% endif %}
+    {% include 'includes/support_widget.html' %}
+
+    <footer class="site-footer-main site-footer-main--compact">
+        <div class="container site-footer-main__inner site-footer-main__inner--compact">
+            <div class="row">
+                <div class="col-lg-4 mb-4">
+                    <a class="site-brand mb-3" href="{% url 'home' %}">
+                        <span class="site-brand__mark"><i class="fas fa-clinic-medical"></i></span>
+                        <span class="site-brand__text">
+                            <span class="site-brand__eyebrow">GIS Pharma</span>
+                            <span class="site-brand__title">Cửa hàng Dược phẩm</span>
+                        </span>
+                    </a>
+                    <p class="footer-brand-copy">
+                        Tra cứu thuốc, xem chi nhánh và đặt hàng theo vị trí trên cùng một hệ thống.
+                    </p>
+                </div>
+                <div class="col-sm-6 col-lg-2 mb-4">
+                    <div class="footer-heading">Khám phá</div>
+                    <ul class="footer-links">
+                        <li><a href="{% url 'home' %}">Trang chủ</a></li>
+                        <li><a href="{% url 'product_list' %}">Sản phẩm</a></li>
+                        <li><a href="{% url 'map_view' %}">Bản đồ nhà thuốc</a></li>
+                        <li><a href="{% url 'cart_detail' %}">Giỏ hàng</a></li>
+                    </ul>
+                </div>
+                <div class="col-sm-6 col-lg-3 mb-4">
+                    <div class="footer-heading">Tài khoản</div>
+                    <ul class="footer-links">
+                        {% if user.is_authenticated %}
+                            <li><a href="{% url 'account' %}">Tài khoản cá nhân</a></li>
+                            <li><a href="{% url 'order_history' %}">Lịch sử đơn hàng</a></li>
+                            {% if user.is_staff %}
+                                <li><a href="{% url 'custom_admin_dashboard' %}">Quản trị hệ thống</a></li>
+                            {% endif %}
+                            <li><a href="{% url 'logout' %}">Đăng xuất</a></li>
+                        {% else %}
+                            <li><a href="{% url 'login' %}?next={{ request.get_full_path|urlencode }}">Đăng nhập</a></li>
+                            <li><a href="{% url 'register' %}?next={{ request.get_full_path|urlencode }}">Đăng ký</a></li>
+                        {% endif %}
+                    </ul>
+                </div>
+                <div class="col-lg-3 mb-4">
+                    <div class="footer-heading">Liên hệ</div>
+                    <ul class="footer-links">
+                        <li><span>Hỗ trợ mua hàng: 1800 6928</span></li>
+                        <li><span>Phục vụ mỗi ngày: 08:00 - 22:00</span></li>
+                        <li><span>Email: support@gispharma.local</span></li>
+                        <li><a href="{% url 'map_view' %}">Xem chi nhánh gần bạn</a></li>
+                    </ul>
+                </div>
+            </div>
+            <div class="footer-bottom">
+                GIS Pharma © 2026. Hệ thống bán thuốc trực tuyến kết hợp bản đồ nhà thuốc.
+            </div>
+        </div>
+    </footer>
 
     <script src="https://code.jquery.com/jquery-3.5.1.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@4.6.2/dist/js/bootstrap.bundle.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@splidejs/splide@4.1.4/dist/js/splide.min.js"></script>
+    <script src="{% static 'js/site.js' %}"></script>
+    <script src="{% static 'js/support-widget.js' %}"></script>
+    {% block extra_js %}{% endblock %}
 </body>
 </html>

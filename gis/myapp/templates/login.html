@@ -1,38 +1,94 @@
 {% extends "base.html" %}
 {% block title %}Đăng nhập{% endblock %}
+{% block body_class %}site-page login-page{% endblock %}
 
 {% block content_wrapper %}
-<div class="container mt-5">
-    <div class="row justify-content-center">
-        <div class="col-md-5">
-            <div class="card shadow-sm">
-                <div class="card-header bg-success text-white text-center">
-                    <h4>ĐĂNG NHẬP</h4>
+<div class="auth-layout">
+    <div class="container">
+        <div class="auth-shell">
+            <section class="auth-panel">
+                <div class="section-heading__eyebrow text-white">
+                    <i class="fas fa-user-shield"></i>
+                    <span>Đăng nhập tài khoản</span>
                 </div>
-                <div class="card-body">
-                    {% if messages %}
-                        {% for message in messages %}
-                            <div class="alert alert-danger">{{ message }}</div>
-                        {% endfor %}
+                <h1>Truy cập tài khoản để quản lý đơn hàng và giỏ thuốc của bạn.</h1>
+                <p>Đăng nhập để xem lịch sử mua hàng, theo dõi đơn và sử dụng đầy đủ các chức năng trên hệ thống.</p>
+
+                <div class="auth-benefits">
+                    <div class="auth-benefit">
+                        <i class="fas fa-receipt"></i>
+                        <div>
+                            <strong>Lịch sử đơn hàng</strong>
+                            <div>Xem lại các đơn đã đặt và trạng thái xử lý từng đơn.</div>
+                        </div>
+                    </div>
+                    <div class="auth-benefit">
+                        <i class="fas fa-shopping-cart"></i>
+                        <div>
+                            <strong>Giỏ hàng cá nhân</strong>
+                            <div>Quản lý sản phẩm đã chọn trên cùng một tài khoản.</div>
+                        </div>
+                    </div>
+                    <div class="auth-benefit">
+                        <i class="fas fa-id-card"></i>
+                        <div>
+                            <strong>Tài khoản cá nhân</strong>
+                            <div>Xem thông tin tài khoản và các chức năng theo quyền truy cập.</div>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <section class="content-card auth-card">
+                <h2>Đăng nhập</h2>
+                <p>Nhập tên tài khoản và mật khẩu để tiếp tục.</p>
+
+                <form method="post" autocomplete="off" class="auth-form-grid">
+                    {% csrf_token %}
+                    <input type="hidden" name="next" value="{{ request.GET.next|default:'' }}">
+
+                    {% if form.non_field_errors %}
+                        {{ form.non_field_errors }}
                     {% endif %}
-                    
-                    <form method="post" autocomplete="off">
-                        {% csrf_token %}
-                        <div class="form-group">
-                            <label>Tên đăng nhập</label>
-                            {{ form.username }}
-                        </div>
-                        <div class="form-group">
-                            <label>Mật khẩu</label>
-                            {{ form.password }}
-                        </div>
-                        <button type="submit" class="btn btn-success btn-block font-weight-bold">Đăng nhập</button>
-                    </form>
+
+                    {% for field in form %}
+                    <div>
+                        <label for="{{ field.id_for_label }}">{{ field.label }}</label>
+                        {{ field }}
+                        {% if field.errors %}
+                            {{ field.errors }}
+                        {% endif %}
+                    </div>
+                    {% endfor %}
+
+                    <button type="submit" class="pharma-btn">
+                        <i class="fas fa-sign-in-alt"></i>
+                        <span>Đăng nhập</span>
+                    </button>
+                </form>
+
+                <div class="auth-recovery-grid mt-3">
+                    <a href="{% url 'password_reset' %}" class="auth-recovery-card">
+                        <span class="auth-recovery-card__icon"><i class="fas fa-key"></i></span>
+                        <span class="auth-recovery-card__content">
+                            <strong>Quên mật khẩu?</strong>
+                            <small>Nhập email để nhận liên kết đặt lại mật khẩu.</small>
+                        </span>
+                    </a>
+                    <a href="{% url 'password_reset' %}?recovery=username" class="auth-recovery-card">
+                        <span class="auth-recovery-card__icon"><i class="fas fa-user-search"></i></span>
+                        <span class="auth-recovery-card__content">
+                            <strong>Quên tên đăng nhập?</strong>
+                            <small>Dùng email khôi phục. Email gửi về sẽ kèm lại tên đăng nhập của bạn.</small>
+                        </span>
+                    </a>
                 </div>
-                <div class="card-footer text-center">
-                    <small>Chưa có tài khoản? <a href="{% url 'register' %}">Đăng ký ngay</a></small>
+
+                <div class="auth-switch">
+                    Chưa có tài khoản?
+                    <a href="{% url 'register' %}{% if request.GET.next %}?next={{ request.GET.next|urlencode }}{% endif %}">Đăng ký ngay</a>
                 </div>
-            </div>
+            </section>
         </div>
     </div>
 </div>

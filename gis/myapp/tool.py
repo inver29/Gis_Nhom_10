@@ -1,6 +1,9 @@
 import math
-import polyline
-import requests
+
+try:
+    import requests
+except ImportError:
+    requests = None
 
 
 TRAFFIC_CONFIG = {
@@ -15,6 +18,9 @@ TRAFFIC_CONFIG = {
         'walking': 1.05,
     },
 }
+
+NOMINATIM_SEARCH_URL = "https://nominatim.openstreetmap.org/search"
+NOMINATIM_REVERSE_URL = "https://nominatim.openstreetmap.org/reverse"
 
 
 def calculate_air_distance_km(start_lat, start_lng, end_lat, end_lng):
@@ -44,8 +50,9 @@ def calculate_air_distance_km(start_lat, start_lng, end_lat, end_lng):
 def estimate_road_distance_km(air_distance_km, delivery_mode='motorbike'):
     """
     Ước lượng quãng đường di chuyển thực tế từ khoảng cách đường chim bay.
+    Giữ cùng một quãng đường cơ sở cho mọi phương tiện; chỉ khác thời gian di chuyển.
     """
-    road_factor = TRAFFIC_CONFIG['road_distance_factor'].get(delivery_mode, 1.2)
+    road_factor = TRAFFIC_CONFIG['road_distance_factor'].get('motorbike', 1.2)
     return air_distance_km * road_factor
 
 
@@ -68,6 +75,102 @@ def calculate_shipping_fee(estimated_distance_km):
     return shipping_fee_value, shipping_fee_text
 
 
+def search_address_candidates(query, limit=5, country_codes='vn'):
+    """
+    Tim cac dia diem gan dung theo tu khoa dia chi.
+    """
+    query_text = (query or '').strip()
+    if not query_text:
+        return []
+    if requests is None:
+        return []
+
+    try:
+        limit_value = int(limit)
+    except (TypeError, ValueError):
+        limit_value = 5
+
+    limit_value = max(1, min(limit_value, 8))
+
+    response = requests.get(
+        NOMINATIM_SEARCH_URL,
+        params={
+            'q': query_text,
+            'format': 'json',
+            'limit': limit_value,
+            'countrycodes': country_codes,
+            'addressdetails': 1,
+        },
+        headers={
+            'User-Agent': 'GIS-Pharma/1.0 (Django address search)',
+            'Accept-Language': 'vi,en',
+        },
+        timeout=10,
+    )
+    response.raise_for_status()
+
+    search_results = []
+
+    for item in response.json():
+        lat = item.get('lat')
+        lng = item.get('lon')
+        if lat is None or lng is None:
+            continue
+
+        try:
+            lat_value = float(lat)
+            lng_value = float(lng)
+        except (TypeError, ValueError):
+            continue
+
+        search_results.append(
+            {
+                'display_name': item.get('display_name', query_text),
+                'lat': lat_value,
+                'lng': lng_value,
+                'type_label': item.get('type') or item.get('class') or 'location',
+            }
+        )
+
+    return search_results
+
+
+def reverse_geocode_coordinates(lat, lng):
+    """
+    Tra ve dia chi gan nhat tu cap toa do.
+    """
+    if requests is None:
+        return {
+            'display_name': '',
+            'lat': float(lat),
+            'lng': float(lng),
+        }
+
+    response = requests.get(
+        NOMINATIM_REVERSE_URL,
+        params={
+            'lat': lat,
+            'lon': lng,
+            'format': 'jsonv2',
+            'zoom': 18,
+            'addressdetails': 1,
+        },
+        headers={
+            'User-Agent': 'GIS-Pharma/1.0 (Django reverse geocode)',
+            'Accept-Language': 'vi',
+        },
+        timeout=10,
+    )
+    response.raise_for_status()
+
+    data = response.json()
+    return {
+        'display_name': data.get('display_name', ''),
+        'lat': float(data.get('lat', lat)),
+        'lng': float(data.get('lon', lng)),
+    }
+
+
 class DeliveryRoutingService:
     """
     Service trung tâm xử lý định tuyến giao hàng.
@@ -75,21 +178,29 @@ class DeliveryRoutingService:
 
     OSRM_BASE_URL = "http://router.project-osrm.org/route/v1"
 
-    def get_osrm_route_points(self, start_lat, start_lng, end_lat, end_lng, delivery_mode='motorbike'):
+    def get_osrm_route_data(self, start_lat, start_lng, end_lat, end_lng):
         """
-        Gọi OSRM để lấy tuyến đường đẹp hiển thị trên bản đồ.
+        Gọi OSRM một lần để lấy hình học tuyến và quãng đường cơ sở dùng chung cho mọi phương tiện.
         """
-        osrm_profile = 'foot' if delivery_mode == 'walking' else 'driving'
-        route_coordinates = f"{start_lng},{start_lat};{end_lng},{end_lat}"
-        request_url = f"{self.OSRM_BASE_URL}/{osrm_profile}/{route_coordinates}"
+        fallback_points = [
+            [float(start_lat), float(start_lng)],
+            [float(end_lat), float(end_lng)],
+        ]
 
+        if requests is None:
+            return {
+                'route_points': fallback_points,
+                'distance_km': None,
+            }
+
+        route_coordinates = f"{start_lng},{start_lat};{end_lng},{end_lat}"
+        request_url = f"{self.OSRM_BASE_URL}/driving/{route_coordinates}"
         query_params = {
             'overview': 'full',
-            'geometries': 'polyline',
+            'geometries': 'geojson',
             'steps': 'true',
             'alternatives': 'false',
         }
-
         request_headers = {
             'User-Agent': 'Mozilla/5.0',
         }
@@ -105,14 +216,28 @@ class DeliveryRoutingService:
         if response.status_code == 200 and response_data.get('code') == 'Ok':
             route_list = response_data.get('routes', [])
             if route_list:
-                encoded_geometry = route_list[0].get('geometry')
-                if encoded_geometry:
-                    return polyline.decode(encoded_geometry)
+                route_item = route_list[0]
+                geometry = route_item.get('geometry') or {}
+                route_coordinates = geometry.get('coordinates', [])
+                route_points = [
+                    [point[1], point[0]]
+                    for point in route_coordinates
+                    if len(point) >= 2
+                ] or fallback_points
+                distance_km = None
+                try:
+                    distance_km = round(float(route_item.get('distance', 0)) / 1000, 2)
+                except (TypeError, ValueError):
+                    distance_km = None
+                return {
+                    'route_points': route_points,
+                    'distance_km': distance_km,
+                }
 
-        return [
-            [float(start_lat), float(start_lng)],
-            [float(end_lat), float(end_lng)],
-        ]
+        return {
+            'route_points': fallback_points,
+            'distance_km': None,
+        }
 
     def estimate_travel_time_minutes(self, estimated_distance_km, delivery_mode):
         """
@@ -143,26 +268,37 @@ class DeliveryRoutingService:
 
         air_distance_km = calculate_air_distance_km(start_lat, start_lng, end_lat, end_lng)
         estimated_distance_km = estimate_road_distance_km(air_distance_km, delivery_mode)
-        estimated_duration_min = self.estimate_travel_time_minutes(estimated_distance_km, delivery_mode)
-        shipping_fee_value, shipping_fee_text = calculate_shipping_fee(estimated_distance_km)
 
         try:
-            route_points = self.get_osrm_route_points(
+            route_data = self.get_osrm_route_data(
                 start_lat,
                 start_lng,
                 end_lat,
                 end_lng,
-                delivery_mode,
             )
         except Exception:
-            route_points = [
-                [start_lat, start_lng],
-                [end_lat, end_lng],
-            ]
+            route_data = {
+                'route_points': [
+                    [start_lat, start_lng],
+                    [end_lat, end_lng],
+                ],
+                'distance_km': None,
+            }
+
+        route_points = route_data.get('route_points') or [
+            [start_lat, start_lng],
+            [end_lat, end_lng],
+        ]
+        shared_distance_km = route_data.get('distance_km')
+        if shared_distance_km is None:
+            shared_distance_km = round(estimated_distance_km, 2)
+
+        estimated_duration_min = self.estimate_travel_time_minutes(shared_distance_km, delivery_mode)
+        shipping_fee_value, shipping_fee_text = calculate_shipping_fee(shared_distance_km)
 
         route_result = {
             'id': 0,
-            'distance_km': round(estimated_distance_km, 2),
+            'distance_km': round(shared_distance_km, 2),
             'duration_min': estimated_duration_min,
             'route_points': route_points,
             'shipping_fee': shipping_fee_text,
@@ -214,3 +350,46 @@ class DeliveryRoutingService:
             return {'error': 'Không tìm được chi nhánh phù hợp.'}
 
         return best_result
+
+
+def choose_best_pharmacy_fast(service, pharmacies, delivery_lat, delivery_lng, delivery_mode='motorbike'):
+    if not pharmacies:
+        return {'error': 'Khong co nha thuoc kha dung.'}
+
+    best_pharmacy = None
+    shortest_distance_km = None
+
+    for pharmacy in pharmacies:
+        if pharmacy.lat is None or pharmacy.lng is None:
+            continue
+
+        air_distance_km = calculate_air_distance_km(
+            pharmacy.lat,
+            pharmacy.lng,
+            delivery_lat,
+            delivery_lng,
+        )
+        current_distance_km = estimate_road_distance_km(air_distance_km, delivery_mode)
+
+        if shortest_distance_km is None or current_distance_km < shortest_distance_km:
+            shortest_distance_km = current_distance_km
+            best_pharmacy = pharmacy
+
+    if best_pharmacy is None:
+        return {'error': 'Khong tim duoc chi nhanh phu hop.'}
+
+    route_result = service.estimate_route(
+        start_lat=best_pharmacy.lat,
+        start_lng=best_pharmacy.lng,
+        end_lat=delivery_lat,
+        end_lng=delivery_lng,
+        delivery_mode=delivery_mode,
+    )
+    if 'routes' not in route_result or not route_result['routes']:
+        return {'error': 'Khong the tinh duoc chi nhanh giao hang phu hop.'}
+
+    return {
+        'pharmacy': best_pharmacy,
+        'route': route_result['routes'][0],
+        'mode': route_result.get('mode', delivery_mode),
+    }

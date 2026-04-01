@@ -1,0 +1,125 @@
+{% extends "admin_panel/base.html" %}
+
+{% block admin_content %}
+<section class="admin-summary-grid">
+    {% for card in summary_cards %}
+    <article class="admin-surface admin-summary-card tone-{{ card.tone }}">
+        <div class="admin-summary-card__label">{{ card.label }}</div>
+        <div class="admin-summary-card__value">{{ card.value }}</div>
+    </article>
+    {% endfor %}
+</section>
+
+<section class="admin-surface admin-section mb-4">
+    <div class="admin-section-head">
+        <div>
+            <h2>Bộ lọc và tra cứu</h2>
+            <p>Lọc nhanh dữ liệu theo từ khóa, trạng thái và tiêu chí quản lý phù hợp.</p>
+        </div>
+        {% if create_allowed %}
+        <a href="{% url 'custom_admin_create' model_key %}" class="btn-admin btn-admin-success">
+            <i class="fas fa-plus"></i>
+            <span>{{ create_label }}</span>
+        </a>
+        {% endif %}
+    </div>
+
+    <form method="get" class="admin-filter-grid">
+        <div class="admin-field mb-0">
+            <label>Tìm kiếm</label>
+            <input type="text" name="q" value="{{ keyword }}" placeholder="Nhập từ khóa cần tìm...">
+        </div>
+
+        {% for item in filter_options %}
+        <div class="admin-field mb-0">
+            <label>{{ item.label }}</label>
+            <select name="{{ item.name }}">
+                {% for value, label in item.options %}
+                <option value="{{ value }}" {% if item.value == value %}selected{% endif %}>{{ label }}</option>
+                {% endfor %}
+            </select>
+        </div>
+        {% endfor %}
+
+        <div class="admin-field mb-0">
+            <button type="submit" class="btn-admin btn-admin-primary">
+                <i class="fas fa-search"></i>
+                <span>Áp dụng</span>
+            </button>
+        </div>
+    </form>
+</section>
+
+<section class="admin-surface admin-section" data-pagination-key="admin-list">
+    <div class="admin-section-head">
+        <div>
+            <h2>Danh sách {{ title }}</h2>
+            <p>Dữ liệu hiển thị theo đúng bộ lọc và phạm vi quyền hiện tại của tài khoản quản trị. Mỗi trang hiển thị 5 mục.</p>
+        </div>
+    </div>
+
+    <div class="admin-table-wrap">
+        <table class="admin-table">
+            <thead>
+                <tr>
+                    {% for column in columns %}
+                    <th>{{ column }}</th>
+                    {% endfor %}
+                    <th>Thao tác</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for row in rows %}
+                <tr>
+                    {% for cell in row.cells %}
+                    <td>{{ cell }}</td>
+                    {% endfor %}
+                    <td>
+                        <div class="admin-action-stack">
+                            {% for action in row.actions %}
+                            <a href="{{ action.url }}" class="btn btn-sm {{ action.class }}">
+                                <i class="{{ action.icon }}"></i>
+                                <span>{{ action.label }}</span>
+                            </a>
+                            {% empty %}
+                            <span class="admin-cell-sub">Không có thao tác</span>
+                            {% endfor %}
+                        </div>
+                    </td>
+                </tr>
+                {% empty %}
+                <tr>
+                    <td colspan="{{ columns|length|add:1 }}">
+                        <div class="admin-empty-state">Không có dữ liệu phù hợp với bộ lọc hiện tại.</div>
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+
+    {% if page_obj.has_other_pages %}
+    <nav class="admin-pagination" aria-label="Phân trang danh sách quản trị">
+        <div class="admin-pagination__controls">
+            {% if page_obj.has_previous %}
+            <a class="admin-pagination__item admin-pagination__item--nav" href="?q={{ keyword }}{% for item in filter_options %}&{{ item.name }}={{ item.value }}{% endfor %}&page={{ page_obj.previous_page_number }}">Trước</a>
+            {% else %}
+            <span class="admin-pagination__item admin-pagination__item--nav is-disabled">Trước</span>
+            {% endif %}
+
+            {% for page_number in page_obj.paginator.page_range %}
+                {% if page_number >= page_obj.number|add:'-2' and page_number <= page_obj.number|add:'2' %}
+                <a class="admin-pagination__item {% if page_number == page_obj.number %}is-active{% endif %}" href="?q={{ keyword }}{% for item in filter_options %}&{{ item.name }}={{ item.value }}{% endfor %}&page={{ page_number }}">{{ page_number }}</a>
+                {% endif %}
+            {% endfor %}
+
+            {% if page_obj.has_next %}
+            <a class="admin-pagination__item admin-pagination__item--nav" href="?q={{ keyword }}{% for item in filter_options %}&{{ item.name }}={{ item.value }}{% endfor %}&page={{ page_obj.next_page_number }}">Sau</a>
+            {% else %}
+            <span class="admin-pagination__item admin-pagination__item--nav is-disabled">Sau</span>
+            {% endif %}
+        </div>
+    </nav>
+    {% endif %}
+</section>
+{% endblock %}

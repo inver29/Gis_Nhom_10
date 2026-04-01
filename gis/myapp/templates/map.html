@@ -1,470 +1,296 @@
 {% extends "base.html" %}
-{% block title %} Bản đồ Mạng lưới Nhà thuốc {% endblock %}
+{% block title %}Bản đồ mạng lưới nhà thuốc{% endblock %}
+{% block body_class %}site-page map-page{% endblock %}
 
 {% block content_wrapper %}
-<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.css" />
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.css">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.js"></script>
 
 <style>
-    .sidebar-panel { width: 450px; background: #f8f9fa; }
-    .pharmacy-card { border-left: 5px solid #28a745; margin-bottom: 15px; background: white; cursor: pointer; transition: 0.3s; }
-    .pharmacy-card:hover { transform: scale(1.02); box-shadow: 0 5px 15px rgba(0,0,0,0.1); }
-    .distance-badge { font-size: 0.85rem; background: #6c757d; color: white; padding: 2px 8px; border-radius: 4px; display: none; }
-    .distance-badge.road-dist { background: #007bff; }
-
-    .user-pulse-icon { background-color: #007bff; width: 20px; height: 20px; border-radius: 50%; border: 3px solid white; position: relative; }
-    .user-pulse-icon::after { content: ""; position: absolute; top: -10px; left: -10px; width: 40px; height: 40px; background: rgba(0, 123, 255, 0.4); border-radius: 50%; animation: pulse 2s infinite; }
-    @keyframes pulse { 0% { transform: scale(0.5); opacity: 1; } 100% { transform: scale(1.5); opacity: 0; } }
-
-    .route-item { cursor: pointer; border-left: 4px solid transparent; }
-    .route-item:hover { background-color: #e9ecef; }
-    .route-item.active-route { background-color: #e2e6ea; border-left: 4px solid #007bff; }
-
-    .leaflet-popup-content { text-align: center; margin: 10px; width: 200px; }
-    .popup-btn { margin-top: 8px; width: 100%; }
-
-    .transport-mode-group { display: flex; gap: 5px; margin-bottom: 15px; }
-    .mode-btn { flex: 1; padding: 8px; border: 1px solid #ccc; background: white; border-radius: 5px; cursor: pointer; font-size: 14px; transition: 0.2s; }
-    .mode-btn.active { background: #28a745; color: white; border-color: #28a745; font-weight: bold; }
-    .mode-btn:hover { background: #e9ecef; }
-    .mode-btn.active:hover { background: #218838; }
+    .map-page .site-footer-main{display:none}
+    .map-page .site-header-shell{display:none}
+    .map-page .site-alerts{display:none}
+    .map-page .site-page-shell,
+    .map-page .site-page-section{padding-top:0!important;margin-top:0!important}
+    .map-shell{display:grid;grid-template-columns:minmax(360px,420px) minmax(0,1fr);gap:18px;padding:12px 24px 24px 32px;min-height:100vh}
+    .map-sidebar,.map-main{position:sticky;top:12px;height:calc(100vh - 24px);min-height:680px}
+    .map-sidebar{display:flex;flex-direction:column;gap:16px}
+    .map-main{display:grid;grid-template-rows:auto minmax(0,1fr);gap:16px;min-width:0;overflow:visible}
+    .map-panel{background:rgba(255,255,255,.97);border-radius:26px;border:1px solid rgba(17,70,184,.08);box-shadow:0 18px 45px rgba(19,68,168,.08);overflow:hidden}
+    .map-inline-header.map-panel{overflow:visible;position:relative;z-index:1200}
+    .map-inline-header{padding:18px 18px 14px}
+    .map-inline-header .site-header__main--compact{padding:0;box-shadow:none;background:transparent;grid-template-columns:minmax(210px,280px) auto;justify-content:space-between}
+    .map-inline-header .site-nav--compact{margin-top:12px;padding-top:12px}
+    .map-inline-header .site-header__actions{align-self:center}
+    .map-inline-header .account-menu,.map-inline-header .account-dropdown{position:relative;z-index:1305}
+    .map-panel--head{padding:22px;background:linear-gradient(135deg,#1f64e0 0%,#1146b8 100%);color:#fff}
+    .map-panel--head h1{margin:0 0 8px;font-size:1.45rem;font-weight:900}
+    .map-workspace{flex:1;display:flex;flex-direction:column;min-height:0}
+    .map-actions,.map-summary,.map-filter,.map-subhead{padding:18px}
+    .map-actions__row,.map-mode-group{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+    .map-mode-group{grid-template-columns:repeat(3,minmax(0,1fr));padding:0 18px 18px;background:linear-gradient(180deg,rgba(239,245,255,.76) 0%,rgba(255,255,255,0) 100%)}
+    .map-mode-btn{display:inline-flex;align-items:center;justify-content:center;gap:10px;min-height:52px;padding:12px 14px;border-radius:18px;border:1px solid rgba(17,70,184,.12);background:linear-gradient(180deg,#fff 0%,#f4f8ff 100%);color:#24416c;font-weight:800;box-shadow:0 10px 24px rgba(19,68,168,.08);transition:transform .18s ease,box-shadow .18s ease,border-color .18s ease,background .18s ease,color .18s ease}
+    .map-mode-btn i{display:inline-flex;align-items:center;justify-content:center;width:28px;height:28px;border-radius:50%;background:#eef4ff;color:#1f64e0;font-size:.95rem;transition:background .18s ease,color .18s ease,transform .18s ease}
+    .map-mode-btn:hover{transform:translateY(-1px);border-color:rgba(31,100,224,.24);box-shadow:0 16px 32px rgba(19,68,168,.12)}
+    .map-mode-btn.active{background:linear-gradient(135deg,#1f64e0 0%,#1146b8 100%);border-color:transparent;color:#fff;box-shadow:0 18px 36px rgba(17,70,184,.2)}
+    .map-mode-btn.active i{background:rgba(255,255,255,.16);color:#fff;transform:scale(1.02)}
+    .map-summary__card,.map-branch-card{border-radius:20px;padding:16px;background:linear-gradient(180deg,#fff 0%,#f5f9ff 100%);border:1px solid rgba(17,70,184,.08)}
+    .map-summary__label{display:block;margin-bottom:8px;font-size:.78rem;font-weight:800;letter-spacing:.05em;text-transform:uppercase;color:#6b7c96}
+    .map-summary__nearest{display:none;margin-top:14px;padding:14px;border-radius:18px;background:#eef5ff;color:#1146b8}
+    .map-list,.map-route-panel,.map-order-panel{flex:1;min-height:0;overflow-y:auto;overscroll-behavior:contain;padding:0 18px 18px}
+    .map-route-panel,.map-order-panel{display:none}
+    .map-card{display:grid;grid-template-columns:104px minmax(0,1fr);gap:14px;padding:14px;border-radius:22px;background:#fff;border:1px solid rgba(17,70,184,.08);box-shadow:0 10px 24px rgba(19,68,168,.06);cursor:pointer;margin-bottom:14px}
+    .map-card.is-active,.map-card:hover{transform:translateY(-2px);box-shadow:0 18px 38px rgba(19,68,168,.12);border-color:rgba(31,100,224,.24)}
+    .map-card.is-nearest{border-color:rgba(22,163,74,.32);background:linear-gradient(180deg,#fff 0%,#f3fff8 100%)}
+    .map-card__image{width:104px;height:104px;border-radius:18px;overflow:hidden;background:#eef3ff}
+    .map-card__image img{width:100%;height:100%;object-fit:cover}
+    .map-popup__image img,.map-popup__gallery-slide img,.map-branch-card__image img{width:100%;height:100%;object-fit:contain;background:#fff}
+    .map-card__title{display:flex;justify-content:space-between;gap:8px;margin-bottom:6px}.map-card__title h3{margin:0;font-size:1.03rem;font-weight:900}
+    .map-card__address,.map-card__meta{color:#66758c;font-size:.92rem;margin-bottom:6px}
+    .map-card__actions{display:flex;flex-wrap:wrap;gap:8px;margin-top:10px}
+    .map-badge{display:inline-flex;align-items:center;justify-content:center;padding:6px 10px;border-radius:999px;font-size:.8rem;font-weight:800;background:#eef5ff;color:#1146b8}
+    .map-subhead{display:flex;justify-content:space-between;align-items:center;gap:12px}.map-subhead h2{margin:0;font-size:1.2rem;font-weight:900}
+    .map-route-status{padding:0 18px 12px;color:#66758c}.map-route-status.is-error{color:#c62839}
+    .map-route-item{border-radius:18px;border:1px solid rgba(17,70,184,.08);padding:16px;background:#fff;cursor:pointer;margin-bottom:12px}
+    .map-route-item.is-active{border-color:rgba(31,100,224,.26);background:#f4f8ff;box-shadow:0 12px 24px rgba(19,68,168,.1)}
+    .map-route-item__meta{display:flex;justify-content:space-between;gap:10px;margin-bottom:8px;font-weight:800}
+    .map-branch-card{margin:0 18px 18px}.map-branch-card__image{height:180px;border-radius:20px;overflow:hidden;margin-bottom:16px}
+    .map-branch-card__notice{margin-bottom:14px;padding:12px 14px;border-radius:16px;background:#fff8e8;border:1px solid rgba(245,158,11,.25);color:#9a6700}
+    .map-page #direction-panel.map-route-panel,.map-page #select-branch-panel.map-order-panel{position:static !important;top:auto !important;left:auto !important;right:auto !important;bottom:auto !important;z-index:auto !important;background:transparent !important;padding:0 !important;display:none;flex-direction:column}
+    .map-canvas{height:100%;min-height:0}
+    #map{width:100%;height:100%;min-height:680px}
+    .map-popup{width:260px}.map-popup__image,.map-popup__gallery-slide{height:140px;border-radius:16px;overflow:hidden;margin-bottom:12px}
+    .map-popup__actions{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:12px}
+    .map-popup__actions a,.map-popup__actions button{border:none;border-radius:12px;padding:10px 12px;font-weight:800;text-align:center}
+    .map-popup__actions button{background:linear-gradient(135deg,#1f64e0 0%,#1146b8 100%);color:#fff}.map-popup__actions a{background:#eef5ff;color:#1146b8;text-decoration:none}
+    .map-popup__splide .splide__track{padding:0}
+    .map-popup__splide .splide__arrow{width:32px;height:32px}
+    .map-popup__splide .splide__arrow--prev{left:8px}
+    .map-popup__splide .splide__arrow--next{right:8px}
+    @media (max-width:1199px){.map-shell{grid-template-columns:1fr;padding:12px 18px 18px}.map-sidebar,.map-main{position:relative;top:auto;height:auto;min-height:0}.map-canvas{min-height:560px}#map{min-height:560px}}
+    @media (max-width:767px){.map-shell{padding:10px 14px 16px}.map-inline-header{padding:14px}.map-actions__row,.map-mode-group{grid-template-columns:1fr}.map-card{grid-template-columns:1fr}.map-card__image{width:100%;height:180px}}
 </style>
 
-<div class="main-container">
-    <div class="sidebar-panel">
-        <div style="padding: 15px; background: #28a745; color: white;">
-            <h5 class="mb-0"><i class="fas fa-clinic-medical"></i> Danh Sách Nhà Thuốc</h5>
-            <div id="status-area">
-                <small id="status-msg"><i class="fas fa-spinner fa-spin"></i> Đang định vị...</small>
-                <div id="calc-progress" class="progress mt-2" style="height: 5px; display: none;">
-                    <div class="progress-bar bg-warning" role="progressbar" style="width: 0%"></div>
-                </div>
-            </div>
-        </div>
-
-        <div id="radius-box" style="padding: 10px;">
-            <label class="font-weight-bold">Tìm trong bán kính:</label>
-            <select id="radius-select" class="form-control" onchange="filterByRadius()">
-                <option value="0">Tất cả</option>
-                <option value="0.5">Dưới 500m</option>
-                <option value="1.0">Dưới 1km</option>
-                <option value="2.0">Dưới 2km</option>
-                <option value="5.0">Dưới 5km</option>
-                <option value="10.0">Dưới 10km</option>
-                <option value="15.0">Dưới 15km</option>
-            </select>
-        </div>
-
-        <div id="listing-panel" class="scrollable-content" style="padding: 10px;">
-            <div id="pharmacy-list-container">
-                {% if pharmacies %}
-                    {% for item in pharmacies %}
-                    <div class="card pharmacy-card p-3"
-                         id="card-{{ item.id }}"
-                         data-lat="{{ item.lat|stringformat:'.6f' }}"
-                         data-lng="{{ item.lng|stringformat:'.6f' }}"
-                         data-id="{{ item.id }}"
-                         onclick="handleCardClick(this)">
-                        <div class="d-flex">
-                            <img src="{{ item.image }}" style="width: 80px; height: 80px; object-fit: cover; border-radius: 5px; margin-right: 10px;">
-                            <div style="width: 100%;">
-                                <div class="d-flex justify-content-between">
-                                    <h6 class="font-weight-bold mb-1">{{ item.name }}</h6>
-                                    <span id="dist-badge-{{ item.id }}" class="distance-badge">...</span>
-                                </div>
-                                <small class="text-muted"><i class="fas fa-map-marker-alt"></i> {{ item.address }}</small><br>
-                                <div class="mt-2">
-                                    <button class="btn btn-sm btn-outline-success" type="button"
-                                        data-lat="{{ item.lat|stringformat:'.6f' }}"
-                                        data-lng="{{ item.lng|stringformat:'.6f' }}"
-                                        data-name="{{ item.name }}"
-                                        onclick="handleRouteClick(event, this)">
-                                        <i class="fas fa-route"></i> Đường đi
-                                    </button>
-                                    <a href="{% url 'pharmacy_detail' item.id %}" class="btn btn-sm btn-outline-success">Chi tiết</a>
-                                    <button class="btn btn-sm btn-outline-success" type="button"
-                                        onclick="openSelectBranch(event, parseInt('{{ item.id }}'), '{{ item.name|escapejs }}')">
-                                        Đặt hàng
-                                    </button>
-                                </div>
-                            </div>
+<div class="map-shell">
+    <aside class="map-sidebar">
+        <section class="map-panel map-panel--head">
+            <h1>Bản đồ nhà thuốc</h1>
+            <p>Chọn vị trí để xem chi nhánh gần nhất, tính đường đi và chuyển nhanh sang bước đặt hàng.</p>
+        </section>
+        <section class="map-panel map-workspace">
+            <div class="map-actions"><div class="map-actions__row"><button class="pharma-btn" type="button" onclick="findMyLocation()"><i class="fas fa-crosshairs"></i><span>Vị trí của tôi</span></button>{% if saved_address %}<button class="pharma-outline-btn" type="button" onclick="useSavedAddress()"><i class="fas fa-map-pin"></i><span>Địa chỉ đã lưu</span></button>{% else %}<a class="pharma-outline-btn" href="{% url 'account' %}"><i class="fas fa-id-card"></i><span>Lưu địa chỉ</span></a>{% endif %}</div></div>
+            <div class="map-summary"><div class="map-summary__card"><span class="map-summary__label">Vị trí đang chọn</span><div id="selected-address-text">Chọn một điểm trên bản đồ, tìm địa chỉ hoặc dùng nút vị trí hiện tại.</div><div id="nearest-pharmacy-text" class="map-summary__nearest"></div></div></div>
+            <div class="map-filter"><label for="radius-select">Lọc theo khoảng cách</label><select id="radius-select" class="form-control" onchange="filterByRadius()"><option value="0">Tất cả</option><option value="1">Dưới 1 km</option><option value="2">Dưới 2 km</option><option value="5">Dưới 5 km</option><option value="10">Dưới 10 km</option><option value="15">Dưới 15 km</option></select></div>
+            <div id="listing-panel" class="map-list">
+                {% for item in pharmacies %}
+                <article class="map-card" id="card-{{ item.id }}" data-id="{{ item.id }}" data-pharmacy-id="{{ item.id }}">
+                    <div class="map-card__image">
+                        <img src="{{ item.image }}" alt="{{ item.name }}">
+                    </div>
+                    <div>
+                        <div class="map-card__title">
+                            <h3>{{ item.name }}</h3>
+                            <span id="dist-badge-{{ item.id }}" class="map-badge" style="display:none;"></span>
+                        </div>
+                        <div class="map-card__address"><i class="fas fa-map-marker-alt"></i> {{ item.address }}</div>
+                        <div class="map-card__meta"><i class="fas fa-phone-alt"></i> {{ item.phone }} • {{ item.hours }}</div>
+                        <div class="map-card__actions">
+                            <button class="pharma-outline-btn" type="button" data-action="route" data-pharmacy-id="{{ item.id }}">
+                                <i class="fas fa-route"></i><span>Đường đi</span>
+                            </button>
+                            <a href="{% url 'pharmacy_detail' item.id %}" class="pharma-outline-btn" data-action="detail">
+                                <i class="fas fa-eye"></i><span>Chi tiết</span>
+                            </a>
+                            <button class="pharma-btn" type="button" data-action="order" data-pharmacy-id="{{ item.id }}">
+                                <i class="fas fa-shopping-bag"></i><span>Đặt hàng</span>
+                            </button>
                         </div>
                     </div>
-                    {% endfor %}
-                {% else %}
-                    <div class="alert alert-warning">Chưa có dữ liệu nhà thuốc.</div>
-                {% endif %}
+                </article>
+                {% empty %}
+                <div class="site-empty">
+                    <div class="site-empty__icon"><i class="fas fa-map-marked-alt"></i></div>
+                    <h3>Chưa có nhà thuốc khả dụng</h3>
+                    <p>Vui lòng bổ sung dữ liệu chi nhánh và sản phẩm để hiển thị trên bản đồ.</p>
+                </div>
+                {% endfor %}
             </div>
-        </div>
+            <div id="direction-panel" class="map-route-panel"><div class="map-subhead"><h2 id="dest-title">Đường đi</h2><button class="pharma-outline-btn" type="button" onclick="closeDirectionPanel()" style="max-width:140px;"><i class="fas fa-arrow-left"></i><span>Quay lại</span></button></div><div class="map-mode-group"><button class="map-mode-btn active" type="button" onclick="changeMode('motorbike', this)"><i class="fas fa-motorcycle"></i> Xe máy</button><button class="map-mode-btn" type="button" onclick="changeMode('car', this)"><i class="fas fa-car"></i> Ô tô</button><button class="map-mode-btn" type="button" onclick="changeMode('walking', this)"><i class="fas fa-walking"></i> Đi bộ</button></div><div id="route-status" class="map-route-status" style="display:none;"></div><div id="routes-list"></div></div>
+            <div id="select-branch-panel" class="map-order-panel"><div class="map-subhead"><h2>Tiếp tục đặt hàng</h2><button class="pharma-outline-btn" type="button" onclick="closeSelectBranch()" style="max-width:140px;"><i class="fas fa-arrow-left"></i><span>Quay lại</span></button></div><div id="select-branch-info"></div></div>
+        </section>
+    </aside>
+    <div class="map-main">
+        <section class="map-panel map-inline-header">
+            <div class="site-header__main site-header__main--compact">
+                <a class="site-brand" href="{% url 'home' %}">
+                    <span class="site-brand__mark"><i class="fas fa-clinic-medical"></i></span>
+                    <span class="site-brand__text">
+                        <span class="site-brand__eyebrow">GIS Pharma</span>
+                        <span class="site-brand__title">Cửa hàng Dược phẩm</span>
+                    </span>
+                </a>
 
-        <div id="select-branch-panel" style="display:none; flex-direction: column; padding: 15px; height: 100%;">
-            <button class="btn btn-sm btn-outline-success" onclick="closeSelectBranch()"><i class="fas fa-arrow-left"></i> Quay lại </button>
-            <h5 class="text-success mt-2">
-                Đặt tại: <span id="select-branch-name"></span>
-            </h5>
-            <div id="select-branch-info" class="mt-3"></div>
-        </div>
 
-        <div id="direction-panel" style="display:none; flex-direction: column; padding: 15px; height: 100%;">
-            <button class="btn btn-sm btn-outline-success" onclick="closeDirectionPanel()"><i class="fas fa-arrow-left"></i> Quay lại</button>
-            <h5 class="text-success mt-2">Đến: <span id="dest-title">...</span></h5>
+                <div class="site-header__actions">
+                    <div class="dropdown account-menu">
+                        <button
+                            class="header-action account-trigger dropdown-toggle"
+                            type="button"
+                            id="mapAccountMenuButton"
+                            data-toggle="dropdown"
+                            aria-haspopup="true"
+                            aria-expanded="false"
+                        >
+                            <span class="account-trigger__avatar">
+                                {% if user.is_authenticated %}
+                                    {{ user_display_name|default:user.username|first|upper }}
+                                {% else %}
+                                    <i class="fas fa-user"></i>
+                                {% endif %}
+                            </span>
+                            <span class="account-trigger__copy">
+                                <small>Tài khoản</small>
+                                {% if user.is_authenticated %}
+                                    <strong>Xin chào, {{ user_display_name|default:user.username }}</strong>
+                                {% else %}
+                                    <strong>Đăng nhập / Đăng ký</strong>
+                                {% endif %}
+                            </span>
+                        </button>
 
-            <div class="transport-mode-group mt-2">
-                <button class="mode-btn active" onclick="changeMode('motorbike', this)">
-                    <i class="fas fa-motorcycle"></i> Xe máy
-                </button>
-                <button class="mode-btn" onclick="changeMode('car', this)">
-                    <i class="fas fa-car"></i> Ô tô
-                </button>
-                <button class="mode-btn" onclick="changeMode('walking', this)">
-                    <i class="fas fa-walking"></i> Đi bộ
-                </button>
+                        <div class="dropdown-menu dropdown-menu-right account-dropdown" aria-labelledby="mapAccountMenuButton">
+                            {% if user.is_authenticated %}
+                                <div class="account-dropdown__header">
+                                    <strong>{{ user_display_name|default:user.username }}</strong>
+                                    <span>{{ user.email|default:"Chưa cập nhật email" }}</span>
+                                    <div class="account-dropdown__role">
+                                        {% if user.is_superuser %}
+                                            Quản trị viên
+                                        {% elif user.is_staff %}
+                                            Nhân viên quản trị
+                                        {% else %}
+                                            Khách hàng
+                                        {% endif %}
+                                    </div>
+                                </div>
+                                <a class="dropdown-item" href="{% url 'account' %}"><i class="fas fa-id-card"></i><span>Tài khoản cá nhân</span></a>
+                                <a class="dropdown-item" href="{% url 'order_history' %}"><i class="fas fa-receipt"></i><span>Lịch sử đơn hàng</span></a>
+                                <a class="dropdown-item" href="{% url 'cart_detail' %}"><i class="fas fa-shopping-cart"></i><span>Giỏ hàng của tôi</span></a>
+                                {% if user.is_staff %}
+                                <a class="dropdown-item" href="{% url 'custom_admin_dashboard' %}"><i class="fas fa-user-shield"></i><span>Quản trị hệ thống</span></a>
+                                {% endif %}
+                                <a class="dropdown-item" href="{% url 'logout' %}"><i class="fas fa-sign-out-alt"></i><span>Đăng xuất</span></a>
+                            {% else %}
+                                <div class="account-dropdown__header">
+                                    <strong>Chào bạn</strong>
+                                    <span>Đăng nhập để lưu địa chỉ, theo dõi đơn hàng và tiếp tục mua thuốc thuận tiện hơn.</span>
+                                </div>
+                                <a class="dropdown-item" href="{% url 'login' %}?next={{ request.get_full_path|urlencode }}"><i class="fas fa-sign-in-alt"></i><span>Đăng nhập</span></a>
+                                <a class="dropdown-item" href="{% url 'register' %}?next={{ request.get_full_path|urlencode }}"><i class="fas fa-user-plus"></i><span>Đăng ký</span></a>
+                            {% endif %}
+                        </div>
+                    </div>
+
+                    <a class="header-action header-action--primary" href="{% url 'cart_detail' %}">
+                        <i class="fas fa-shopping-cart"></i>
+                        <span>Giỏ hàng</span>
+                        <span class="header-action__count" data-cart-count>{{ cart_items_count }}</span>
+                    </a>
+                </div>
             </div>
+        </section>
 
-            <div id="loading-box" class="text-center" style="display:none"><div class="spinner-border text-success"></div> Đang vẽ đường...</div>
-            <div id="routes-list" class="list-group overflow-auto" style="max-height: 400px;"></div>
-        </div>
+        <section class="map-panel map-canvas"><div id="map"></div></section>
     </div>
-
-    <div class="map-wrapper"><div id="map"></div></div>
 </div>
 
 {{ pharmacies|json_script:"pharmacies-data" }}
+{{ saved_address|json_script:"saved-address-data" }}
+{{ selected_pharmacy_id|json_script:"selected-pharmacy-data" }}
 
 <script>
-    var map = L.map('map').setView([10.7721, 106.6983], 13);
-    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(map);
-
-    var pharmacies = [];
-    try {
-        pharmacies = JSON.parse(document.getElementById('pharmacies-data').textContent);
-    } catch (e) {}
-
-    var userLocation = null;
-    var markers = {};
-    var currentRouteLayers = [];
-    var currentMode = 'motorbike';
-    var currentDestLat = null;
-    var currentDestLng = null;
-
-    var pharmacyIcon = new L.Icon({
-        iconUrl: 'https://cdn-icons-png.flaticon.com/512/169/169869.png',
-        iconSize: [32, 32], iconAnchor: [16, 32], popupAnchor: [0, -32]
-    });
-
-    pharmacies.forEach(p => {
-        if (p.lat && p.lng) {
-            var safeName = p.name.replace(/'/g, "\\'").replace(/"/g, '&quot;');
-            var popupContent = `
-                <div style="text-align:center;">
-                    <h6 style="font-weight:bold; margin-bottom:5px;">${p.name}</h6>
-                    <small style="color:#666;">${p.address}</small>
-                    <br>
-                    <button class="btn btn-sm btn-success popup-btn"
-                            onclick="prepareRoute(${p.lat}, ${p.lng}, '${safeName}')">
-                        <i class="fas fa-directions"></i> Chỉ đường ngay
-                    </button>
-                </div>
-            `;
-            var marker = L.marker([p.lat, p.lng], {icon: pharmacyIcon}).addTo(map).bindPopup(popupContent);
-            markers[p.id] = marker;
-            p.distance = 9999;
-        }
-    });
-
-    navigator.geolocation.getCurrentPosition(
-        pos => {
-            userLocation = { lat: pos.coords.latitude, lng: pos.coords.longitude };
-            const userIcon = L.divIcon({ className: 'custom', html: "<div class='user-pulse-icon'></div>" });
-            L.marker([userLocation.lat, userLocation.lng], { icon: userIcon }).addTo(map).bindPopup("Vị trí của bạn").openPopup();
-            map.setView([userLocation.lat, userLocation.lng], 14);
-
-            calculateHaversineAll();
-            calculateRoadDistanceAll();
-        },
-        err => {
-            console.error(err);
-            alert("Không xác định được vị trí, dùng vị trí mặc định TP.HCM");
-            userLocation = { lat: 10.7721, lng: 106.6983 };
-            calculateHaversineAll();
-        }
-    );
-
-    function calculateHaversineAll() {
-        pharmacies.forEach(p => {
-            p.distance = getDistanceFromLatLonInKm(userLocation.lat, userLocation.lng, p.lat, p.lng);
-            updateBadge(p, false);
-        });
-        sortAndFilter();
+const pharmacies = JSON.parse(document.getElementById("pharmacies-data").textContent || "[]");
+const savedAddress = JSON.parse(document.getElementById("saved-address-data").textContent || "null");
+const selectedPharmacyId = Number(JSON.parse(document.getElementById("selected-pharmacy-data").textContent || "0")) || null;
+const map = L.map("map", { scrollWheelZoom: true }).setView([10.7721, 106.6983], 13);
+attachLeafletBaseLayer(map);
+attachAddressSearchControl(map, { placeholder:"Tìm địa chỉ để đổi vị trí tham chiếu", zoom:16, collapsible:true, toggleLabel:"Tìm địa chỉ", persistMarker:false, onSelect:function(result, coords){ setReferenceLocation(coords.lat, coords.lng, { addressText: result.display_name || "Địa chỉ vừa tìm", popupText:"Địa chỉ vừa tìm", lookupAddress:false, recenter:true, zoom:16 }); } });
+const pharmacyIcon = new L.Icon({ iconUrl:"https://cdn-icons-png.flaticon.com/512/169/169869.png", iconSize:[34,34], iconAnchor:[17,34], popupAnchor:[0,-28] });
+let userLocation = null, userMarker = null, currentMode = "motorbike", currentDestId = null, currentSelectedAddress = "", routeLayers = [], routeRequestId = 0, addressLookupRequestId = 0, branchPreviewRequestId = 0, selectedPharmacyFocusTimer = null;
+const markers = {};
+const listingPanel = document.getElementById("listing-panel");
+function escapeHtml(value){ return String(value || "").replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/\"/g, "&quot;").replace(/'/g, "&#39;"); }
+function buildPopupGallery(pharmacy){
+    const images = Array.isArray(pharmacy.gallery_images) && pharmacy.gallery_images.length ? pharmacy.gallery_images : [pharmacy.image];
+    if(images.length <= 1){
+        return `<div class="map-popup__image"><img src="${escapeHtml(images[0] || pharmacy.image)}" alt="${escapeHtml(pharmacy.name)}" onerror="this.onerror=null;this.src='/media/pharmacies/pm.jpg';"></div>`;
     }
-
-    async function calculateRoadDistanceAll() {
-        var progressBar = document.querySelector('.progress-bar');
-        document.getElementById('calc-progress').style.display = 'flex';
-
-        var sortedList = [...pharmacies].sort((a, b) => a.distance - b.distance);
-        var count = 0;
-
-        for (let p of sortedList) {
-            count++;
-            progressBar.style.width = (count / sortedList.length * 100) + '%';
-
-            try {
-                var url = `/api/route/?start_lat=${userLocation.lat}&start_lng=${userLocation.lng}&end_lat=${p.lat}&end_lng=${p.lng}&mode=motorbike`;
-                let response = await fetch(url);
-                let data = await response.json();
-
-                if (data.routes && data.routes.length > 0) {
-                    let minDistance = Math.min(...data.routes.map(r => r.distance_km));
-                    p.distance = minDistance;
-                    p.isRoadDist = true;
-                    updateBadge(p, true);
-                }
-            } catch (err) {}
-
-            sortAndFilter();
-            await new Promise(r => setTimeout(r, 100));
+    const slides = images.map(function(imageUrl){
+        return `<li class="splide__slide"><div class="map-popup__gallery-slide"><img src="${escapeHtml(imageUrl)}" alt="${escapeHtml(pharmacy.name)}" onerror="this.onerror=null;this.src='/media/pharmacies/pm.jpg';"></div></li>`;
+    }).join("");
+    return `<div class="splide site-splide map-popup__splide" data-site-splide data-per-page="1" data-gap="10px"><div class="splide__track"><ul class="splide__list">${slides}</ul></div></div>`;
+}
+L.DomEvent.disableScrollPropagation(document.getElementById("listing-panel"));
+L.DomEvent.disableScrollPropagation(document.getElementById("direction-panel"));
+L.DomEvent.disableScrollPropagation(document.getElementById("select-branch-panel"));
+pharmacies.forEach(function(pharmacy){ pharmacy.distance = Number.POSITIVE_INFINITY; const popupContent = `<div class="map-popup">${buildPopupGallery(pharmacy)}<h4>${escapeHtml(pharmacy.name)}</h4><p><i class="fas fa-map-marker-alt"></i> ${escapeHtml(pharmacy.address)}</p><p><i class="fas fa-phone-alt"></i> ${escapeHtml(pharmacy.phone)}</p><p><i class="fas fa-clock"></i> ${escapeHtml(pharmacy.hours)}</p><div class="map-popup__actions"><button type="button" onclick="prepareRouteById(${pharmacy.id})">Đường đi</button><a href="/pharmacy/${pharmacy.id}/">Chi tiết</a></div></div>`; const marker = L.marker([pharmacy.lat, pharmacy.lng], { icon: pharmacyIcon }).addTo(map).bindPopup(popupContent, { autoPan:false, closeButton:false }); marker.on("click", function(){ setActiveCard(pharmacy.id, false); }); marker.on("mouseover", function(){ marker.openPopup(); setActiveCard(pharmacy.id, false); }); marker.on("mouseout", function(){ window.setTimeout(function(){ if(!marker._icon || !marker.getPopup()){ return; } if(!marker.getPopup()._container || !marker.getPopup()._container.matches(":hover")){ marker.closePopup(); } }, 140); }); marker.on("popupopen", function(){ if(window.siteUtils && typeof window.siteUtils.initSplideCarousels === "function"){ window.siteUtils.initSplideCarousels(); } const popupEl = marker.getPopup() && marker.getPopup().getElement ? marker.getPopup().getElement() : null; if(popupEl){ popupEl.addEventListener("mouseleave", function(){ marker.closePopup(); }, { once:true }); } }); markers[pharmacy.id] = marker; });
+listingPanel.addEventListener("click", function(event){
+    const actionButton = event.target.closest("[data-action]");
+    if(actionButton){
+        const pharmacyId = Number(actionButton.dataset.pharmacyId || "0");
+        const action = actionButton.dataset.action;
+        if(action === "route"){
+            handleRouteClick(event, pharmacyId);
+            return;
         }
-
-        document.getElementById('status-msg').innerHTML = '<i class="fas fa-check"></i> Định vị xong!';
-        setTimeout(() => {
-            document.getElementById('calc-progress').style.display = 'none';
-        }, 2000);
-    }
-
-    function updateBadge(p, isRoad) {
-        var badge = document.getElementById(`dist-badge-${p.id}`);
-        if (badge) {
-            badge.innerText = `${p.distance.toFixed(1)} km`;
-            badge.style.display = 'inline-block';
-
-            if (isRoad) {
-                badge.classList.add('road-dist');
-                badge.title = "Khoảng cách ước lượng theo đường đi";
-            } else {
-                badge.classList.remove('road-dist');
-                badge.title = "Khoảng cách đường chim bay";
-            }
+        if(action === "order"){
+            openSelectBranch(event, pharmacyId);
+            return;
+        }
+        if(action === "detail"){
+            event.stopPropagation();
+            return;
         }
     }
 
-    function sortAndFilter() {
-        var container = document.getElementById('pharmacy-list-container');
-        var cards = Array.from(container.children);
-
-        cards.sort((a, b) => {
-            var distA = pharmacies.find(p => p.id == a.getAttribute('data-id'))?.distance || 9999;
-            var distB = pharmacies.find(p => p.id == b.getAttribute('data-id'))?.distance || 9999;
-            return distA - distB;
-        });
-
-        cards.forEach(card => container.appendChild(card));
-        filterByRadius();
+    const card = event.target.closest(".map-card");
+    if(card){
+        focusPharmacy(Number(card.dataset.pharmacyId || card.dataset.id || "0"));
     }
-
-    function filterByRadius() {
-        if (!userLocation) return;
-
-        var radiusKm = parseFloat(document.getElementById('radius-select').value);
-
-        pharmacies.forEach(p => {
-            var card = document.getElementById(`card-${p.id}`);
-            var marker = markers[p.id];
-
-            if (radiusKm === 0 || p.distance <= radiusKm) {
-                if (card) card.style.display = 'block';
-                if (marker && !map.hasLayer(marker)) map.addLayer(marker);
-            } else {
-                if (card) card.style.display = 'none';
-                if (marker && map.hasLayer(marker)) map.removeLayer(marker);
-            }
-        });
-    }
-
-    function handleCardClick(element) {
-        var lat = element.getAttribute('data-lat');
-        var lng = element.getAttribute('data-lng');
-        map.flyTo([lat, lng], 16);
-    }
-
-    function handleRouteClick(event, element) {
-        event.stopPropagation();
-        if (!userLocation) return alert("Chưa có vị trí.");
-        prepareRoute(
-            element.getAttribute('data-lat'),
-            element.getAttribute('data-lng'),
-            element.getAttribute('data-name')
-        );
-    }
-
-    function prepareRoute(destLat, destLng, name) {
-        document.getElementById('listing-panel').style.display = 'none';
-        document.getElementById('direction-panel').style.display = 'flex';
-        document.getElementById('dest-title').innerText = name;
-
-        currentDestLat = destLat;
-        currentDestLng = destLng;
-
-        callApiRoute();
-    }
-
-    function changeMode(mode, btn) {
-        currentMode = mode;
-        document.querySelectorAll('.mode-btn').forEach(b => b.classList.remove('active'));
-        btn.classList.add('active');
-        callApiRoute();
-    }
-
-    function callApiRoute() {
-        if (!currentDestLat || !currentDestLng) return;
-
-        document.getElementById('loading-box').style.display = 'block';
-        document.getElementById('routes-list').innerHTML = '';
-        currentRouteLayers.forEach(layer => map.removeLayer(layer));
-        currentRouteLayers = [];
-
-        var url = `/api/route/?start_lat=${userLocation.lat}&start_lng=${userLocation.lng}&end_lat=${currentDestLat}&end_lng=${currentDestLng}&mode=${currentMode}`;
-
-        fetch(url).then(r => r.json()).then(data => {
-            document.getElementById('loading-box').style.display = 'none';
-
-            if (data.routes && data.routes.length > 0) {
-                data.routes.sort((a, b) => a.duration_min - b.duration_min);
-
-                data.routes.forEach((route, index) => {
-                    var isFirst = index === 0;
-                    var polylineLayer = L.polyline(route.route_points, {
-                        color: isFirst ? '#007bff' : '#6c757d',
-                        weight: isFirst ? 6 : 4,
-                        opacity: isFirst ? 1.0 : 0.6
-                    }).addTo(map);
-
-                    polylineLayer.on('click', () => highlightRoute(index));
-                    if (isFirst) polylineLayer.bringToFront();
-                    currentRouteLayers.push(polylineLayer);
-
-                    const shipBadge = `<span class="badge badge-light border">Ship: ${route.shipping_fee}</span>`;
-
-                    var html = `
-                        <div class="list-group-item list-group-item-action route-item ${isFirst ? 'active-route' : ''}"
-                             onclick="highlightRoute(${index})" id="route-item-${index}">
-                            <div class="d-flex justify-content-between">
-                                <strong>Cách ${index + 1}</strong>
-                                ${shipBadge}
-                            </div>
-                            <div class="mt-2" style="font-size: 1.1em;">
-                                <i class="fas fa-road"></i> ${route.distance_km} km &nbsp;|&nbsp;
-                                <i class="fas fa-clock text-primary"></i> <strong>${route.duration_min} phút</strong>
-                            </div>
-                        </div>`;
-                    document.getElementById('routes-list').insertAdjacentHTML('beforeend', html);
-                });
-
-                map.fitBounds(currentRouteLayers[0].getBounds(), { padding: [50, 50] });
-            } else {
-                document.getElementById('routes-list').innerHTML = '<div class="text-danger p-2">Không tìm thấy đường.</div>';
-            }
-        }).catch(err => {
-            console.error(err);
-            document.getElementById('loading-box').style.display = 'none';
-            document.getElementById('routes-list').innerHTML = `<div class="text-danger p-2">Lỗi kết nối server.</div>`;
-        });
-    }
-
-    function highlightRoute(selectedIndex) {
-        currentRouteLayers.forEach((layer, index) => {
-            if (index === selectedIndex) {
-                layer.setStyle({ color: '#007bff', weight: 6, opacity: 1 });
-                layer.bringToFront();
-            } else {
-                layer.setStyle({ color: '#6c757d', weight: 4, opacity: 0.5 });
-            }
-        });
-
-        document.querySelectorAll('.route-item').forEach(item => item.classList.remove('active-route'));
-        var selectedItem = document.getElementById(`route-item-${selectedIndex}`);
-        if (selectedItem) {
-            selectedItem.classList.add('active-route');
-            selectedItem.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
-        }
-    }
-
-    function closeDirectionPanel() {
-        document.getElementById('direction-panel').style.display = 'none';
-        document.getElementById('listing-panel').style.display = 'block';
-        currentRouteLayers.forEach(layer => map.removeLayer(layer));
-        if (userLocation) {
-            map.setView([userLocation.lat, userLocation.lng], 14);
-        }
-    }
-
-    function openSelectBranch(event, pharmacyId, pharmacyName) {
-        event.stopPropagation();
-        if (!userLocation) return alert("Chưa xác định được vị trí của bạn");
-
-        var pharmacy = pharmacies.find(p => p.id === pharmacyId);
-        if (!pharmacy) return;
-
-        document.getElementById('listing-panel').style.display = 'none';
-        document.getElementById('radius-box').style.display = 'none';
-        document.getElementById('direction-panel').style.display = 'none';
-        document.getElementById('select-branch-panel').style.display = 'block';
-        document.getElementById('select-branch-name').innerText = pharmacyName;
-
-        currentRouteLayers.forEach(layer => map.removeLayer(layer));
-        currentRouteLayers = [];
-
-        var url = `/api/route/?start_lat=${userLocation.lat}&start_lng=${userLocation.lng}&end_lat=${pharmacy.lat}&end_lng=${pharmacy.lng}&mode=motorbike`;
-
-        fetch(url).then(res => res.json()).then(data => {
-            if (!data.routes || data.routes.length === 0) {
-                document.getElementById('select-branch-info').innerHTML = `<div class="text-danger">Không thể tính khoảng cách</div>`;
-                return;
-            }
-
-            var route = data.routes[0];
-            var polylineLayer = L.polyline(route.route_points, { color: '#28a745', weight: 6 }).addTo(map);
-            currentRouteLayers.push(polylineLayer);
-            map.fitBounds(polylineLayer.getBounds(), { padding: [50, 50] });
-
-            document.getElementById('select-branch-info').innerHTML = `
-                <div class="card p-3 shadow-sm">
-                    <p><strong><i class="fas fa-ruler"></i> Khoảng cách:</strong> ${route.distance_km} km</p>
-                    <p><strong><i class="fas fa-clock"></i> Thời gian dự kiến:</strong> ${route.duration_min} phút</p>
-                    <p><strong><i class="fas fa-shipping-fast"></i> Phí ship:</strong> ${route.shipping_fee}</p>
-                    <button class="btn btn-success w-100 font-weight-bold"
-                        onclick="confirmSelectBranch(${pharmacyId}, ${route.distance_km}, ${route.shipping_fee_value})">
-                        TIẾP TỤC ĐẶT HÀNG
-                    </button>
-                </div>
-            `;
-        });
-    }
-
-    function closeSelectBranch() {
-        document.getElementById('select-branch-panel').style.display = 'none';
-        document.getElementById('listing-panel').style.display = 'block';
-        document.getElementById('radius-box').style.display = 'block';
-        currentRouteLayers.forEach(layer => map.removeLayer(layer));
-    }
-
-    function confirmSelectBranch(pid, dist, fee) {
-        window.location.href = `/order/?pharmacy_id=${pid}&distance=${dist}&shipping_fee=${fee}`;
-    }
-
-    function getDistanceFromLatLonInKm(lat1, lon1, lat2, lon2) {
-        var R = 6371;
-        var dLat = deg2rad(lat2 - lat1);
-        var dLon = deg2rad(lon2 - lon1);
-        var a =
-            Math.sin(dLat / 2) * Math.sin(dLat / 2) +
-            Math.cos(deg2rad(lat1)) * Math.cos(deg2rad(lat2)) *
-            Math.sin(dLon / 2) * Math.sin(dLon / 2);
-        return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
-    }
-
-    function deg2rad(deg) {
-        return deg * (Math.PI / 180);
-    }
+});
+map.on("click", function(event){ setReferenceLocation(event.latlng.lat, event.latlng.lng, { popupText:"Vị trí bạn chọn", recenter:false }); });
+function refreshMapSize(){ window.setTimeout(function(){ map.invalidateSize(); }, 0); window.setTimeout(function(){ map.invalidateSize(); }, 180); }
+function clearRouteLayers(){ routeLayers.forEach(function(layer){ if(map.hasLayer(layer)){ map.removeLayer(layer); } }); routeLayers = []; }
+function showRouteStatus(message, tone){ const box = document.getElementById("route-status"); if(!message){ box.style.display="none"; box.textContent=""; box.classList.remove("is-error"); return; } box.style.display="block"; box.textContent = message; box.classList.toggle("is-error", tone === "error"); }
+function setActiveCard(id, shouldScroll){ document.querySelectorAll(".map-card").forEach(function(card){ card.classList.toggle("is-active", Number(card.dataset.id) === id); }); const card = document.getElementById(`card-${id}`); if(card && shouldScroll !== false){ card.scrollIntoView({ behavior:"smooth", block:"nearest" }); } }
+function updateSelectedAddress(text){ currentSelectedAddress = text || ""; document.getElementById("selected-address-text").textContent = text || "Chưa chọn vị trí."; }
+function updateNearestSummary(pharmacy){ const box = document.getElementById("nearest-pharmacy-text"); if(!pharmacy){ box.style.display="none"; box.innerHTML=""; return; } box.style.display="block"; box.innerHTML = `<strong>${pharmacy.name}</strong><div>Gần nhất khoảng ${pharmacy.distance.toFixed(1)} km</div>`; }
+function updateDistanceBadge(pharmacy){ const badge = document.getElementById(`dist-badge-${pharmacy.id}`); if(!badge || !Number.isFinite(pharmacy.distance)){ return; } badge.style.display="inline-flex"; badge.textContent = `${pharmacy.distance.toFixed(1)} km`; }
+function persistProfileAddress(addressText, lat, lng){ if(!window.siteSessionData || !window.siteSessionData.canPersistCustomerAddress || !window.siteUtils){ return; } const formData = new FormData(); formData.append("address_text", addressText || ""); formData.append("lat", lat); formData.append("lng", lng); fetch("/api/save-profile-address/", { method:"POST", headers:{ "X-CSRFToken": window.siteUtils.getCookie("csrftoken") }, body: formData }).catch(function(){}); }
+async function syncAddressFromCoordinates(lat, lng, fallbackAddress){ const requestId = ++addressLookupRequestId; updateSelectedAddress(fallbackAddress || "Đang cập nhật địa chỉ..."); try { const response = await fetch(`/api/reverse-address/?lat=${encodeURIComponent(lat)}&lng=${encodeURIComponent(lng)}`); const data = await response.json(); if(requestId !== addressLookupRequestId){ return; } if(!response.ok){ throw new Error(data.error || "Không thể lấy địa chỉ."); } const addressText = data.address || fallbackAddress || `Tọa độ: ${Number(lat).toFixed(5)}, ${Number(lng).toFixed(5)}`; updateSelectedAddress(addressText); persistProfileAddress(addressText, lat, lng); } catch (error){ const addressText = fallbackAddress || `Tọa độ: ${Number(lat).toFixed(5)}, ${Number(lng).toFixed(5)}`; updateSelectedAddress(addressText); persistProfileAddress(addressText, lat, lng); } }
+function distanceKm(lat1, lon1, lat2, lon2){ const r = 6371; const dLat = (lat2 - lat1) * Math.PI / 180; const dLon = (lon2 - lon1) * Math.PI / 180; const a = Math.sin(dLat/2)*Math.sin(dLat/2) + Math.cos(lat1*Math.PI/180)*Math.cos(lat2*Math.PI/180)*Math.sin(dLon/2)*Math.sin(dLon/2); return r * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a)); }
+function calculateDistances(){ if(!userLocation){ return; } pharmacies.forEach(function(pharmacy){ pharmacy.distance = distanceKm(userLocation.lat, userLocation.lng, pharmacy.lat, pharmacy.lng); updateDistanceBadge(pharmacy); }); sortAndFilter(); }
+function nearestVisible(){ if(!userLocation){ return null; } const radiusKm = parseFloat(document.getElementById("radius-select").value || "0"); return pharmacies.filter(function(pharmacy){ return radiusKm === 0 || pharmacy.distance <= radiusKm; }).sort(function(a,b){ return a.distance - b.distance; })[0] || null; }
+function highlightNearest(shouldScroll){ document.querySelectorAll(".map-card").forEach(function(card){ card.classList.remove("is-nearest"); }); const pharmacy = nearestVisible(); if(!pharmacy){ updateNearestSummary(null); return; } const card = document.getElementById(`card-${pharmacy.id}`); if(card){ card.classList.add("is-nearest"); if(shouldScroll){ card.scrollIntoView({ behavior:"smooth", block:"nearest" }); } } updateNearestSummary(pharmacy); }
+function sortAndFilter(){ const container = document.getElementById("listing-panel"); Array.from(container.querySelectorAll(".map-card")).sort(function(a,b){ const pa = pharmacies.find(function(item){ return item.id === Number(a.dataset.id); }); const pb = pharmacies.find(function(item){ return item.id === Number(b.dataset.id); }); return (pa ? pa.distance : 999999) - (pb ? pb.distance : 999999); }).forEach(function(card){ container.appendChild(card); }); filterByRadius(); }
+function filterByRadius(){ const radiusKm = parseFloat(document.getElementById("radius-select").value || "0"); pharmacies.forEach(function(pharmacy){ const visible = !userLocation || radiusKm === 0 || pharmacy.distance <= radiusKm; const card = document.getElementById(`card-${pharmacy.id}`); const marker = markers[pharmacy.id]; if(card){ card.style.display = visible ? "grid" : "none"; } if(marker){ if(visible && !map.hasLayer(marker)){ map.addLayer(marker); } else if(!visible && map.hasLayer(marker)){ map.removeLayer(marker); } } }); highlightNearest(false); }
+function resetPanels(){ document.getElementById("listing-panel").style.display="block"; document.getElementById("direction-panel").style.display="none"; document.getElementById("select-branch-panel").style.display="none"; document.getElementById("routes-list").innerHTML=""; showRouteStatus(""); clearRouteLayers(); }
+function setReferenceLocation(lat, lng, options){ options = options || {}; userLocation = { lat:Number(lat), lng:Number(lng) }; routeRequestId += 1; branchPreviewRequestId += 1; clearRouteLayers(); if(!userMarker){ userMarker = L.marker([userLocation.lat, userLocation.lng], { draggable:true }).addTo(map).bindPopup(options.popupText || "Vị trí bạn chọn", { autoPan:false }); userMarker.on("dragend", function(){ const next = userMarker.getLatLng(); setReferenceLocation(next.lat, next.lng, { popupText:"Vị trí bạn chọn", recenter:false }); }); } else { userMarker.setLatLng([userLocation.lat, userLocation.lng]); userMarker.bindPopup(options.popupText || "Vị trí bạn chọn", { autoPan:false }); } if(options.lookupAddress === false){ const addressText = options.addressText || options.popupText || "Địa chỉ vừa chọn"; updateSelectedAddress(addressText); persistProfileAddress(addressText, userLocation.lat, userLocation.lng); } else { syncAddressFromCoordinates(userLocation.lat, userLocation.lng, options.addressText || options.popupText); } if(options.recenter === true){ map.stop(); map.setView([userLocation.lat, userLocation.lng], options.zoom || 16); } resetPanels(); calculateDistances(); highlightNearest(true); refreshMapSize(); }
+function findMyLocation(){ if(!navigator.geolocation){ alert("Trình duyệt không hỗ trợ định vị."); return; } navigator.geolocation.getCurrentPosition(function(position){ setReferenceLocation(position.coords.latitude, position.coords.longitude, { popupText:"Vị trí của bạn", recenter:true, zoom:16 }); }, function(error){ alert("Không thể lấy vị trí: " + error.message); }); }
+function useSavedAddress(){ if(!savedAddress || savedAddress.lat === null || savedAddress.lng === null){ return; } setReferenceLocation(savedAddress.lat, savedAddress.lng, { addressText:savedAddress.address_text || "Địa chỉ đã lưu", popupText:"Địa chỉ đã lưu", lookupAddress:false, recenter:true, zoom:16 }); }
+function focusPharmacy(id){ const pharmacy = pharmacies.find(function(item){ return item.id === id; }); if(!pharmacy){ return; } if(selectedPharmacyFocusTimer){ window.clearTimeout(selectedPharmacyFocusTimer); selectedPharmacyFocusTimer = null; } setActiveCard(id, true); map.stop(); map.setView([pharmacy.lat, pharmacy.lng], 16); if(markers[id]){ markers[id].openPopup(); } refreshMapSize(); }
+function handleRouteClick(event, id){ event.stopPropagation(); prepareRouteById(id); }
+function prepareRouteById(id){ if(!userLocation){ alert("Hãy chọn vị trí của bạn trước."); return; } const pharmacy = pharmacies.find(function(item){ return item.id === id; }); if(!pharmacy){ return; } currentDestId = id; setActiveCard(id, true); document.getElementById("dest-title").textContent = pharmacy.name; document.getElementById("listing-panel").style.display="none"; document.getElementById("select-branch-panel").style.display="none"; document.getElementById("direction-panel").style.display="block"; document.getElementById("routes-list").innerHTML=""; showRouteStatus("Đang tính đường đi..."); clearRouteLayers(); callApiRoute(); }
+function highlightRoute(index){ routeLayers.forEach(function(layer, i){ if(i === index){ layer.setStyle({ color:"#1f64e0", weight:6, opacity:1 }); layer.bringToFront(); } else { layer.setStyle({ color:"#89a7ef", weight:4, opacity:.5 }); } }); document.querySelectorAll(".map-route-item").forEach(function(item){ item.classList.remove("is-active"); }); const item = document.getElementById(`route-item-${index}`); if(item){ item.classList.add("is-active"); } }
+function changeMode(mode, button){ currentMode = mode; document.querySelectorAll(".map-mode-btn").forEach(function(item){ item.classList.remove("active"); }); button.classList.add("active"); callApiRoute(); }
+function callApiRoute(){ if(!currentDestId || !userLocation){ return; } const pharmacy = pharmacies.find(function(item){ return item.id === currentDestId; }); if(!pharmacy){ return; } const requestId = ++routeRequestId; document.getElementById("routes-list").innerHTML=""; showRouteStatus("Đang tính đường đi..."); clearRouteLayers(); fetch(`/api/route/?start_lat=${userLocation.lat}&start_lng=${userLocation.lng}&end_lat=${pharmacy.lat}&end_lng=${pharmacy.lng}&mode=${currentMode}`).then(function(response){ return response.json(); }).then(function(data){ if(requestId !== routeRequestId){ return; } if(!data.routes || data.routes.length === 0){ throw new Error("Không tìm thấy đường đi phù hợp."); } showRouteStatus(""); data.routes.forEach(function(route, index){ const first = index === 0; const line = L.polyline(route.route_points, { color:first ? "#1f64e0" : "#89a7ef", weight:first ? 6 : 4, opacity:first ? 1 : .6 }).addTo(map); routeLayers.push(line); const ship = currentMode === "motorbike" ? `<span class="map-badge">Ship: ${route.shipping_fee}</span>` : ""; document.getElementById("routes-list").insertAdjacentHTML("beforeend", `<div class="map-route-item ${first ? "is-active" : ""}" id="route-item-${index}" onclick="highlightRoute(${index})"><div class="map-route-item__meta"><span>Cách ${index + 1}</span>${ship}</div><div><i class="fas fa-road"></i> ${route.distance_km} km</div><div class="mt-2"><i class="fas fa-clock"></i> ${route.duration_min} phút</div></div>`); }); refreshMapSize(); }).catch(function(error){ if(requestId !== routeRequestId){ return; } showRouteStatus(error.message || "Không thể tải đường đi lúc này.", "error"); }); }
+function closeDirectionPanel(){ document.getElementById("direction-panel").style.display="none"; document.getElementById("listing-panel").style.display="block"; document.getElementById("routes-list").innerHTML=""; showRouteStatus(""); clearRouteLayers(); refreshMapSize(); }
+function openSelectBranch(event, id){ event.stopPropagation(); if(!userLocation){ alert("Hãy chọn vị trí của bạn trước."); return; } const pharmacy = pharmacies.find(function(item){ return item.id === id; }); if(!pharmacy){ return; } const requestId = ++branchPreviewRequestId; document.getElementById("listing-panel").style.display="none"; document.getElementById("direction-panel").style.display="none"; document.getElementById("select-branch-panel").style.display="block"; document.getElementById("select-branch-info").innerHTML = `<div class="map-branch-card"><div class="text-muted">Đang tính thông tin giao hàng...</div></div>`; clearRouteLayers(); fetch(`/api/find-best-pharmacy/?delivery_lat=${userLocation.lat}&delivery_lng=${userLocation.lng}&mode=motorbike&pharmacy_id=${pharmacy.id}`).then(function(response){ return response.json(); }).then(function(data){ if(requestId !== branchPreviewRequestId){ return; } if(!data.route){ throw new Error(data.error || "Không thể tính khoảng cách."); } const line = L.polyline(data.route.route_points, { color:"#16a34a", weight:6 }).addTo(map); routeLayers = [line]; refreshMapSize(); const noticeHtml = data.notice ? `<div class="map-branch-card__notice">${data.notice}</div>` : ""; document.getElementById("select-branch-info").innerHTML = `<div class="map-branch-card">${noticeHtml}<div class="map-branch-card__image"><img src="${pharmacy.image}" alt="${pharmacy.name}" onerror="this.onerror=null;this.src='/media/pharmacies/pm.jpg';"></div><h3 class="font-weight-bold mb-3">${pharmacy.name}</h3><div class="mb-2"><i class="fas fa-map-marker-alt"></i> ${pharmacy.address}</div><div class="mb-2"><i class="fas fa-road"></i> Khoảng cách: ${data.route.distance_km} km</div><div class="mb-2"><i class="fas fa-clock"></i> Thời gian dự kiến: ${data.route.duration_min} phút</div><div class="mb-3"><i class="fas fa-shipping-fast"></i> Phí ship: ${data.route.shipping_fee}</div><button class="pharma-btn" type="button" onclick="confirmSelectBranch(${pharmacy.id})"><i class="fas fa-arrow-right"></i><span>Tiếp tục đến thanh toán</span></button></div>`; }).catch(function(error){ if(requestId !== branchPreviewRequestId){ return; } document.getElementById("select-branch-info").innerHTML = `<div class="map-branch-card"><div class="text-danger">${error.message || "Không thể tải thông tin chi nhánh."}</div></div>`; }); }
+function closeSelectBranch(){ document.getElementById("select-branch-panel").style.display="none"; document.getElementById("listing-panel").style.display="block"; clearRouteLayers(); refreshMapSize(); }
+function confirmSelectBranch(id){ if(!userLocation){ return; } const params = new URLSearchParams({ pharmacy_id:id, delivery_lat:userLocation.lat, delivery_lng:userLocation.lng, address:currentSelectedAddress || "" }); window.location.href = `/checkout/?${params.toString()}`; }
+window.findMyLocation = findMyLocation; window.useSavedAddress = useSavedAddress; window.focusPharmacy = focusPharmacy; window.handleRouteClick = handleRouteClick; window.prepareRouteById = prepareRouteById; window.changeMode = changeMode; window.highlightRoute = highlightRoute; window.closeDirectionPanel = closeDirectionPanel; window.openSelectBranch = openSelectBranch; window.closeSelectBranch = closeSelectBranch; window.confirmSelectBranch = confirmSelectBranch; window.filterByRadius = filterByRadius;
+if(savedAddress && savedAddress.lat !== null && savedAddress.lng !== null){ setReferenceLocation(savedAddress.lat, savedAddress.lng, { addressText:savedAddress.address_text || "Địa chỉ đã lưu", popupText:"Địa chỉ đã lưu", lookupAddress:false, recenter:false }); }
+if(selectedPharmacyId){ selectedPharmacyFocusTimer = window.setTimeout(function(){ selectedPharmacyFocusTimer = null; focusPharmacy(selectedPharmacyId); }, 180); }
+refreshMapSize();
 </script>
 {% endblock %}

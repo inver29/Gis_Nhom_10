@@ -1,30 +1,106 @@
 {% extends "base.html" %}
+{% load currency_filters %}
 {% block title %}Giỏ hàng{% endblock %}
+{% block body_class %}site-page cart-page{% endblock %}
 
 {% block content_wrapper %}
-<div class="container mt-4">
-    <h3><i class="fas fa-shopping-cart"></i> Giỏ hàng của bạn</h3>
-    {% if cart.items.exists %}
-        <table class="table mt-3">
-            <thead class="thead-light"><tr><th>Sản phẩm</th><th>Giá</th><th>SL</th><th>Tổng</th><th></th></tr></thead>
-            <tbody>
-                {% for item in cart.items.all %}
-                <tr>
-                    <td>{{ item.medicine.name }}</td>
-                    <td>{{ item.medicine.price }}</td>
-                    <td>{{ item.quantity }}</td>
-                    <td>{{ item.total_price }}</td>
-                    <td><a href="{% url 'remove_from_cart' item.id %}" class="text-danger"><i class="fas fa-trash"></i></a></td>
-                </tr>
-                {% endfor %}
-            </tbody>
-        </table>
-        <div class="text-right">
-            <h4>Tổng tiền: <span class="text-danger">{{ cart.total_price }} VNĐ</span></h4>
-            <a href="{% url 'checkout' %}" class="btn btn-success btn-lg mt-2">Đặt hàng</a>
+<div class="cart-layout">
+    <div class="container">
+        <div class="section-heading mb-4">
+            <div>
+                <div class="section-heading__eyebrow"><i class="fas fa-shopping-cart"></i> Giỏ hàng của bạn</div>
+                <h1>Kiểm tra sản phẩm trước khi thanh toán</h1>
+            </div>
+            <a href="{% url 'product_list' %}" class="section-link">Tiếp tục mua <i class="fas fa-arrow-right"></i></a>
         </div>
-    {% else %}
-        <div class="alert alert-warning mt-3">Giỏ hàng trống. <a href="{% url 'product_list' %}">Mua ngay</a></div>
-    {% endif %}
+
+        {% if cart.items.exists %}
+        <div class="cart-grid">
+            <div class="content-card p-3 p-md-4">
+                <div class="table-responsive">
+                    <table class="cart-table">
+                        <thead>
+                            <tr>
+                                <th>Sản phẩm</th>
+                                <th class="text-center">Giá</th>
+                                <th class="text-center">SL</th>
+                                <th class="text-center">Tổng</th>
+                                <th class="text-center">Xóa</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for item in cart.items.all %}
+                            <tr>
+                                <td>
+                                    <div class="d-flex align-items-center">
+                                        <div class="cart-thumb mr-3">
+                                            {% if item.medicine.primary_image_url %}
+                                                <img src="{{ item.medicine.primary_image_url }}" alt="{{ item.medicine.name }}">
+                                            {% else %}
+                                                <i class="fas fa-pills text-secondary"></i>
+                                            {% endif %}
+                                        </div>
+                                        <div>
+                                            <div class="font-weight-bold">
+                                                <a href="{% url 'medicine_detail' item.medicine.id %}" class="text-dark">{{ item.medicine.name }}</a>
+                                            </div>
+                                            <div class="small text-muted">{{ item.medicine.pharmacy.name }}</div>
+                                            <div class="small text-muted">{{ item.medicine.unit|default:"Hộp" }}</div>
+                                        </div>
+                                    </div>
+                                </td>
+                                <td class="text-center">{{ item.medicine.price|vnd }}</td>
+                                <td class="text-center">{{ item.quantity }}</td>
+                                <td class="text-center font-weight-bold text-danger">{{ item.total_price|vnd }}</td>
+                                <td class="text-center">
+                                    <a href="{% url 'remove_from_cart' item.id %}" class="pharma-outline-btn" style="width:auto; padding:10px 14px;">
+                                        <i class="fas fa-trash-alt"></i>
+                                    </a>
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+            <div class="content-card summary-card">
+                <h3>Tóm tắt đơn hàng</h3>
+                <div class="summary-line">
+                    <span>Số dòng sản phẩm</span>
+                    <strong>{{ cart.items.count }}</strong>
+                </div>
+                <div class="summary-line">
+                    <span>Tổng số lượng</span>
+                    <strong>{{ cart_items_count }}</strong>
+                </div>
+                <div class="summary-line">
+                    <span>Tạm tính</span>
+                    <strong class="text-danger">{{ cart.total_price|vnd }}</strong>
+                </div>
+                <p class="text-muted mt-3 mb-0">
+                    Phí giao hàng sẽ được tính sau khi bạn chọn địa chỉ nhận hàng và chi nhánh xử lý.
+                </p>
+
+                <div class="summary-total d-flex justify-content-between">
+                    <span>Tổng tiền hàng</span>
+                    <span class="text-danger">{{ cart.total_price|vnd }}</span>
+                </div>
+
+                <a href="{% url 'checkout' %}" class="pharma-btn mt-3">
+                    <i class="fas fa-credit-card"></i>
+                    <span>Tiến hành thanh toán</span>
+                </a>
+            </div>
+        </div>
+        {% else %}
+        <div class="site-empty">
+            <div class="site-empty__icon"><i class="fas fa-shopping-basket"></i></div>
+            <h3>Giỏ hàng của bạn đang trống</h3>
+            <p>Hãy thêm sản phẩm vào giỏ trước khi tiến hành thanh toán.</p>
+            <a href="{% url 'product_list' %}" class="pharma-btn" style="max-width:260px; margin:0 auto;">Đi tới trang sản phẩm</a>
+        </div>
+        {% endif %}
+    </div>
 </div>
 {% endblock %}

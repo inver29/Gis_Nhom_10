@@ -1,0 +1,1 @@
+Xác nhận đơn hàng #{{ order.id }} từ {{ site_name }}

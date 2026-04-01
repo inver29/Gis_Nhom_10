@@ -1,0 +1,12 @@
+Hóa đơn tạm tính - đơn hàng #{{ order.id }}
+
+{% for item in order_items %}
+- {{ item.medicine_name }} x{{ item.quantity }}: {{ item.line_total|floatformat:0 }} VND
+{% endfor %}
+
+Tiền hàng: {{ order.total_product_price|floatformat:0 }} VND
+Phí ship: {{ order.shipping_fee|floatformat:0 }} VND
+Tổng thanh toán: {{ order.final_total_price|floatformat:0 }} VND
+
+Xem lại đơn hàng:
+{{ order_history_url }}

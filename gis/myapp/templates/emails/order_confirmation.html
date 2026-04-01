@@ -1,0 +1,24 @@
+{% load currency_filters %}
+<html>
+<body style="margin:0;padding:24px;background:#f4f8ff;font-family:Arial,sans-serif;color:#163057;">
+  <div style="max-width:640px;margin:0 auto;background:#ffffff;border-radius:20px;overflow:hidden;border:1px solid #dbe8ff;">
+    <div style="padding:20px 24px;background:linear-gradient(135deg,#1f64e0 0%,#1146b8 100%);color:#ffffff;">
+      <h1 style="margin:0;font-size:24px;">Đơn hàng #{{ order.id }} đã được ghi nhận</h1>
+    </div>
+    <div style="padding:24px;">
+      <p style="margin-top:0;">{{ recipient_name }} thân mến,</p>
+      <p>{{ site_name }} đã tiếp nhận đơn hàng của bạn và đang chuẩn bị xử lý.</p>
+      <table style="width:100%;border-collapse:collapse;margin:20px 0;">
+        <tr><td style="padding:8px 0;color:#5d7090;">Người nhận</td><td style="padding:8px 0;font-weight:700;">{{ order.full_name }}</td></tr>
+        <tr><td style="padding:8px 0;color:#5d7090;">Số điện thoại</td><td style="padding:8px 0;font-weight:700;">{{ order.phone }}</td></tr>
+        <tr><td style="padding:8px 0;color:#5d7090;">Địa chỉ</td><td style="padding:8px 0;font-weight:700;">{{ order.address_text }}</td></tr>
+        <tr><td style="padding:8px 0;color:#5d7090;">Chi nhánh xử lý</td><td style="padding:8px 0;font-weight:700;">{{ order.pharmacy.name|default:"Chưa gán chi nhánh" }}</td></tr>
+        <tr><td style="padding:8px 0;color:#5d7090;">Tổng thanh toán</td><td style="padding:8px 0;font-weight:800;color:#d62839;">{{ order.final_total_price|vnd }}</td></tr>
+      </table>
+      <p style="margin-bottom:20px;">Bạn có thể xem lại đơn hàng tại liên kết bên dưới:</p>
+      <p><a href="{{ order_history_url }}" style="display:inline-block;padding:12px 18px;border-radius:12px;background:#1f64e0;color:#ffffff;text-decoration:none;font-weight:700;">Xem lịch sử đơn hàng</a></p>
+      <p style="margin-bottom:0;color:#5d7090;">Nếu cần hỗ trợ, vui lòng liên hệ {{ support_email }}.</p>
+    </div>
+  </div>
+</body>
+</html>
