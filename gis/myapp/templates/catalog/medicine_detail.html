@@ -228,7 +228,7 @@
                         {% for row in medicine_review_summary.distribution %}
                         <div class="review-bar-row">
                             <span>{{ row.rating }} sao</span>
-                            <div class="review-bar-track"><div class="review-bar-fill" style="width: {{ row.percent }}%;"></div></div>
+                            <div class="review-bar-track"><div class="review-bar-fill" data-review-bar-width="{{ row.percent }}"></div></div>
                             <strong>{{ row.count }}</strong>
                         </div>
                         {% endfor %}
@@ -326,7 +326,7 @@
                     {% endif %}
                 </div>
                 <div class="review-list-card__footer">
-                    <button type="button" class="pharma-outline-btn" data-review-load-more data-next-page="{{ medicine_review_panel.next_page|default:'' }}" {% if not medicine_review_panel.has_next %}style="display:none;"{% endif %}>
+                    <button type="button" class="pharma-outline-btn" data-review-load-more data-next-page="{{ medicine_review_panel.next_page|default:'' }}" {% if not medicine_review_panel.has_next %}hidden{% endif %}>
                         <i class="fas fa-chevron-down"></i>
                         <span>Xem thêm đánh giá</span>
                     </button>
@@ -467,6 +467,13 @@
     var activeRating = '';
     var isLoading = false;
 
+    root.querySelectorAll('[data-review-bar-width]').forEach(function (bar) {
+        var width = parseFloat(bar.dataset.reviewBarWidth || '');
+        if (!isNaN(width) && width >= 0) {
+            bar.style.width = width + '%';
+        }
+    });
+
     function escapeHtml(value) {
         return String(value || '').replace(/[&<>"']/g, function (char) {
             return {'&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'}[char] || char;
@@ -528,7 +535,7 @@
             return;
         }
         loadMoreButton.dataset.nextPage = hasNext ? String(nextPage || '') : '';
-        loadMoreButton.style.display = hasNext ? '' : 'none';
+        loadMoreButton.hidden = !hasNext;
     }
 
     function setActiveFilter(rating) {

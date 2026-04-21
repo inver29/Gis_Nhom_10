@@ -29,7 +29,7 @@
         </div>
     </div>
 
-    <form method="post" enctype="multipart/form-data" id="admin-main-form" novalidate>
+    <form method="post" enctype="multipart/form-data" id="admin-main-form" novalidate data-has-rich-editors="{% if has_rich_editors %}true{% else %}false{% endif %}">
         {% csrf_token %}
         {% for hidden in form.hidden_fields %}
             {{ hidden }}
@@ -1444,16 +1444,17 @@ document.addEventListener('DOMContentLoaded', function () {
         roleField.addEventListener('change', syncManagedPharmacyVisibility);
     }
 
-    {% if has_rich_editors %}
-    ensureRichEditors();
-    window.setTimeout(ensureRichEditors, 400);
-    window.setTimeout(ensureRichEditors, 1200);
-
     var adminMainForm = document.getElementById('admin-main-form');
-    if (adminMainForm) {
-        adminMainForm.addEventListener('submit', syncAllRichEditorInputs);
+    var hasRichEditors = adminMainForm && adminMainForm.dataset.hasRichEditors === 'true';
+    if (hasRichEditors) {
+        ensureRichEditors();
+        window.setTimeout(ensureRichEditors, 400);
+        window.setTimeout(ensureRichEditors, 1200);
+
+        if (adminMainForm) {
+            adminMainForm.addEventListener('submit', syncAllRichEditorInputs);
+        }
     }
-    {% endif %}
 });
 </script>
 {% endblock %}

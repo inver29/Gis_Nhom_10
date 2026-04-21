@@ -140,14 +140,14 @@
             </div>
             {% if timeline_chart %}
             <div class="report-chart-scroll">
-                <div class="report-vertical-chart" style="grid-template-columns: repeat({{ timeline_chart|length }}, minmax(72px, 1fr)); min-width: {{ timeline_chart_min_width }}px;">
+                <div class="report-vertical-chart" data-report-chart-columns="{{ timeline_chart|length }}" data-report-chart-min-width="{{ timeline_chart_min_width }}">
                     {% for item in timeline_chart %}
                     <div class="report-vertical-bar">
                         <div class="report-vertical-bar__value">
                             {% if item.value > 0 %}{{ item.value|vnd }}{% else %}0 đ{% endif %}<br>{{ item.order_count }} đơn
                         </div>
                         <div class="report-vertical-bar__track">
-                            <div class="report-vertical-bar__fill" style="height: {{ item.height_percent }}%;"></div>
+                            <div class="report-vertical-bar__fill" data-report-fill-height="{{ item.height_percent }}"></div>
                         </div>
                         <div class="report-vertical-bar__label">{{ item.label }}</div>
                         <div class="report-vertical-bar__range">{{ item.range_label }}</div>
@@ -178,7 +178,7 @@
                         <div class="report-status-item__meta">{{ item.share_percent }}% tổng đơn trong kỳ</div>
                     </div>
                     <div class="report-status-item__value">{{ item.count }}</div>
-                    <div class="report-bar-track"><div class="report-bar-fill" style="width: {{ item.bar_percent }}%;"></div></div>
+                    <div class="report-bar-track"><div class="report-bar-fill" data-report-fill-width="{{ item.bar_percent }}"></div></div>
                 </div>
                 {% endfor %}
             </div>
@@ -231,7 +231,7 @@
                         </div>
                         <div class="report-bar-item__value">{{ item.revenue|vnd }}</div>
                     </div>
-                    <div class="report-bar-track"><div class="report-bar-fill" style="width: {{ item.bar_percent }}%;"></div></div>
+                    <div class="report-bar-track"><div class="report-bar-fill" data-report-fill-width="{{ item.bar_percent }}"></div></div>
                 </div>
                 {% endfor %}
             </div>
@@ -259,7 +259,7 @@
                         </div>
                         <div class="report-bar-item__value">{{ item.count }}</div>
                     </div>
-                    <div class="report-bar-track"><div class="report-bar-fill" style="width: {{ item.bar_percent }}%;"></div></div>
+                    <div class="report-bar-track"><div class="report-bar-fill" data-report-fill-width="{{ item.bar_percent }}"></div></div>
                 </div>
                 {% endfor %}
             </div>
@@ -320,7 +320,7 @@
                         </div>
                         <div class="report-bar-item__value">{{ item.revenue|vnd }}</div>
                     </div>
-                    <div class="report-bar-track"><div class="report-bar-fill" style="width: {{ item.bar_percent }}%;"></div></div>
+                    <div class="report-bar-track"><div class="report-bar-fill" data-report-fill-width="{{ item.bar_percent }}"></div></div>
                 </div>
                 {% endfor %}
             </div>
@@ -394,4 +394,35 @@
         </div>
     </section>
 </div>
+{% endblock %}
+
+{% block extra_scripts %}
+<script>
+(function () {
+    document.querySelectorAll('[data-report-chart-columns]').forEach(function (chart) {
+        var columns = parseInt(chart.dataset.reportChartColumns || '', 10);
+        var minWidth = parseInt(chart.dataset.reportChartMinWidth || '', 10);
+        if (!isNaN(columns) && columns > 0) {
+            chart.style.gridTemplateColumns = 'repeat(' + columns + ', minmax(72px, 1fr))';
+        }
+        if (!isNaN(minWidth) && minWidth > 0) {
+            chart.style.minWidth = minWidth + 'px';
+        }
+    });
+
+    document.querySelectorAll('[data-report-fill-width]').forEach(function (bar) {
+        var width = parseFloat(bar.dataset.reportFillWidth || '');
+        if (!isNaN(width) && width >= 0) {
+            bar.style.width = width + '%';
+        }
+    });
+
+    document.querySelectorAll('[data-report-fill-height]').forEach(function (bar) {
+        var height = parseFloat(bar.dataset.reportFillHeight || '');
+        if (!isNaN(height) && height >= 0) {
+            bar.style.height = height + '%';
+        }
+    });
+})();
+</script>
 {% endblock %}

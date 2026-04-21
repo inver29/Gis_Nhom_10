@@ -55,10 +55,10 @@
                     </div>
 
                     <div class="utility-actions mt-4">
-                        <button type="button" class="pharma-btn" onclick="window.location.href='{% url 'home' %}'">
+                        <a href="{% url 'home' %}" class="pharma-btn">
                             <i class="fas fa-check-circle"></i>
                             <span>Xác nhận đặt hàng</span>
-                        </button>
+                        </a>
                         <a href="{% url 'map_view' %}" class="pharma-outline-btn">
                             <i class="fas fa-map-marked-alt"></i>
                             <span>Đổi chi nhánh</span>
