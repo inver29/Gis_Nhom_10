@@ -86,8 +86,8 @@
                                 </div>
                                 <div class="product-card__body">
                                     <div class="product-card__meta">{{ m.category|default:"Thuốc / Dược phẩm" }}</div>
-                                    <div class="product-card__title"><a href="{% url 'medicine_detail' m.id %}">{{ m.name }}</a></div>
-                                    <div class="product-card__desc">{{ m.short_description|default:"Thông tin sản phẩm đang được cập nhật."|striptags|truncatechars:88 }}</div>
+                                    <div class="product-card__title" title="{{ m.name }}"><a href="{% url 'medicine_detail' m.id %}">{{ m.name }}</a></div>
+                                    <div class="product-card__desc" title="{{ m.short_description|default:'Thông tin sản phẩm đang được cập nhật.'|striptags }}">{{ m.short_description|default:"Thông tin sản phẩm đang được cập nhật."|striptags|truncatechars:88 }}</div>
                                     <div class="price-stack">
                                         <div class="price-stack__value">{{ m.current_price_value|vnd }}&nbsp;/&nbsp;{{ m.unit|default:"Hộp" }}</div>
                                         <span class="price-stack__meta"><s>{{ m.original_price_value|vnd }}</s> · {{ m.active_discount_payload.label|default:"Đang ưu đãi" }}</span>
@@ -150,8 +150,8 @@
                                     </div>
                                     <div class="product-card__body">
                                         <div class="product-card__meta">{{ m.category|default:"Thuốc / Dược phẩm" }}</div>
-                                        <div class="product-card__title"><a href="{% url 'medicine_detail' m.id %}">{{ m.name }}</a></div>
-                                        <div class="product-card__desc">{{ m.short_description|default:"Thông tin sản phẩm đang được cập nhật."|striptags|truncatechars:88 }}</div>
+                                        <div class="product-card__title" title="{{ m.name }}"><a href="{% url 'medicine_detail' m.id %}">{{ m.name }}</a></div>
+                                        <div class="product-card__desc" title="{{ m.short_description|default:'Thông tin sản phẩm đang được cập nhật.'|striptags }}">{{ m.short_description|default:"Thông tin sản phẩm đang được cập nhật."|striptags|truncatechars:88 }}</div>
                                         <div class="price-stack">
                                             <div class="price-stack__value">{% if m.has_discount_value %}{{ m.current_price_value|vnd }}{% else %}{{ m.price|vnd }}{% endif %}&nbsp;/&nbsp;{{ m.unit|default:"Hộp" }}</div>
                                             <span class="price-stack__meta">{% if m.has_discount_value %}<s>{{ m.price|vnd }}</s> · {% endif %}Nhà sản xuất: {{ m.manufacturer|default:"Đang cập nhật" }}</span>
@@ -194,8 +194,8 @@
                         </div>
                         <div class="product-card__body">
                             <div class="product-card__meta">{{ m.category|default:"Thuốc / Dược phẩm" }}</div>
-                            <div class="product-card__title"><a href="{% url 'medicine_detail' m.id %}">{{ m.name }}</a></div>
-                            <div class="product-card__desc">{{ m.short_description|default:"Thông tin sản phẩm đang được cập nhật."|striptags|truncatechars:88 }}</div>
+                            <div class="product-card__title" title="{{ m.name }}"><a href="{% url 'medicine_detail' m.id %}">{{ m.name }}</a></div>
+                            <div class="product-card__desc" title="{{ m.short_description|default:'Thông tin sản phẩm đang được cập nhật.'|striptags }}">{{ m.short_description|default:"Thông tin sản phẩm đang được cập nhật."|striptags|truncatechars:88 }}</div>
                             <div class="price-stack">
                                 <div class="price-stack__value">{% if m.has_discount_value %}{{ m.current_price_value|vnd }}{% else %}{{ m.price|vnd }}{% endif %}&nbsp;/&nbsp;{{ m.unit|default:"Hộp" }}</div>
                                 <span class="price-stack__meta">{% if m.has_discount_value %}<s>{{ m.price|vnd }}</s> · {% endif %}Nhà sản xuất: {{ m.manufacturer|default:"Đang cập nhật" }}</span>
@@ -251,11 +251,13 @@
                                     {% endif %}
                                 </div>
                                 <div class="pharmacy-card__body">
-                                    <h3>{{ pharmacy.name }}</h3>
-                                    <p><i class="fas fa-map-marker-alt text-primary"></i> {{ pharmacy.address }}</p>
-                                    <p><i class="fas fa-clock text-primary"></i> {{ pharmacy.opening_hours }}</p>
-                                    {% with open_state=pharmacy.open_state %}<p><i class="{{ open_state.icon|default:'fas fa-store-alt' }} text-primary"></i> {{ open_state.label|default:'Chưa rõ giờ hoạt động' }}</p>{% endwith %}
-                                    <div class="product-card__actions mt-3">
+                                    <h3 class="pharmacy-card__name" title="{{ pharmacy.name }}">{{ pharmacy.name }}</h3>
+                                    <p class="pharmacy-card__address" title="{{ pharmacy.address }}"><i class="fas fa-map-marker-alt text-primary"></i> {{ pharmacy.address }}</p>
+                                    <div class="pharmacy-card__meta">
+                                        <p class="pharmacy-card__info"><i class="fas fa-clock text-primary"></i> {{ pharmacy.opening_hours }}</p>
+                                        {% with open_state=pharmacy.open_state %}<p class="pharmacy-card__info"><i class="{{ open_state.icon|default:'fas fa-store-alt' }} text-primary"></i> {{ open_state.label|default:'Chưa rõ giờ hoạt động' }}</p>{% endwith %}
+                                    </div>
+                                    <div class="product-card__actions pharmacy-card__actions">
                                         <a href="{% url 'pharmacy_detail' pharmacy.id %}" class="pharma-outline-btn">
                                             <i class="fas fa-eye"></i>
                                             <span>Xem chi nhánh</span>

@@ -210,10 +210,10 @@
 
                     <div class="product-card__body">
                         <div class="product-card__meta">{{ product.manufacturer }} • {{ product.origin }}</div>
-                        <div class="product-card__title">
+                        <div class="product-card__title" title="{{ product.name }}">
                             <a href="{% url 'medicine_detail' product.detail_id %}">{{ product.name }}</a>
                         </div>
-                        <div class="product-card__desc">{{ product.description|default:"Thông tin sản phẩm đang được cập nhật."|striptags|truncatechars:110 }}</div>
+                        <div class="product-card__desc" title="{{ product.description|default:'Thông tin sản phẩm đang được cập nhật.'|striptags }}">{{ product.description|default:"Thông tin sản phẩm đang được cập nhật."|striptags|truncatechars:110 }}</div>
 
                         <div class="price-stack">
                             <div class="price-stack__value">

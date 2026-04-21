@@ -296,6 +296,7 @@
                 </article>
                 {% endfor %}
             </div>
+            {% include "admin_panel/shared/report_pagination.html" with page_obj=top_products_page_obj query_string=top_products_query_string page_param='top_page' aria_label='Phân trang top sản phẩm' %}
             {% else %}
             <div class="report-empty">Chưa có dữ liệu bán hàng để xếp hạng sản phẩm trong kỳ lọc này.</div>
             {% endif %}
@@ -307,7 +308,7 @@
                     <h2>{% if selected_pharmacy %}Hiệu suất chi nhánh{% else %}Doanh thu theo chi nhánh{% endif %}</h2>
                     <p>{% if selected_pharmacy %}Chi nhánh đang được lọc hiện chỉ còn một điểm bán để theo dõi sâu hơn.{% else %}So sánh nhanh mức đóng góp doanh thu giữa các chi nhánh trong cùng khoảng thời gian.{% endif %}</p>
                 </div>
-                <span class="admin-badge admin-badge-secondary">{{ branch_performance|length }} mục</span>
+                <span class="admin-badge admin-badge-secondary">{{ branch_performance_page_obj.paginator.count }} mục</span>
             </div>
             {% if branch_performance %}
             <div class="report-bar-list">
@@ -324,6 +325,7 @@
                 </div>
                 {% endfor %}
             </div>
+            {% include "admin_panel/shared/report_pagination.html" with page_obj=branch_performance_page_obj query_string=branch_performance_query_string page_param='branch_page' aria_label='Phân trang hiệu suất chi nhánh' %}
             {% else %}
             <div class="report-empty">Chưa có chi nhánh nào phát sinh doanh thu trong phạm vi báo cáo hiện tại.</div>
             {% endif %}
@@ -360,6 +362,7 @@
                         </article>
                         {% endfor %}
                     </div>
+                    {% include "admin_panel/shared/report_pagination.html" with page_obj=low_stock_page_obj query_string=low_stock_query_string page_param='stock_page' aria_label='Phân trang sản phẩm sắp hết hàng' %}
                     {% else %}
                     <div class="report-empty">Không có thuốc nào đang nằm trong ngưỡng cảnh báo tồn kho.</div>
                     {% endif %}
@@ -388,6 +391,7 @@
                 </article>
                 {% endfor %}
             </div>
+            {% include "admin_panel/shared/report_pagination.html" with page_obj=expiring_soon_page_obj query_string=expiring_soon_query_string page_param='expiry_page' aria_label='Phân trang thuốc sắp hết hạn' %}
             {% else %}
             <div class="report-empty">Không có thuốc nào sắp hết hạn trong 6 tháng tới trong phạm vi đang xem.</div>
             {% endif %}

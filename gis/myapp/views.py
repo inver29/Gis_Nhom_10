@@ -6111,6 +6111,7 @@ def build_review_insight_context(request):
 
 
 def build_admin_reports_context(request):
+    reports_page_size = 6
     managed_pharmacy = get_admin_scope_pharmacy(request.user)
     orders_base = filter_queryset_by_admin_scope(Order.objects.select_related('pharmacy'), request.user, 'order')
     medicines_base = filter_queryset_by_admin_scope(Medicine.objects.select_related('pharmacy'), request.user, 'medicine')
@@ -6247,6 +6248,14 @@ def build_admin_reports_context(request):
         if diff_value > 0:
             return {'text': f'Tăng {percent_value}% so với kỳ trước', 'tone': 'up'}
         return {'text': f'Giảm {percent_value}% so với kỳ trước', 'tone': 'down'}
+
+    def paginate_report_items(items, page_param):
+        paginator = Paginator(items, reports_page_size)
+        page_obj = paginator.get_page(request.GET.get(page_param))
+        query_params = request.GET.copy()
+        if page_param in query_params:
+            del query_params[page_param]
+        return page_obj, query_params.urlencode()
 
     def start_of_week(day_value):
         return day_value - timedelta(days=day_value.weekday())
@@ -6456,7 +6465,7 @@ def build_admin_reports_context(request):
             -current_item['revenue'],
             (current_item['name'] or 'Sản phẩm không xác định').casefold(),
         )
-    )[:8]
+    )
 
     branch_map = {}
     for order in filtered_completed_orders:
@@ -6480,14 +6489,12 @@ def build_admin_reports_context(request):
         item['average_order_value'] = round(item['revenue'] / item['order_count']) if item['order_count'] else 0
         item['share_percent'] = round(item['revenue'] * 100 / total_completed_revenue) if total_completed_revenue else 0
         item['bar_percent'] = max(12, round(item['revenue'] * 100 / max_branch_revenue)) if item['revenue'] and max_branch_revenue else 0
-    if managed_pharmacy is None and not selected_pharmacy:
-        branch_performance = branch_performance[:8]
 
-    low_stock_medicines = list(medicines_base.filter(quantity__gt=0, quantity__lte=LOW_STOCK_THRESHOLD).order_by('quantity', 'name')[:6])
+    low_stock_queryset = medicines_base.filter(quantity__gt=0, quantity__lte=LOW_STOCK_THRESHOLD).order_by('quantity', 'name')
     out_of_stock_count = medicines_base.filter(quantity__lte=0).count()
     expiring_soon_qs = get_expiring_soon_medicines_queryset(medicines_base)
-    expiring_soon_medicines = list(expiring_soon_qs.order_by('expiry_date', 'name')[:6])
-    low_stock_count = medicines_base.filter(quantity__gt=0, quantity__lte=LOW_STOCK_THRESHOLD).count()
+    expiring_soon_queryset = expiring_soon_qs.order_by('expiry_date', 'name')
+    low_stock_count = low_stock_queryset.count()
     expiring_soon_count = expiring_soon_qs.count()
 
     return_requests = list(return_requests_base.order_by('-created_at', '-id'))
@@ -6635,6 +6642,16 @@ def build_admin_reports_context(request):
         },
     ]
 
+    top_products_page_obj, top_products_query_string = paginate_report_items(top_products, 'top_page')
+    branch_performance_page_obj, branch_performance_query_string = paginate_report_items(branch_performance, 'branch_page')
+    low_stock_page_obj, low_stock_query_string = paginate_report_items(low_stock_queryset, 'stock_page')
+    expiring_soon_page_obj, expiring_soon_query_string = paginate_report_items(expiring_soon_queryset, 'expiry_page')
+
+    top_products = list(top_products_page_obj.object_list)
+    branch_performance = list(branch_performance_page_obj.object_list)
+    low_stock_medicines = list(low_stock_page_obj.object_list)
+    expiring_soon_medicines = list(expiring_soon_page_obj.object_list)
+
     filter_chips = [
         {'icon': 'fas fa-calendar-alt', 'label': f"{start_date.strftime('%d/%m/%Y')} - {end_date.strftime('%d/%m/%Y')}"},
         {'icon': 'fas fa-layer-group', 'label': selected_pharmacy.name if selected_pharmacy else 'Toàn hệ thống'},
@@ -6691,9 +6708,17 @@ def build_admin_reports_context(request):
         'payment_method_breakdown': payment_method_breakdown,
         'status_breakdown': status_breakdown,
         'top_products': top_products,
+        'top_products_page_obj': top_products_page_obj,
+        'top_products_query_string': top_products_query_string,
         'branch_performance': branch_performance,
+        'branch_performance_page_obj': branch_performance_page_obj,
+        'branch_performance_query_string': branch_performance_query_string,
         'low_stock_medicines': low_stock_medicines,
+        'low_stock_page_obj': low_stock_page_obj,
+        'low_stock_query_string': low_stock_query_string,
         'expiring_soon_medicines': expiring_soon_medicines,
+        'expiring_soon_page_obj': expiring_soon_page_obj,
+        'expiring_soon_query_string': expiring_soon_query_string,
         'low_stock_count': low_stock_count,
         'expiring_soon_count': expiring_soon_count,
         'out_of_stock_count': out_of_stock_count,
@@ -8600,11 +8625,16 @@ def custom_admin_about_page(request):
             form_kwargs={'link_choices': quick_link_choices},
         )
 
+    about_field_groups = build_singleton_field_groups(form, AboutPageContentForm.FIELD_GROUPS)
+    hero_field_group = about_field_groups[0] if about_field_groups else None
+    remaining_field_groups = about_field_groups[1:] if len(about_field_groups) > 1 else []
+
     context = {
         'page_title': 'Quản lý trang Giới thiệu',
         'current_model': 'about_page',
         'form': form,
-        'field_groups': build_singleton_field_groups(form, AboutPageContentForm.FIELD_GROUPS),
+        'field_groups': remaining_field_groups,
+        'hero_field_group': hero_field_group,
         'about_content': about_content,
         'builtin_section_formset': builtin_section_formset,
         'slide_formset': slide_formset,

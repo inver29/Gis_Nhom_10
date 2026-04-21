@@ -724,8 +724,12 @@ a {
     font-weight: 800;
     line-height: 1.45;
     color: var(--text-strong);
-    min-height: 52px;
+    min-height: calc(1.45em * 2);
     margin-bottom: 10px;
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
 }
 
 .product-card__title a {
@@ -736,8 +740,13 @@ a {
 .product-card__desc {
     color: var(--text-muted);
     font-size: 0.94rem;
-    min-height: 44px;
+    line-height: 1.65;
+    min-height: calc(1.65em * 3);
     margin-bottom: 14px;
+    display: -webkit-box;
+    -webkit-line-clamp: 3;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
 }
 
 .product-card__price {
@@ -859,6 +868,8 @@ button[disabled] {
     box-shadow: var(--shadow-soft);
     overflow: hidden;
     height: 100%;
+    display: flex;
+    flex-direction: column;
 }
 
 .pharmacy-card__media {
@@ -874,17 +885,58 @@ button[disabled] {
 
 .pharmacy-card__body {
     padding: 22px;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    flex: 1;
 }
 
 .pharmacy-card__body h3 {
     font-size: 1.18rem;
     font-weight: 800;
-    margin-bottom: 10px;
+    margin: 0;
+    line-height: 1.35;
+    min-height: calc(1.35em * 2);
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
 }
 
 .pharmacy-card__body p {
     color: var(--text-muted);
-    margin-bottom: 8px;
+    margin: 0;
+    line-height: 1.6;
+}
+
+.pharmacy-card__address {
+    min-height: calc(1.6em * 2);
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+}
+
+.pharmacy-card__meta {
+    display: grid;
+    gap: 8px;
+}
+
+.pharmacy-card__info {
+    display: flex;
+    align-items: flex-start;
+    gap: 8px;
+}
+
+.pharmacy-card__info i,
+.pharmacy-card__address i {
+    margin-top: 0.18rem;
+    flex: 0 0 auto;
+}
+
+.pharmacy-card__actions {
+    margin-top: auto;
+    padding-top: 4px;
 }
 
 .filter-bar {
@@ -2342,27 +2394,37 @@ button[disabled] {
 
 .account-stats {
     display: grid;
-    grid-template-columns: repeat(4, minmax(0, 1fr));
-    gap: 14px;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 16px;
     margin-bottom: 22px;
 }
 
 .account-stat {
-    padding: 16px;
+    min-height: 128px;
+    padding: 18px 16px;
     border-radius: 18px;
     background: #f7faff;
     border: 1px solid rgba(17, 70, 184, 0.08);
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+    text-align: center;
+    gap: 8px;
 }
 
 .account-stat strong {
     display: block;
     color: var(--brand-blue);
-    font-size: 1.4rem;
+    font-size: 1.9rem;
+    line-height: 1;
     font-weight: 900;
 }
 
 .account-stat span {
     color: var(--text-muted);
+    line-height: 1.45;
+    max-width: 12ch;
 }
 
 .account-action-grid {
@@ -2738,6 +2800,11 @@ button[disabled] {
 
 .carousel-slide {
     height: auto;
+    display: flex;
+}
+
+.carousel-slide > * {
+    width: 100%;
 }
 
 .site-alerts .alert,
@@ -2998,7 +3065,7 @@ button[disabled] {
 }
 
 .products-page .product-card__title {
-    min-height: 0;
+    min-height: calc(1.45em * 2);
     display: -webkit-box;
     -webkit-line-clamp: 2;
     -webkit-box-orient: vertical;
@@ -3006,10 +3073,10 @@ button[disabled] {
 }
 
 .products-page .product-card__desc {
-    min-height: 0;
+    min-height: calc(1.65em * 3);
     margin-bottom: 8px;
     display: -webkit-box;
-    -webkit-line-clamp: 2;
+    -webkit-line-clamp: 3;
     -webkit-box-orient: vertical;
     overflow: hidden;
 }
@@ -3848,20 +3915,25 @@ button[disabled] {
 }
 
 .price-stack__value {
-    display: flex;
-    flex-direction: column;
-    align-items: flex-start;
-    gap: 2px;
+    display: inline-flex;
+    align-items: baseline;
+    gap: 8px;
+    flex-wrap: nowrap;
     padding: 12px 14px;
     border-radius: 18px;
     background: linear-gradient(180deg, #fff 0%, #fff7f8 100%);
     border: 1px solid rgba(255, 255, 255, 0.014);
     box-shadow: 0 12px 24px rgba(214, 40, 57, 0.08);
     line-height: 1.15;
+    white-space: nowrap;
+    width: fit-content;
+    max-width: 100%;
 }
 
 .price-stack__unit {
-    margin-top: 2px;
+    margin-top: 0;
+    flex: 0 0 auto;
+    white-space: nowrap;
 }
 
 .price-stack__meta {

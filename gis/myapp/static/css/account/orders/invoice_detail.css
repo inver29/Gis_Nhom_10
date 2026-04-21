@@ -1,7 +1,7 @@
 :root{--ink:#1a2f52;--muted:#6d7c97;--primary:#1146b8;--line:#dfe8f7;--soft:#f7faff;--total:#d62839}
         *{box-sizing:border-box}
         @page{size:A4 portrait;margin:10mm}
-        body{margin:0;background:#eef4ff;font-family:Arial,sans-serif;color:var(--ink)}
+        body{margin:0;background:#eef4ff;font-family:"Segoe UI",Arial,Helvetica,sans-serif;color:var(--ink)}
         .invoice-shell{max-width:860px;margin:0 auto;padding:24px 16px 36px}
         .invoice-toolbar{display:flex;justify-content:space-between;align-items:center;gap:12px;margin-bottom:16px;flex-wrap:wrap}
         .invoice-btn{display:inline-flex;align-items:center;gap:8px;padding:11px 16px;border-radius:12px;border:1px solid rgba(17,70,184,.14);background:#fff;color:var(--primary);text-decoration:none;font-weight:700}

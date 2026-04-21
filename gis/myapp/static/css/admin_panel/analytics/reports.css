@@ -60,6 +60,12 @@
     .report-empty{padding:22px;border-radius:20px;background:#f9fbff;border:1px dashed rgba(17,70,184,.14);color:#6f84a4;text-align:center;line-height:1.65}
     .report-filter-note{margin-top:10px;color:#6d81a2;font-size:.88rem;line-height:1.6}
     .report-actions{display:flex;flex-wrap:wrap;gap:10px}
+    .report-pagination{display:flex;align-items:center;justify-content:flex-start;gap:10px;flex-wrap:wrap;margin-top:16px}
+    .report-pagination__item{display:inline-flex;align-items:center;justify-content:center;gap:8px;min-width:42px;padding:9px 14px;border-radius:999px;background:#fff;border:1px solid rgba(17,70,184,.10);color:#365a94;font-size:.84rem;font-weight:800;text-decoration:none}
+    .report-pagination__item:hover{color:#1f64e0;text-decoration:none;border-color:rgba(31,100,224,.18)}
+    .report-pagination__item.is-active{background:linear-gradient(135deg,#1f64e0 0%,#1146b8 100%);border-color:transparent;color:#fff;box-shadow:0 12px 24px rgba(17,70,184,.16)}
+    .report-pagination__item.is-disabled{opacity:.45;pointer-events:none}
+    .report-pagination__status{color:#6d81a2;font-size:.84rem;font-weight:700}
     @media (max-width:1399px){
         .report-filter-grid{grid-template-columns:repeat(4,minmax(0,1fr)) auto auto}
         .report-kpi-grid{grid-template-columns:repeat(3,minmax(0,1fr))}
@@ -80,4 +86,6 @@
         .report-list__stats{justify-content:flex-start}
         .report-status-item{grid-template-columns:auto 1fr}
         .report-status-item__value{grid-column:2/3}
+        .report-pagination{gap:8px}
+        .report-pagination__status{width:100%}
     }

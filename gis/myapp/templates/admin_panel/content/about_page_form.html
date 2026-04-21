@@ -46,6 +46,32 @@
         <div class="alert alert-danger">{{ custom_block_formset.non_form_errors }}</div>
         {% endif %}
 
+        {% if hero_field_group %}
+        <section class="about-editor__section about-editor__section--hero-content">
+            <div class="about-editor__section-head">
+                <div>
+                    <h3>{{ hero_field_group.title }}</h3>
+                    <p>Nhóm này điều khiển phần trên cùng của trang giới thiệu. Hãy chỉnh nội dung mở đầu và phần đi cùng slider trước, rồi mới xuống các khối story, value, chi nhánh và CTA bên dưới.</p>
+                </div>
+                <span class="admin-badge admin-badge-info">{{ hero_field_group.fields|length }} trường</span>
+            </div>
+            <div class="about-editor__grid">
+                {% for item in hero_field_group.fields %}
+                <div class="about-editor__field {% if item.is_textarea or item.is_rich_text %}about-editor__field--wide{% endif %}">
+                    <label for="{{ item.field.id_for_label }}">{{ item.field.label }}</label>
+                    {% if item.is_rich_text %}
+                        {% include "admin_panel/_partials/rich_editor_field.html" with field=item.field %}
+                    {% else %}
+                        {{ item.field }}
+                    {% endif %}
+                    {% if item.field.help_text %}<div class="admin-inline-help">{{ item.field.help_text }}</div>{% endif %}
+                    {% if item.field.errors %}<div class="admin-field-error">{{ item.field.errors }}</div>{% endif %}
+                </div>
+                {% endfor %}
+            </div>
+        </section>
+        {% endif %}
+
         <section class="about-editor__section" data-dynamic-formset data-prefix="builtin_sections" data-item-label-singular="khối" data-item-label-plural="khối">
             <div class="about-editor__section-head">
                 <div>
@@ -179,9 +205,9 @@
             <div class="about-editor__hint">Liên kết của từng slide có danh sách gợi ý sẵn. Nếu đường dẫn bạn cần không có trong danh sách, chọn “Tự nhập liên kết khác”.</div>
             <div class="about-editor__list" data-formset-list>
                 {% for slide_form in slide_formset.forms %}
-                <article class="about-editor__item-card" data-formset-card>
+                <article class="about-editor__item-card about-editor__item-card--slide" data-formset-card>
                     {% for hidden in slide_form.hidden_fields %}{{ hidden }}{% endfor %}
-                    <div class="about-editor__preview">
+                    <div class="about-editor__preview about-editor__preview--slide">
                         {% if slide_form.instance.image %}
                         <img src="{{ slide_form.instance.image.url }}" alt="{{ slide_form.instance.alt_text|default:'Slide giới thiệu' }}">
                         {% elif slide_form.instance.legacy_static_path %}
@@ -217,10 +243,10 @@
                 {% endfor %}
             </div>
             <template data-formset-template>
-                <article class="about-editor__item-card" data-formset-card>
+                <article class="about-editor__item-card about-editor__item-card--slide" data-formset-card>
                     {% with slide_form=slide_formset.empty_form %}
                     {% for hidden in slide_form.hidden_fields %}{{ hidden }}{% endfor %}
-                    <div class="about-editor__preview">
+                    <div class="about-editor__preview about-editor__preview--slide">
                         <div class="about-editor__placeholder">
                             <i class="fas fa-images fa-2x"></i>
                             <span>Slide mới</span>

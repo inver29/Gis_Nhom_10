@@ -6,7 +6,7 @@
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>Hóa đơn {{ order.resolved_invoice_code }}</title>
-        <link rel="stylesheet" href="{% static 'css/account/orders/invoice_detail.css' %}">
+    <link rel="stylesheet" href="{% static 'css/account/orders/invoice_detail.css' %}">
 </head>
 <body>
     <div class="invoice-shell">
@@ -18,8 +18,6 @@
         <section class="invoice-paper">
             <div class="invoice-head">
                 <div class="invoice-brand">
-                    <span class="sr-only">HÃA ÄÆ N BÃN HÃNG</span>
-                    <span class="sr-only">HÃƒÂ“A Ã„ÂÃ†Â N BÃƒÂN HÃƒÂ€NG</span>
                     <h1>HÓA ĐƠN BÁN HÀNG</h1>
                     <p><strong>GIS Pharma</strong></p>
                     <p>Chi nhánh: {{ order.pharmacy.name|default:"Chưa gán chi nhánh" }}</p>
@@ -91,7 +89,8 @@
             <div class="invoice-summary">
                 <div class="invoice-summary-box">
                     <div class="invoice-summary-row"><span>Tạm tính sau khuyến mãi hệ thống</span><strong>{{ order.product_subtotal_before_tier_discount|vnd }}</strong></div>
-                    {% if order.has_customer_tier_discount %}<div class="invoice-summary-row"><span>Ưu đãi hạng {{ order.customer_tier_name }}</span><strong>-{{ order.customer_tier_discount_total|vnd }}</strong></div>{% endif %}<div class="invoice-summary-row"><span>Phí giao hàng</span><strong>{{ order.shipping_fee|vnd }}</strong></div>
+                    {% if order.has_customer_tier_discount %}<div class="invoice-summary-row"><span>Ưu đãi hạng {{ order.customer_tier_name }}</span><strong>-{{ order.customer_tier_discount_total|vnd }}</strong></div>{% endif %}
+                    <div class="invoice-summary-row"><span>Phí giao hàng</span><strong>{{ order.shipping_fee|vnd }}</strong></div>
                     <div class="invoice-summary-row total"><span>Tổng thanh toán</span><strong>{{ order.final_total_price|vnd }}</strong></div>
                 </div>
             </div>

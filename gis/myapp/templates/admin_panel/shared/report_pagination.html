@@ -1,0 +1,35 @@
+{% if page_obj.paginator.num_pages > 1 %}
+<nav class="report-pagination" aria-label="{{ aria_label|default:'Phân trang báo cáo' }}">
+    {% if page_obj.has_previous %}
+    <a class="report-pagination__item report-pagination__item--nav" href="?{% if query_string %}{{ query_string }}&{% endif %}{{ page_param }}={{ page_obj.previous_page_number }}">
+        <i class="fas fa-chevron-left"></i>
+        <span>Trước</span>
+    </a>
+    {% else %}
+    <span class="report-pagination__item report-pagination__item--nav is-disabled">
+        <i class="fas fa-chevron-left"></i>
+        <span>Trước</span>
+    </span>
+    {% endif %}
+
+    {% for page_number in page_obj.paginator.page_range %}
+    <a class="report-pagination__item {% if page_number == page_obj.number %}is-active{% endif %}" href="?{% if query_string %}{{ query_string }}&{% endif %}{{ page_param }}={{ page_number }}">
+        {{ page_number }}
+    </a>
+    {% endfor %}
+
+    {% if page_obj.has_next %}
+    <a class="report-pagination__item report-pagination__item--nav" href="?{% if query_string %}{{ query_string }}&{% endif %}{{ page_param }}={{ page_obj.next_page_number }}">
+        <span>Sau</span>
+        <i class="fas fa-chevron-right"></i>
+    </a>
+    {% else %}
+    <span class="report-pagination__item report-pagination__item--nav is-disabled">
+        <span>Sau</span>
+        <i class="fas fa-chevron-right"></i>
+    </span>
+    {% endif %}
+
+    <span class="report-pagination__status">Trang {{ page_obj.number }}/{{ page_obj.paginator.num_pages }}</span>
+</nav>
+{% endif %}
