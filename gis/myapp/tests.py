@@ -1,9 +1,17 @@
+import re
+from datetime import timedelta
+from django.contrib.auth.hashers import make_password
 from django.contrib.auth.models import User
-from django.test import TestCase
+from django.core import mail
+from django.core.files.uploadedfile import SimpleUploadedFile
+from django.test import TestCase, override_settings
 from django.urls import reverse
+from django.utils import timezone
 
-from .models import Cart, CartItem, Medicine, Order, OrderItem, Pharmacy
+from .forms import AccountProfileForm, AboutPageContentForm, CheckoutForm, MedicineAdminForm, PharmacyAdminForm, ProfilePasswordChangeForm, ReturnRefundRequestForm
+from .models import AccountOtpChallenge, AboutPageContent, Cart, CartItem, Medicine, MedicineLot, MedicineReview, NewsArticle, Order, OrderItem, Pharmacy, ReturnRefundRequest, UserProfile, fold_text_for_match
 from .tool import DeliveryRoutingService
+from .views import get_or_create_medicine_for_import
 
 
 class DeliveryRoutingServiceTest(TestCase):
@@ -20,7 +28,7 @@ class DeliveryRoutingServiceTest(TestCase):
 class PharmacyAvailabilityTest(TestCase):
     def test_has_available_medicines_property(self):
         pharmacy = Pharmacy.objects.create(
-            name='Nhà thuốc A',
+            name='NhÃ  thuá»c A',
             address='123 Test',
             phone='0900000000',
             opening_hours='8:00 - 22:00',
@@ -41,8 +49,8 @@ class PharmacyAvailabilityTest(TestCase):
 class InventoryWorkflowTest(TestCase):
     def setUp(self):
         self.pharmacy = Pharmacy.objects.create(
-            name='Nhà thuốc Test',
-            address='123 Đường Test',
+            name='NhÃ  thuá»c Test',
+            address='123 ÄÆ°á»ng Test',
             phone='0900000001',
             opening_hours='08:00 - 22:00',
             lat=10.77,
@@ -59,7 +67,7 @@ class InventoryWorkflowTest(TestCase):
             name='Paracetamol 500mg',
             price=12000,
             quantity=10,
-            unit='Hộp',
+            unit='Há»p',
         )
         cart = Cart.objects.create(user=self.customer)
         CartItem.objects.create(cart=cart, medicine=medicine, quantity=3)
@@ -68,9 +76,9 @@ class InventoryWorkflowTest(TestCase):
         response = self.client.post(
             reverse('checkout'),
             {
-                'full_name': 'Khách Test',
+                'full_name': 'KhÃ¡ch Test',
                 'phone': '0900000002',
-                'address_text': '1 Nguyễn Huệ, Quận 1',
+                'address_text': '1 Nguyá»n Huá», Quáº­n 1',
                 'note': '',
                 'delivery_lat': '10.7750',
                 'delivery_lng': '106.7000',
@@ -90,13 +98,13 @@ class InventoryWorkflowTest(TestCase):
             name='Vitamin C',
             price=50000,
             quantity=7,
-            unit='Hộp',
+            unit='Há»p',
         )
         order = Order.objects.create(
             user=self.customer,
-            full_name='Khách Test',
+            full_name='KhÃ¡ch Test',
             phone='0900000002',
-            address_text='1 Nguyễn Huệ, Quận 1',
+            address_text='1 Nguyá»n Huá», Quáº­n 1',
             pharmacy=self.pharmacy,
             total_product_price=150000,
             final_total_price=165000,
@@ -129,13 +137,13 @@ class InventoryWorkflowTest(TestCase):
             name='Omega 3',
             price=90000,
             quantity=5,
-            unit='Hộp',
+            unit='Há»p',
         )
         order = Order.objects.create(
             user=self.customer,
-            full_name='Khách Test',
+            full_name='KhÃ¡ch Test',
             phone='0900000002',
-            address_text='1 Nguyễn Huệ, Quận 1',
+            address_text='1 Nguyá»n Huá», Quáº­n 1',
             pharmacy=self.pharmacy,
             total_product_price=180000,
             final_total_price=195000,
@@ -163,3 +171,907 @@ class InventoryWorkflowTest(TestCase):
         order.refresh_from_db()
         self.assertEqual(order.status, Order.STATUS_CANCELLED)
         self.assertEqual(medicine.quantity, 7)
+
+
+class PaymentExperienceTest(TestCase):
+    def setUp(self):
+        self.pharmacy = Pharmacy.objects.create(
+            name='NhÃ  thuá»c Thanh ToÃ¡n',
+            address='456 ÄÆ°á»ng QR',
+            phone='0900000009',
+            opening_hours='08:00 - 22:00',
+            lat=10.77,
+            lng=106.69,
+        )
+        self.customer = User.objects.create_user(
+            username='payment_user',
+            password='Test@123456',
+        )
+
+    def test_payment_preview_api_returns_qr_data_for_bank(self):
+        response = self.client.get(
+            reverse('payment_preview_api'),
+            {
+                'payment_method': 'bank',
+                'amount': '125000',
+                'pharmacy_id': str(self.pharmacy.pk),
+                'reference': 'DH000001-0604',
+            },
+        )
+        self.assertEqual(response.status_code, 200)
+        payload = response.json()
+        self.assertTrue(payload['show_qr'])
+        self.assertTrue(
+            payload['qr_image'].startswith('data:image')
+            or payload['qr_image'].startswith('https://img.vietqr.io/')
+            or payload['qr_image'].startswith('/static/images/')
+        )
+        self.assertEqual(payload['amount_value'], 125000)
+
+    @override_settings(
+        PAYMENT_BANK_QR_IMAGE_URL='images/payment-bank-qr.png',
+        PAYMENT_MOMO_QR_IMAGE_URL='images/payment-momo-qr.png',
+    )
+    def test_payment_preview_api_uses_configured_custom_qr_images(self):
+        bank_response = self.client.get(
+            reverse('payment_preview_api'),
+            {
+                'payment_method': 'bank',
+                'amount': '125000',
+                'pharmacy_id': str(self.pharmacy.pk),
+                'reference': 'DH000001-0604',
+            },
+        )
+        self.assertEqual(bank_response.status_code, 200)
+        self.assertEqual(bank_response.json()['qr_image'], '/static/images/payment-bank-qr.png')
+
+        momo_response = self.client.get(
+            reverse('payment_preview_api'),
+            {
+                'payment_method': 'momo',
+                'amount': '125000',
+                'pharmacy_id': str(self.pharmacy.pk),
+                'reference': 'DH000001-0604',
+            },
+        )
+        self.assertEqual(momo_response.status_code, 200)
+        self.assertEqual(momo_response.json()['qr_image'], '/static/images/payment-momo-qr.png')
+
+    def test_invoice_view_is_available_for_order_owner(self):
+        order = Order.objects.create(
+            user=self.customer,
+            full_name='KhÃ¡ch Invoice',
+            phone='0900000010',
+            address_text='789 ÄÆ°á»ng In HÃ³a ÄÆ¡n',
+            pharmacy=self.pharmacy,
+            total_product_price=150000,
+            shipping_fee=15000,
+            final_total_price=165000,
+            payment_method=Order.PAYMENT_BANK,
+            payment_status=Order.PAYMENT_STATUS_AWAITING_TRANSFER,
+            payment_reference='DH000123-0604',
+            invoice_code='HD20260406-000123',
+            invoice_staff_name='NhÃ¢n viÃªn Test',
+        )
+        OrderItem.objects.create(
+            order=order,
+            medicine=None,
+            medicine_name='Paracetamol',
+            price=150000,
+            quantity=1,
+        )
+
+        self.client.force_login(self.customer)
+        response = self.client.get(reverse('order_invoice_view', args=[order.pk]))
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, 'HÃA ÄÆ N BÃN HÃNG')
+        self.assertContains(response, 'NhÃ¢n viÃªn Test')
+
+
+class OrderPostPurchaseWorkflowTest(TestCase):
+    TINY_PNG = (
+        b'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAusB9s2u8xQAAAAASUVORK5CYII='
+    )
+
+
+    def setUp(self):
+        self.pharmacy = Pharmacy.objects.create(
+            name='NhÃ  thuá»c Háº­u mÃ£i',
+            address='12 Nguyá»n TrÃ£i',
+            phone='0900000099',
+            opening_hours='08:00 - 22:00',
+            lat=10.77,
+            lng=106.69,
+        )
+        self.customer = User.objects.create_user(username='buyer_case', password='Test@123456', email='buyer@example.com')
+        self.medicine = Medicine.objects.create(
+            pharmacy=self.pharmacy,
+            name='Thuá»c A',
+            price=100000,
+            quantity=20,
+            unit='Há»p',
+        )
+
+    def create_order(self, status=Order.STATUS_PENDING, payment_method=Order.PAYMENT_COD, estimated_delivery_at=None):
+        order = Order.objects.create(
+            user=self.customer,
+            full_name='KhÃ¡ch hÃ ng A',
+            phone='0900000011',
+            address_text='1 Nguyá»n Huá»',
+            pharmacy=self.pharmacy,
+            total_product_price=200000,
+            shipping_fee=15000,
+            final_total_price=215000,
+            payment_method=payment_method,
+            payment_status=Order.PAYMENT_STATUS_COD_WAITING if payment_method == Order.PAYMENT_COD else Order.PAYMENT_STATUS_AWAITING_TRANSFER,
+            status=status,
+            estimated_delivery_at=estimated_delivery_at,
+        )
+        OrderItem.objects.create(order=order, medicine=self.medicine, medicine_name=self.medicine.name, price=self.medicine.price, quantity=2)
+        return order
+
+    def test_customer_can_cancel_pending_order(self):
+        order = self.create_order(status=Order.STATUS_PENDING)
+        self.client.force_login(self.customer)
+        response = self.client.post(reverse('cancel_order', args=[order.pk]))
+        self.assertEqual(response.status_code, 302)
+        order.refresh_from_db()
+        self.assertEqual(order.status, Order.STATUS_CANCELLED)
+        self.assertIsNotNone(order.cancelled_at)
+
+    def test_customer_confirm_received_marks_order_completed(self):
+        order = self.create_order(status=Order.STATUS_SHIPPING)
+        self.client.force_login(self.customer)
+        response = self.client.post(reverse('confirm_order_received', args=[order.pk]))
+        self.assertEqual(response.status_code, 302)
+        order.refresh_from_db()
+        self.assertEqual(order.status, Order.STATUS_COMPLETED)
+        self.assertEqual(order.payment_status, Order.PAYMENT_STATUS_PAID)
+        self.assertIsNotNone(order.received_confirmed_at)
+
+    def test_order_history_auto_completes_overdue_shipping_order(self):
+        order = self.create_order(
+            status=Order.STATUS_SHIPPING,
+            estimated_delivery_at=timezone.now() - timedelta(days=6),
+        )
+        self.client.force_login(self.customer)
+        response = self.client.get(reverse('order_history'))
+        self.assertEqual(response.status_code, 200)
+        order.refresh_from_db()
+        self.assertEqual(order.status, Order.STATUS_COMPLETED)
+        self.assertIsNotNone(order.auto_completed_at)
+
+    def test_order_history_is_paginated_three_orders_per_page(self):
+        for _ in range(5):
+            self.create_order(status=Order.STATUS_PENDING)
+
+        self.client.force_login(self.customer)
+
+        first_page = self.client.get(reverse('order_history'))
+        self.assertEqual(first_page.status_code, 200)
+        self.assertEqual(len(first_page.context['orders']), 3)
+        self.assertEqual(first_page.context['page_obj'].number, 1)
+        self.assertEqual(first_page.context['page_obj'].paginator.num_pages, 2)
+
+        second_page = self.client.get(reverse('order_history'), {'page': 2})
+        self.assertEqual(second_page.status_code, 200)
+        self.assertEqual(len(second_page.context['orders']), 2)
+        self.assertEqual(second_page.context['page_obj'].number, 2)
+
+    def test_completed_order_can_create_return_request(self):
+        order = self.create_order(status=Order.STATUS_COMPLETED)
+        self.client.force_login(self.customer)
+        response = self.client.post(
+            reverse('return_request', args=[order.pk]),
+            {
+                'reason': 'Giao sai sáº£n pháº©m',
+                'bank_account_number': '123456789',
+                'momo_account_number': '',
+                'contact_email': 'buyer@example.com',
+                'contact_phone': '0900000011',
+                'bill_image': SimpleUploadedFile('bill.png', __import__('base64').b64decode(self.TINY_PNG), content_type='image/png'),
+                'proof_images': [SimpleUploadedFile('proof1.png', __import__('base64').b64decode(self.TINY_PNG), content_type='image/png')],
+            },
+        )
+        self.assertEqual(response.status_code, 302)
+        request_obj = ReturnRefundRequest.objects.get(order=order)
+        self.assertEqual(request_obj.status, ReturnRefundRequest.STATUS_PROCESSING)
+        self.assertEqual(request_obj.evidences.count(), 1)
+
+
+class ReviewUpdateFlagTest(TestCase):
+    def test_review_update_flag_only_true_after_real_update(self):
+        pharmacy = Pharmacy.objects.create(
+            name='NhÃ  thuá»c Review',
+            address='456 Test',
+            phone='0900000022',
+            opening_hours='08:00 - 22:00',
+            lat=10.77,
+            lng=106.69,
+        )
+        medicine = Medicine.objects.create(pharmacy=pharmacy, name='Thuá»c Review', price=10000, quantity=5)
+        user = User.objects.create_user(username='review_user', password='Test@123456')
+        review = MedicineReview.objects.create(user=user, medicine=medicine, rating=5, comment='Tá»t')
+        self.assertFalse(review.was_updated_by_user)
+        MedicineReview.objects.filter(pk=review.pk).update(is_edited=True)
+        review.refresh_from_db()
+        self.assertTrue(review.was_updated_by_user)
+
+
+class MedicineCatalogSyncWorkflowTest(TestCase):
+    def setUp(self):
+        self.branch_a = Pharmacy.objects.create(
+            name='Nha thuoc A',
+            address='1 Duong A',
+            phone='0900000200',
+            opening_hours='08:00 - 22:00',
+            lat=10.77,
+            lng=106.69,
+        )
+        self.branch_b = Pharmacy.objects.create(
+            name='Nha thuoc B',
+            address='2 Duong B',
+            phone='0900000201',
+            opening_hours='08:00 - 22:00',
+            lat=10.78,
+            lng=106.7,
+        )
+        self.admin_user = User.objects.create_superuser(
+            username='catalog_admin',
+            password='Test@123456',
+            email='catalog_admin@example.com',
+        )
+
+    def test_fold_text_for_match_normalizes_vietnamese_d_character(self):
+        self.assertEqual(fold_text_for_match('điều trị'), 'dieu tri')
+        self.assertEqual(
+            fold_text_for_match('Oresol bù nước'),
+            fold_text_for_match('Oresol bu nuoc'),
+        )
+
+    def test_medicine_admin_form_syncs_shared_fields_across_catalog_group(self):
+        medicine_a = Medicine.objects.create(
+            pharmacy=self.branch_a,
+            name='Oresol bu nuoc',
+            category='Tieu hoa',
+            unit='Goi',
+            manufacturer='DHG Pharma',
+            origin='Viet Nam',
+            price=12000,
+            quantity=0,
+            description='Mo ta cu',
+            usage='Cong dung cu',
+            ingredients='Thanh phan cu',
+            dosage='Lieu cu',
+            prescription_required=False,
+        )
+        medicine_b = Medicine.objects.create(
+            pharmacy=self.branch_b,
+            name='Oresol bù nước',
+            category='',
+            unit='Goi',
+            manufacturer='DHG Pharma',
+            origin='',
+            price=10000,
+            quantity=0,
+            description='',
+            usage='',
+            ingredients='',
+            dosage='',
+            prescription_required=False,
+        )
+
+        form = MedicineAdminForm(
+            data={
+                'pharmacy': str(self.branch_a.pk),
+                'name': 'Oresol bù nước chuẩn',
+                'category': 'Tieu hoa',
+                'unit': 'Goi',
+                'manufacturer': 'DHG Pharma',
+                'origin': 'Việt Nam',
+                'price': '15000',
+                'gallery_urls': '',
+                'description': 'Bù nước và điện giải cho cơ thể.',
+                'usage': 'Hỗ trợ bù nước nhanh.',
+                'ingredients': 'Glucose, natri clorid.',
+                'dosage': 'Dùng theo hướng dẫn trên gói.',
+                'prescription_required': 'on',
+            },
+            instance=medicine_a,
+            admin_user=self.admin_user,
+        )
+
+        self.assertTrue(form.is_valid(), form.errors.as_json())
+        saved = form.save()
+        medicine_b.refresh_from_db()
+
+        self.assertEqual(saved.name, 'Oresol bù nước chuẩn')
+        self.assertEqual(medicine_b.name, 'Oresol bù nước chuẩn')
+        self.assertEqual(medicine_b.origin, 'Việt Nam')
+        self.assertEqual(medicine_b.price, 15000)
+        self.assertEqual(medicine_b.description, 'Bù nước và điện giải cho cơ thể.')
+        self.assertEqual(medicine_b.usage, 'Hỗ trợ bù nước nhanh.')
+        self.assertTrue(medicine_b.prescription_required)
+
+    def test_import_reuses_existing_medicine_when_excel_name_is_without_accents(self):
+        existing_medicine = Medicine.objects.create(
+            pharmacy=self.branch_a,
+            name='Oresol bù nước',
+            category='Tieu hoa',
+            unit='Goi',
+            manufacturer='DHG Pharma',
+            origin='Việt Nam',
+            price=12000,
+            quantity=0,
+        )
+
+        medicine, was_created = get_or_create_medicine_for_import(
+            self.branch_a,
+            {
+                'medicine_name': 'Oresol bu nuoc',
+                'manufacturer': 'DHG Pharma',
+                'unit': 'Goi',
+                'sale_price': '18000',
+            },
+            row_number=2,
+        )
+
+        self.assertFalse(was_created)
+        self.assertEqual(medicine.pk, existing_medicine.pk)
+        self.assertEqual(medicine.name, 'Oresol bù nước')
+
+
+@override_settings(EMAIL_BACKEND='django.core.mail.backends.locmem.EmailBackend')
+class RegistrationEmailActivationTest(TestCase):
+    def test_register_sends_activation_email_and_activates_after_link_click(self):
+        response = self.client.post(
+            reverse('register'),
+            {
+                'username': 'new_customer',
+                'email': 'new_customer@example.com',
+                'password': 'Test@123456',
+                'confirm_password': 'Test@123456',
+            },
+        )
+
+        self.assertRedirects(response, reverse('login'))
+        user = User.objects.get(username='new_customer')
+        self.assertFalse(user.is_active)
+        self.assertTrue(UserProfile.objects.filter(user=user).exists())
+        self.assertEqual(len(mail.outbox), 1)
+        self.assertIn('Xác nhận đăng ký tài khoản', mail.outbox[0].subject)
+        activation_match = re.search(r'http://testserver(?P<path>/register/activate/[^\s]+)', mail.outbox[0].body)
+        self.assertIsNotNone(activation_match)
+
+        inactive_login_response = self.client.post(
+            reverse('login'),
+            {'username': 'new_customer', 'password': 'Test@123456'},
+        )
+        self.assertEqual(inactive_login_response.status_code, 200)
+        self.assertContains(inactive_login_response, 'chưa xác nhận email')
+
+        activation_response = self.client.get(activation_match.group('path'))
+        self.assertRedirects(activation_response, reverse('login'))
+        user.refresh_from_db()
+        self.assertTrue(user.is_active)
+
+        login_response = self.client.post(
+            reverse('login'),
+            {'username': 'new_customer', 'password': 'Test@123456'},
+        )
+        self.assertRedirects(login_response, reverse('home'))
+
+    def test_register_rejects_duplicate_email_even_when_username_is_different(self):
+        User.objects.create_user(
+            username='existing_customer',
+            email='duplicate@example.com',
+            password='Test@123456',
+        )
+
+        response = self.client.post(
+            reverse('register'),
+            {
+                'username': 'other_customer',
+                'email': 'duplicate@example.com',
+                'password': 'Test@123456',
+                'confirm_password': 'Test@123456',
+            },
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, 'Email này đã được dùng để đăng ký tài khoản.')
+        self.assertFalse(User.objects.filter(username='other_customer').exists())
+        self.assertEqual(len(mail.outbox), 0)
+
+
+@override_settings(EMAIL_BACKEND='django.core.mail.backends.locmem.EmailBackend')
+class EmailNotificationWorkflowTest(TestCase):
+    def setUp(self):
+        self.pharmacy = Pharmacy.objects.create(
+            name='Nha thuoc Email',
+            address='99 Duong Email',
+            phone='0900000100',
+            opening_hours='08:00 - 22:00',
+            lat=10.77,
+            lng=106.69,
+        )
+        self.customer = User.objects.create_user(
+            username='email_customer',
+            password='Test@123456',
+            email='email_customer@example.com',
+        )
+        self.admin_user = User.objects.create_superuser(
+            username='email_admin',
+            password='Test@123456',
+            email='admin@example.com',
+        )
+
+    def create_order(self, status=Order.STATUS_PENDING):
+        return Order.objects.create(
+            user=self.customer,
+            full_name='Khach Email',
+            phone='0900000101',
+            address_text='123 Duong Email',
+            pharmacy=self.pharmacy,
+            total_product_price=150000,
+            shipping_fee=15000,
+            final_total_price=165000,
+            payment_method=Order.PAYMENT_COD,
+            payment_status=Order.PAYMENT_STATUS_COD_WAITING,
+            status=status,
+        )
+
+    def test_admin_order_status_change_sends_email(self):
+        order = self.create_order(status=Order.STATUS_PENDING)
+        self.client.force_login(self.admin_user)
+
+        with self.captureOnCommitCallbacks(execute=True):
+            response = self.client.post(
+                reverse('custom_admin_order_detail', args=[order.pk]),
+                {
+                    'pharmacy': str(self.pharmacy.pk),
+                    'status': Order.STATUS_SHIPPING,
+                },
+            )
+
+        self.assertEqual(response.status_code, 302)
+        order.refresh_from_db()
+        self.assertEqual(order.status, Order.STATUS_SHIPPING)
+        self.assertEqual(len(mail.outbox), 1)
+        self.assertIn(order.order_code, mail.outbox[0].subject)
+        self.assertIn('Đang giao hàng', mail.outbox[0].body)
+        self.assertEqual(mail.outbox[0].to, [self.customer.email])
+
+    def test_return_request_status_change_sends_email(self):
+        order = self.create_order(status=Order.STATUS_COMPLETED)
+        request_obj = ReturnRefundRequest.objects.create(
+            order=order,
+            reason='Giao sai sản phẩm',
+            contact_email='fallback@example.com',
+            contact_phone='0900000101',
+            status=ReturnRefundRequest.STATUS_PROCESSING,
+        )
+        self.client.force_login(self.admin_user)
+
+        with self.captureOnCommitCallbacks(execute=True):
+            response = self.client.post(
+                reverse('custom_admin_return_request_detail', args=[request_obj.pk]),
+                {
+                    'status': ReturnRefundRequest.STATUS_APPROVED,
+                    'admin_note': 'Đã duyệt hoàn tiền cho khách.',
+                },
+            )
+
+        self.assertEqual(response.status_code, 302)
+        request_obj.refresh_from_db()
+        order.refresh_from_db()
+        self.assertEqual(request_obj.status, ReturnRefundRequest.STATUS_APPROVED)
+        self.assertEqual(order.status, Order.STATUS_CANCELLED)
+        self.assertEqual(len(mail.outbox), 1)
+        self.assertIn(order.order_code, mail.outbox[0].subject)
+        self.assertIn('Đã duyệt hoàn tiền cho khách.', mail.outbox[0].body)
+        self.assertEqual(mail.outbox[0].to, [self.customer.email])
+
+    def test_username_recovery_email_includes_username(self):
+        response = self.client.post(
+            f"{reverse('password_reset')}?recovery=username",
+            {'email': self.customer.email},
+        )
+
+        self.assertEqual(response.status_code, 302)
+        self.assertEqual(len(mail.outbox), 1)
+        self.assertIn('Gửi lại tên đăng nhập', mail.outbox[0].subject)
+        self.assertIn(self.customer.username, mail.outbox[0].body)
+
+
+class RichContentPresentationTest(TestCase):
+    def setUp(self):
+        self.pharmacy = Pharmacy.objects.create(
+            name='Nhà thuốc Mô tả',
+            address='99 Đường Mẫu',
+            phone='0909999999',
+            opening_hours='08:00 - 22:00',
+            desc='<p><strong>Chi nhánh trung tâm</strong> với khu vực tư vấn riêng.</p>',
+            lat=10.77,
+            lng=106.69,
+        )
+        self.medicine = Medicine.objects.create(
+            pharmacy=self.pharmacy,
+            name='Cetirizin 10mg',
+            price=25000,
+            quantity=12,
+            unit='Hộp',
+            description='<p>Thuốc giảm triệu chứng viêm mũi dị ứng và mề đay.</p>',
+            usage='<p>Công dụng cũ</p>',
+            ingredients='<p>Thành phần cũ</p>',
+            dosage='<p>Cách dùng cũ</p>',
+        )
+
+    def test_pharmacy_detail_shows_description_block(self):
+        response = self.client.get(reverse('pharmacy_detail', args=[self.pharmacy.pk]))
+        self.assertEqual(response.status_code, 200)
+        content = response.content.decode('utf-8')
+        self.assertIn('pharmacy-description-panel', content)
+        self.assertIn('Chi nhánh trung tâm', content)
+        self.assertLess(content.index('Trạng thái phục vụ'), content.index('pharmacy-description-panel'))
+
+    def test_medicine_detail_separates_description_and_removes_legacy_sections(self):
+        response = self.client.get(reverse('medicine_detail', args=[self.medicine.pk]))
+        self.assertEqual(response.status_code, 200)
+        content = response.content.decode('utf-8')
+        self.assertIn('medicine-description-panel', content)
+        self.assertIn('Thuốc giảm triệu chứng viêm mũi dị ứng và mề đay.', content)
+        self.assertIn('buy-panel--compact', content)
+        self.assertIn('Thêm vào giỏ hàng', content)
+        self.assertIn('Mua ngay', content)
+        self.assertNotIn('<h3><i class="fas fa-briefcase-medical"></i> Công dụng</h3>', content)
+        self.assertNotIn('<h3><i class="fas fa-flask"></i> Thành phần</h3>', content)
+        self.assertNotIn('<h3><i class="fas fa-notes-medical"></i> Cách dùng</h3>', content)
+
+
+class RichEditorAdminExperienceTest(TestCase):
+    def setUp(self):
+        self.superuser = User.objects.create_superuser(
+            username='admin_editor',
+            email='admin@example.com',
+            password='Test@123456',
+        )
+        self.pharmacy = Pharmacy.objects.create(
+            name='Nhà thuốc Editor',
+            address='12 Đường Admin',
+            phone='0901231231',
+            opening_hours='08:00 - 22:00',
+            lat=10.77,
+            lng=106.69,
+        )
+
+    def test_admin_forms_expose_rich_editor_attributes(self):
+        pharmacy_form = PharmacyAdminForm()
+        medicine_form = MedicineAdminForm(admin_user=self.superuser)
+
+        self.assertEqual(pharmacy_form.fields['desc'].widget.attrs.get('data-rich-editor'), '1')
+        self.assertEqual(medicine_form.fields['description'].widget.attrs.get('data-rich-editor'), '1')
+        self.assertEqual(medicine_form.fields['usage'].widget.attrs.get('data-rich-editor'), '1')
+        self.assertFalse(pharmacy_form.fields['desc'].help_text)
+        self.assertFalse(medicine_form.fields['description'].help_text)
+
+    def test_custom_admin_create_pages_render_visible_wysiwyg_toolbar_and_hide_specialized_block(self):
+        self.client.force_login(self.superuser)
+
+        pharmacy_response = self.client.get(reverse('custom_admin_create', args=['pharmacy']))
+        medicine_response = self.client.get(reverse('custom_admin_create', args=['medicine']))
+
+        self.assertEqual(pharmacy_response.status_code, 200)
+        self.assertEqual(medicine_response.status_code, 200)
+        self.assertContains(pharmacy_response, 'data-rich-editor-root')
+        self.assertContains(pharmacy_response, 'data-editor-image-width')
+        self.assertContains(pharmacy_response, 'data-editor-image-reset')
+        self.assertContains(medicine_response, 'data-rich-editor-root')
+        self.assertContains(medicine_response, 'data-editor-image-align=\"center\"')
+        self.assertContains(medicine_response, 'data-editor-source-toggle')
+        self.assertNotContains(medicine_response, 'Thông tin chuyên môn')
+
+
+class AboutPageRefreshTest(TestCase):
+    def test_about_page_introduces_website_products_benefits_and_branches(self):
+        pharmacy = Pharmacy.objects.create(
+            name='Quan 5 Branch',
+            address='51 Nguyen Trai, Quan 5',
+            phone='0901111111',
+            opening_hours='08:00 - 22:00',
+            lat=10.77,
+            lng=106.69,
+        )
+        Medicine.objects.create(
+            pharmacy=pharmacy,
+            name='Vitamin C 500mg',
+            price=30000,
+            quantity=10,
+            unit='Hộp',
+            category='Vitamin',
+            product_type='medicine',
+        )
+
+        response = self.client.get(reverse('about'))
+        self.assertEqual(response.status_code, 200)
+        content = response.content.decode('utf-8')
+        self.assertIn('About GIS Pharma', content)
+        self.assertIn('story + value + CTA', content)
+        self.assertIn('about-value-grid', content)
+        self.assertIn('about-branch-grid', content)
+        self.assertIn('Quan 5 Branch', content)
+        self.assertIn('Vitamin', content)
+        self.assertEqual(response.context['product_type_summary']['medicine'], 1)
+        self.assertEqual(response.context['pharmacy_total'], 1)
+
+
+@override_settings(EMAIL_BACKEND='django.core.mail.backends.locmem.EmailBackend')
+class AdminEnhancementRegressionTest(TestCase):
+    def setUp(self):
+        self.superuser = User.objects.create_superuser(
+            username='root_admin',
+            email='root@example.com',
+            password='Test@123456',
+        )
+        self.staff = User.objects.create_user(
+            username='staff_perm',
+            email='staff@example.com',
+            password='Test@123456',
+            is_staff=True,
+        )
+        self.pharmacy = Pharmacy.objects.create(
+            name='Nhà thuốc Trung tâm',
+            address='1 Đường Chính',
+            phone='0902222222',
+            opening_hours='08:00 - 22:00',
+            lat=10.77,
+            lng=106.69,
+        )
+        self.profile = UserProfile.objects.create(user=self.superuser, full_name='Root Admin', phone='0901111222')
+        UserProfile.objects.create(user=self.staff, full_name='Nhân viên', phone='0903333444', managed_pharmacy=self.pharmacy)
+
+    def test_admin_form_pages_render_rich_editor_and_locked_coordinates(self):
+        self.client.force_login(self.superuser)
+        response = self.client.get(reverse('custom_admin_create', args=['pharmacy']))
+        self.assertEqual(response.status_code, 200)
+        content = response.content.decode('utf-8')
+        self.assertIn('data-rich-editor-root', content)
+        self.assertIn('data-editor-image-width', content)
+        self.assertIn('data-editor-image-reset', content)
+        self.assertIn('readonly', content)
+        self.assertIn('height: 520px', content)
+
+        medicine_response = self.client.get(reverse('custom_admin_create', args=['medicine']))
+        self.assertEqual(medicine_response.status_code, 200)
+        self.assertContains(medicine_response, 'data-editor-image-align=\"center\"')
+        self.assertContains(medicine_response, 'data-editor-source-toggle')
+        self.assertNotContains(medicine_response, 'Thông tin chuyên môn')
+
+    def test_home_page_admin_renders_management_formsets(self):
+        self.client.force_login(self.superuser)
+        response = self.client.get(reverse('custom_admin_home_page'))
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, 'Quan ly trang chu')
+        self.assertContains(response, 'hero_slides-TOTAL_FORMS')
+        self.assertContains(response, 'category_items-TOTAL_FORMS')
+        self.assertContains(response, 'commitment_items-TOTAL_FORMS')
+
+    def test_news_create_page_and_purchase_import_page_render_new_tools(self):
+        self.client.force_login(self.superuser)
+
+        news_response = self.client.get(reverse('custom_admin_create', args=['news']))
+        self.assertEqual(news_response.status_code, 200)
+        self.assertContains(news_response, 'data-rich-editor-root')
+        self.assertContains(news_response, 'id_cover_image-live-preview')
+
+        import_response = self.client.get(reverse('custom_admin_create', args=['purchase_import']))
+        self.assertEqual(import_response.status_code, 200)
+        self.assertContains(import_response, 'purchase-import-preview-data')
+        self.assertContains(import_response, 'excel-new-products-trigger')
+        self.assertContains(import_response, 'new-products-modal')
+
+    def test_home_hero_slides_link_to_about_page(self):
+        response = self.client.get(reverse('home'))
+        self.assertEqual(response.status_code, 200)
+        content = response.content.decode('utf-8')
+        self.assertIn('hero-splide__link', content)
+        self.assertEqual(content.count('class="hero-splide__link"'), 3)
+        self.assertIn('data-interval="4000"', content)
+
+    def test_about_page_admin_updates_public_about_content(self):
+        self.client.force_login(self.superuser)
+        content = AboutPageContent.get_solo()
+
+        admin_response = self.client.get(reverse('custom_admin_about_page'))
+        self.assertEqual(admin_response.status_code, 200)
+        self.assertContains(admin_response, 'Quản lý nội dung trang Giới thiệu')
+
+        form = AboutPageContentForm(instance=content)
+        data = {field_name: getattr(content, field_name) for field_name in form.fields}
+        data['hero_title'] = 'Trang giới thiệu đang lấy nội dung từ trang quản lý'
+        data['story_title'] = 'Câu chuyện đã được chỉnh trong admin'
+        data['cta_primary_label'] = 'Xem catalog đã chỉnh'
+
+        response = self.client.post(reverse('custom_admin_about_page'), data)
+        self.assertEqual(response.status_code, 302)
+        self.assertEqual(response.url, reverse('custom_admin_about_page'))
+
+        public_response = self.client.get(reverse('about'))
+        self.assertEqual(public_response.status_code, 200)
+        self.assertContains(public_response, 'Trang giới thiệu đang lấy nội dung từ trang quản lý')
+        self.assertContains(public_response, 'Câu chuyện đã được chỉnh trong admin')
+        self.assertContains(public_response, 'Xem catalog đã chỉnh')
+
+    def test_news_article_generates_slug_and_public_page(self):
+        article = NewsArticle.objects.create(
+            title='Thong bao he thong GIS Pharma',
+            summary='Tom tat bai viet',
+            content='<p>Noi dung bai viet</p>',
+            is_published=True,
+            created_by=self.superuser,
+            updated_by=self.superuser,
+        )
+
+        self.assertTrue(article.slug)
+        self.assertIsNotNone(article.published_at)
+
+        response = self.client.get(reverse('news_detail', args=[article.slug]))
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, 'Thong bao he thong GIS Pharma')
+        self.assertContains(response, 'Noi dung bai viet')
+
+    def test_permissions_center_is_grouped_and_review_insights_removed(self):
+        self.client.force_login(self.superuser)
+        response = self.client.get(reverse('custom_admin_permissions_center'), {'user': self.staff.pk})
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, 'Nhóm 1 · Tổng quan và vận hành chính')
+        self.assertContains(response, 'Nhóm 2 · Sản phẩm, kho và báo cáo')
+        self.assertContains(response, 'Nhóm 3 · Tài khoản và phân quyền')
+        self.assertNotContains(response, 'Phân tích đánh giá')
+
+    def test_review_insights_route_redirects_back_to_reports(self):
+        self.client.force_login(self.superuser)
+        response = self.client.get(reverse('custom_admin_review_insights'))
+        self.assertEqual(response.status_code, 302)
+        self.assertEqual(response.url, reverse('custom_admin_reports'))
+
+    def test_home_featured_pharmacies_use_sellable_lot_inventory(self):
+        medicine = Medicine.objects.create(
+            pharmacy=self.pharmacy,
+            name='Thuốc còn lô',
+            price=15000,
+            quantity=0,
+            unit='Hộp',
+        )
+        MedicineLot.objects.create(
+            medicine=medicine,
+            pharmacy=self.pharmacy,
+            source_label='LOT-AVAILABLE',
+            received_quantity=10,
+            remaining_quantity=10,
+            expiry_date=timezone.localdate() + timedelta(days=90),
+        )
+        response = self.client.get(reverse('home'))
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, 'Nhà thuốc Trung tâm')
+
+    def test_inventory_alert_center_paginates_three_rows_each_section_and_keeps_panel_open(self):
+        self.client.force_login(self.superuser)
+        for index in range(6):
+            med = Medicine.objects.create(
+                pharmacy=self.pharmacy,
+                name=f'Hết hạn {index}',
+                price=10000 + index,
+                quantity=1,
+            )
+            MedicineLot.objects.create(
+                medicine=med,
+                pharmacy=self.pharmacy,
+                source_label=f'EXP-{index}',
+                received_quantity=5,
+                remaining_quantity=5,
+                expiry_date=timezone.localdate() - timedelta(days=index + 1),
+            )
+        for index in range(6):
+            med = Medicine.objects.create(
+                pharmacy=self.pharmacy,
+                name=f'Cận hạn {index}',
+                price=20000 + index,
+                quantity=1,
+            )
+            MedicineLot.objects.create(
+                medicine=med,
+                pharmacy=self.pharmacy,
+                source_label=f'WRN-{index}',
+                received_quantity=5,
+                remaining_quantity=5,
+                expiry_date=timezone.localdate() + timedelta(days=20 + index),
+            )
+
+        response = self.client.get(reverse('custom_admin_list', args=['inventory_lot']))
+        self.assertEqual(response.status_code, 200)
+        content = response.content.decode('utf-8')
+        self.assertEqual(content.count('Đi tới phiếu xử lý'), 6)
+        self.assertIn('Hiển thị tối đa 3 dòng mỗi trang', content)
+        self.assertIn('inventory_alert_open=1', content)
+        self.assertIn('expired_page=2', content)
+        self.assertIn('warning_page=2', content)
+
+        next_page_response = self.client.get(reverse('custom_admin_list', args=['inventory_lot']), {'expired_page': 2, 'inventory_alert_open': 1})
+        self.assertEqual(next_page_response.status_code, 200)
+        self.assertContains(next_page_response, 'admin-alert-center is-open')
+
+    def test_phone_validation_uses_vietnamese_messages(self):
+        account_form = AccountProfileForm(
+            data={'full_name': 'A', 'email': 'a@example.com', 'phone': '12345'},
+            user=self.superuser,
+            profile=self.profile,
+            is_customer=False,
+        )
+        self.assertFalse(account_form.is_valid())
+        self.assertIn('Số điện thoại phải gồm đúng 10 chữ số', account_form.errors['phone'][0])
+
+        checkout_form = CheckoutForm(data={
+            'full_name': 'Khách A',
+            'phone': '09123',
+            'address_text': '12 Đường A',
+            'payment_method': Order.PAYMENT_COD,
+        })
+        self.assertFalse(checkout_form.is_valid())
+        self.assertIn('Số điện thoại phải gồm đúng 10 chữ số', checkout_form.errors['phone'][0])
+
+    def test_password_change_blocks_reuse_and_sends_notification_email(self):
+        self.client.force_login(self.superuser)
+        response = self.client.post(reverse('account'), {
+            'form_action': 'change_password',
+            'old_password': 'Test@123456',
+            'new_password1': 'Test@123456',
+            'new_password2': 'Test@123456',
+        })
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, 'Mật khẩu mới không được trùng với mật khẩu đang dùng trước đó.')
+        self.assertEqual(len(mail.outbox), 0)
+
+        response = self.client.post(reverse('account'), {
+            'form_action': 'change_password',
+            'old_password': 'Test@123456',
+            'new_password1': 'MoiMatKhau@123',
+            'new_password2': 'MoiMatKhau@123',
+        })
+        self.assertEqual(response.status_code, 302)
+        self.assertEqual(len(mail.outbox), 1)
+        self.assertIn('thay đổi mật khẩu', mail.outbox[0].subject.lower())
+
+    def test_password_recovery_also_blocks_reuse_and_sends_notification_email(self):
+        challenge = AccountOtpChallenge.objects.create(
+            user=self.superuser,
+            purpose=AccountOtpChallenge.PURPOSE_PASSWORD_RESET,
+            email=self.superuser.email,
+            otp_hash=make_password('123456'),
+            username_snapshot=self.superuser.username,
+            expires_at=timezone.now() + timedelta(minutes=10),
+        )
+
+        invalid_response = self.client.post(reverse('account_recovery_verify', args=[challenge.public_token]), {
+            'otp_code': '123456',
+            'new_password1': 'Test@123456',
+            'new_password2': 'Test@123456',
+        })
+        self.assertEqual(invalid_response.status_code, 200)
+        self.assertContains(invalid_response, 'Mật khẩu mới không được trùng với mật khẩu đang dùng trước đó.')
+        self.assertEqual(len(mail.outbox), 0)
+
+        challenge.otp_hash = make_password('654321')
+        challenge.consumed_at = None
+        challenge.attempts = 0
+        challenge.expires_at = timezone.now() + timedelta(minutes=10)
+        challenge.save(update_fields=['otp_hash', 'consumed_at', 'attempts', 'expires_at', 'updated_at'])
+
+        valid_response = self.client.post(reverse('account_recovery_verify', args=[challenge.public_token]), {
+            'otp_code': '654321',
+            'new_password1': 'MatKhauMoiKhac@456',
+            'new_password2': 'MatKhauMoiKhac@456',
+        })
+        self.assertEqual(valid_response.status_code, 302)
+        self.assertEqual(len(mail.outbox), 1)
+        self.assertIn('thay đổi mật khẩu', mail.outbox[0].subject.lower())

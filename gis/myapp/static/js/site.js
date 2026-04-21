@@ -341,25 +341,79 @@
         return stack;
     }
 
+    function dismissToast(toast) {
+        if (!toast || toast.dataset.closing === "1") {
+            return;
+        }
+        toast.dataset.closing = "1";
+        toast.classList.add("is-hiding");
+        window.setTimeout(function () {
+            if (toast.parentNode) {
+                toast.parentNode.removeChild(toast);
+            }
+        }, 420);
+    }
+
+    function initAutoDismissAlerts() {
+        document.querySelectorAll('.js-auto-dismiss-alert').forEach(function (alertElement) {
+            if (alertElement.dataset.autoDismissReady === '1') {
+                return;
+            }
+            alertElement.dataset.autoDismissReady = '1';
+            window.setTimeout(function () {
+                alertElement.classList.add('is-hiding');
+                window.setTimeout(function () {
+                    if (window.jQuery && typeof window.jQuery(alertElement).alert === 'function') {
+                        window.jQuery(alertElement).alert('close');
+                    } else if (alertElement.parentNode) {
+                        alertElement.parentNode.removeChild(alertElement);
+                    }
+                }, 420);
+            }, 3000);
+        });
+    }
+
     function showToast(message, tone) {
         var stack = ensureToastStack();
         var toast = document.createElement("div");
         toast.className = "site-toast site-toast--" + (tone || "info");
         toast.innerHTML = [
-            "<i class=\"fas " + (tone === "error" ? "fa-exclamation-circle" : "fa-check-circle") + " mt-1\"></i>",
-            "<div class=\"flex-grow-1\">" + message + "</div>",
-            "<button type=\"button\" aria-label=\"Đóng\"><i class=\"fas fa-times\"></i></button>"
+            '<i class="fas ' + (tone === "error" ? "fa-exclamation-circle" : "fa-check-circle") + ' mt-1"></i>',
+            '<div class="flex-grow-1">' + message + '</div>',
+            '<button type="button" aria-label="Đóng"><i class="fas fa-times"></i></button>'
         ].join("");
 
         var closeButton = toast.querySelector("button");
         closeButton.addEventListener("click", function () {
-            toast.remove();
+            dismissToast(toast);
         });
 
         stack.appendChild(toast);
         window.setTimeout(function () {
-            toast.remove();
-        }, 3200);
+            dismissToast(toast);
+        }, 3000);
+    }
+
+    function parseJsonResponse(response) {
+        return response.text().then(function (text) {
+            var data = {};
+            if (text) {
+                try {
+                    data = JSON.parse(text);
+                } catch (error) {
+                    data = {
+                        message: response.status === 403
+                            ? "Phiên làm việc đã hết hạn hoặc yêu cầu không hợp lệ. Vui lòng tải lại trang rồi thử lại."
+                            : "Máy chủ trả về dữ liệu không hợp lệ. Vui lòng thử lại sau."
+                    };
+                }
+            }
+            return {
+                ok: response.ok,
+                status: response.status,
+                data: data
+            };
+        });
     }
 
     function updateCartCount(nextCount) {
@@ -379,20 +433,14 @@
         fetch(form.action, {
             method: "POST",
             body: new FormData(form),
+            credentials: "same-origin",
             headers: {
-                "X-CSRFToken": getCookie("csrftoken"),
+                "X-CSRFToken": getCookie("csrftoken") || (form.querySelector('[name="csrfmiddlewaretoken"]') ? form.querySelector('[name="csrfmiddlewaretoken"]').value : ""),
                 "X-Requested-With": "XMLHttpRequest",
                 "Accept": "application/json"
             }
         })
-            .then(function (response) {
-                return response.json().then(function (data) {
-                    return {
-                        ok: response.ok,
-                        data: data
-                    };
-                });
-            })
+            .then(parseJsonResponse)
             .then(function (payload) {
                 if (!payload.ok) {
                     throw new Error(payload.data && payload.data.message ? payload.data.message : "Không thể thêm vào giỏ hàng.");
@@ -416,6 +464,7 @@
         getCookie: getCookie,
         showToast: showToast,
         updateCartCount: updateCartCount,
+        initAutoDismissAlerts: initAutoDismissAlerts,
         initSplideCarousels: initSplideCarousels,
         initGallerySplides: initGallerySplides,
         initRevealAnimations: initRevealAnimations,
@@ -439,5 +488,6 @@
         initRevealAnimations();
         initCountUps();
         initProductZoomGalleries();
+        initAutoDismissAlerts();
     });
 })();

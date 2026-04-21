@@ -1,0 +1,389 @@
+{% extends "admin_panel/base.html" %}
+
+{% block extra_head %}
+<style>
+    .news-admin{display:grid;gap:20px}
+    .news-admin__hero,
+    .news-admin__filters,
+    .news-admin__card,
+    .news-admin__tips{
+        border-radius:28px;
+        background:#fff;
+        border:1px solid rgba(17,70,184,.08);
+        box-shadow:0 18px 42px rgba(17,70,184,.08);
+    }
+    .news-admin__hero{
+        display:grid;
+        grid-template-columns:minmax(0,1fr) auto;
+        gap:18px;
+        align-items:center;
+        padding:28px;
+        background:linear-gradient(145deg,#f8fbff 0%,#ffffff 58%,#eef5ff 100%);
+    }
+    .news-admin__hero h2{margin:0 0 8px;color:#17315d;font-size:1.42rem;font-weight:900}
+    .news-admin__hero p{margin:0;color:#5f7290;line-height:1.72;max-width:760px}
+    .news-admin__hero-actions{display:flex;flex-wrap:wrap;gap:10px}
+    .news-admin__summary{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:14px}
+    .news-admin__summary-card{
+        padding:18px 20px;
+        border-radius:24px;
+        background:#fff;
+        border:1px solid rgba(17,70,184,.08);
+        box-shadow:0 14px 34px rgba(17,70,184,.06);
+    }
+    .news-admin__summary-card strong{
+        display:block;
+        color:#17315d;
+        font-size:1.55rem;
+        line-height:1;
+        font-weight:900;
+    }
+    .news-admin__summary-card span{
+        display:block;
+        margin-top:8px;
+        color:#607392;
+        font-weight:700;
+    }
+    .news-admin__filters{padding:22px}
+    .news-admin__filters-head{
+        display:flex;
+        justify-content:space-between;
+        gap:12px;
+        align-items:flex-start;
+        margin-bottom:16px;
+    }
+    .news-admin__filters-head h3,
+    .news-admin__tips h3{
+        margin:0;
+        color:#17315d;
+        font-weight:900;
+    }
+    .news-admin__filters-head p,
+    .news-admin__tips p{margin:6px 0 0;color:#607392;line-height:1.66}
+    .news-admin__filter-grid{
+        display:grid;
+        grid-template-columns:1.25fr repeat(4,minmax(0,1fr)) auto;
+        gap:12px;
+        align-items:end;
+    }
+    .news-admin__filter-field{display:grid;gap:8px}
+    .news-admin__filter-field label{margin:0;color:#27466f;font-weight:800}
+    .news-admin__filter-field input,
+    .news-admin__filter-field select{
+        width:100%;
+        min-height:46px;
+        padding:0 14px;
+        border-radius:16px;
+        border:1px solid rgba(17,70,184,.12);
+        background:#fcfdff;
+        color:#17315d;
+        font-weight:700;
+    }
+    .news-admin__filter-actions{display:flex;flex-wrap:wrap;gap:10px}
+    .news-admin__layout{
+        display:grid;
+        grid-template-columns:minmax(0,1fr) 310px;
+        gap:20px;
+        align-items:start;
+    }
+    .news-admin__cards{display:grid;gap:16px}
+    .news-admin__card{
+        display:grid;
+        grid-template-columns:240px minmax(0,1fr);
+        gap:18px;
+        padding:18px;
+        background:linear-gradient(180deg,#ffffff 0%,#f9fbff 100%);
+    }
+    .news-admin__media{
+        overflow:hidden;
+        min-height:205px;
+        border-radius:24px;
+        background:#eef5ff;
+        display:flex;
+        align-items:center;
+        justify-content:center;
+    }
+    .news-admin__media img{
+        display:block;
+        width:100%;
+        height:100%;
+        object-fit:cover;
+    }
+    .news-admin__placeholder{
+        display:grid;
+        gap:8px;
+        justify-items:center;
+        color:#1b57c8;
+        text-align:center;
+        padding:18px;
+    }
+    .news-admin__body{display:grid;gap:12px}
+    .news-admin__topline{
+        display:flex;
+        flex-wrap:wrap;
+        gap:10px;
+        align-items:center;
+    }
+    .news-admin__status{
+        display:inline-flex;
+        align-items:center;
+        gap:8px;
+        padding:8px 13px;
+        border-radius:999px;
+        font-size:.82rem;
+        font-weight:900;
+    }
+    .news-admin__status--success{background:#ebf9f0;color:#1c8f4d}
+    .news-admin__status--warning{background:#fff6e8;color:#b56b00}
+    .news-admin__slug{
+        color:#5d7191;
+        font-weight:700;
+        word-break:break-word;
+    }
+    .news-admin__card h3{
+        margin:0;
+        color:#17315d;
+        font-size:1.32rem;
+        line-height:1.16;
+        font-weight:900;
+    }
+    .news-admin__meta{
+        display:flex;
+        flex-wrap:wrap;
+        gap:14px;
+        color:#627696;
+        font-weight:700;
+    }
+    .news-admin__copy{color:#607392;line-height:1.74}
+    .news-admin__actions{display:flex;flex-wrap:wrap;gap:10px}
+    .news-admin__tips{
+        position:sticky;
+        top:18px;
+        display:grid;
+        gap:14px;
+        padding:22px;
+    }
+    .news-admin__tips-list{display:grid;gap:12px}
+    .news-admin__tips-item{
+        display:flex;
+        align-items:flex-start;
+        gap:10px;
+        padding:12px 14px;
+        border-radius:18px;
+        background:#f8fbff;
+        border:1px solid rgba(17,70,184,.08);
+        color:#5d7190;
+        line-height:1.66;
+    }
+    .news-admin__tips-item i{margin-top:2px;color:#1146b8}
+    .news-admin__empty{
+        padding:34px;
+        border-radius:28px;
+        background:#fff;
+        border:1px dashed rgba(17,70,184,.18);
+        text-align:center;
+        color:#607392;
+    }
+    .news-admin__pagination{
+        display:flex;
+        flex-wrap:wrap;
+        gap:10px;
+        margin-top:2px;
+    }
+    @media (max-width:1199px){
+        .news-admin__layout{grid-template-columns:1fr}
+        .news-admin__tips{position:static}
+        .news-admin__filter-grid{grid-template-columns:repeat(2,minmax(0,1fr))}
+    }
+    @media (max-width:991px){
+        .news-admin__summary{grid-template-columns:repeat(2,minmax(0,1fr))}
+        .news-admin__hero,
+        .news-admin__card{grid-template-columns:1fr}
+    }
+    @media (max-width:767px){
+        .news-admin__summary,
+        .news-admin__filter-grid{grid-template-columns:1fr}
+        .news-admin__hero-actions .btn-admin,
+        .news-admin__filter-actions .btn-admin{width:100%;justify-content:center}
+    }
+</style>
+{% endblock %}
+
+{% block admin_content %}
+<div class="news-admin">
+    <section class="news-admin__hero">
+        <div>
+            <h2>Quản lý trang Tin tức</h2>
+            <p>Khu này đã được tách riêng khỏi danh sách quản trị dùng chung để việc tìm bài, lọc trạng thái, cập nhật bài và kiểm tra hiển thị ngoài website dễ dùng hơn rõ rệt.</p>
+        </div>
+        <div class="news-admin__hero-actions">
+            <a href="{% url 'news_list' %}" class="btn-admin btn-admin-light" target="_blank" rel="noopener">
+                <i class="fas fa-external-link-alt"></i>
+                <span>Xem trang ngoài</span>
+            </a>
+            {% if create_allowed %}
+            <a href="{% url 'custom_admin_create' 'news' %}" class="btn-admin btn-admin-primary">
+                <i class="fas fa-plus"></i>
+                <span>{{ create_label }}</span>
+            </a>
+            {% endif %}
+        </div>
+    </section>
+
+    <section class="news-admin__summary">
+        {% for card in summary_cards %}
+        <article class="news-admin__summary-card">
+            <strong>{{ card.value }}</strong>
+            <span>{{ card.label }}</span>
+        </article>
+        {% endfor %}
+    </section>
+
+    <section class="news-admin__filters">
+        <div class="news-admin__filters-head">
+            <div>
+                <h3>Lọc và tra cứu nội dung</h3>
+                <p>Tìm nhanh theo tiêu đề hoặc slug, lọc theo trạng thái xuất bản và mốc thời gian.</p>
+            </div>
+        </div>
+        <form method="get" class="news-admin__filter-grid" novalidate>
+            <div class="news-admin__filter-field">
+                <label for="news-search">Từ khóa</label>
+                <input id="news-search" type="text" name="q" value="{{ keyword }}" placeholder="Nhập tiêu đề hoặc slug cần tìm...">
+            </div>
+            <div class="news-admin__filter-field">
+                <label for="news-publish-state">Trạng thái</label>
+                <select id="news-publish-state" name="publish_state">
+                    <option value="" {% if not news_filter_state.publish_state %}selected{% endif %}>Tất cả</option>
+                    <option value="published" {% if news_filter_state.publish_state == 'published' %}selected{% endif %}>Đã xuất bản</option>
+                    <option value="draft" {% if news_filter_state.publish_state == 'draft' %}selected{% endif %}>Nháp</option>
+                </select>
+            </div>
+            <div class="news-admin__filter-field">
+                <label for="news-from">Từ ngày</label>
+                <input id="news-from" type="date" name="published_from" value="{{ news_filter_state.published_from }}">
+            </div>
+            <div class="news-admin__filter-field">
+                <label for="news-to">Đến ngày</label>
+                <input id="news-to" type="date" name="published_to" value="{{ news_filter_state.published_to }}">
+            </div>
+            <div class="news-admin__filter-field">
+                <label for="news-sort">Sắp xếp</label>
+                <select id="news-sort" name="sort">
+                    {% for value, label in news_sort_options %}
+                    <option value="{{ value }}" {% if news_filter_state.sort == value %}selected{% endif %}>{{ label }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div class="news-admin__filter-actions">
+                <button type="submit" class="btn-admin btn-admin-primary">
+                    <i class="fas fa-search"></i>
+                    <span>Áp dụng</span>
+                </button>
+                <a href="{% url 'custom_admin_list' 'news' %}" class="btn-admin btn-admin-light">
+                    <i class="fas fa-rotate-left"></i>
+                    <span>Đặt lại</span>
+                </a>
+            </div>
+        </form>
+    </section>
+
+    <section class="news-admin__layout">
+        <div class="news-admin__cards">
+            {% for card in news_cards %}
+            <article class="news-admin__card">
+                <div class="news-admin__media">
+                    {% if card.article.cover_image %}
+                    <img src="{{ card.article.cover_image.url }}" alt="{{ card.article.title }}">
+                    {% else %}
+                    <div class="news-admin__placeholder">
+                        <i class="fas fa-image fa-2x"></i>
+                        <span>Chưa có ảnh bìa</span>
+                    </div>
+                    {% endif %}
+                </div>
+
+                <div class="news-admin__body">
+                    <div class="news-admin__topline">
+                        <span class="news-admin__status news-admin__status--{{ card.status_tone }}">
+                            <i class="fas fa-circle"></i>
+                            {{ card.status_label }}
+                        </span>
+                        <span class="news-admin__slug">/{{ card.article.slug }}</span>
+                    </div>
+                    <h3>{{ card.article.title }}</h3>
+                    <div class="news-admin__meta">
+                        <span><i class="far fa-calendar-alt"></i> {% if card.article.published_at %}{{ card.article.published_at|date:"d/m/Y H:i" }}{% else %}Chưa hẹn giờ{% endif %}</span>
+                        <span><i class="fas fa-user-edit"></i> {{ card.article.author_display_name }}</span>
+                        <span><i class="fas fa-clock"></i> Cập nhật {{ card.article.updated_at|date:"d/m/Y H:i" }}</span>
+                    </div>
+                    <div class="news-admin__copy">{{ card.article.summary|striptags|truncatechars:200 }}</div>
+                    <div class="news-admin__actions">
+                        {% if card.preview_url %}
+                        <a href="{{ card.preview_url }}" class="btn-admin btn-admin-light" target="_blank" rel="noopener">
+                            <i class="fas fa-eye"></i>
+                            <span>Xem ngoài site</span>
+                        </a>
+                        {% endif %}
+                        <a href="{{ card.edit_url }}" class="btn-admin btn-admin-primary">
+                            <i class="fas fa-pen"></i>
+                            <span>Chỉnh sửa</span>
+                        </a>
+                        {% if card.delete_url %}
+                        <a href="{{ card.delete_url }}" class="btn-admin btn-admin-danger">
+                            <i class="fas fa-trash"></i>
+                            <span>Xóa</span>
+                        </a>
+                        {% endif %}
+                    </div>
+                </div>
+            </article>
+            {% empty %}
+            <div class="news-admin__empty">
+                <div class="mb-3"><i class="fas fa-newspaper fa-3x text-primary"></i></div>
+                <h3>Chưa có bài viết nào</h3>
+                <p class="mb-0">Tạo bài viết đầu tiên để hệ thống bắt đầu hiển thị phần tin tức ngoài website.</p>
+            </div>
+            {% endfor %}
+
+            {% if page_obj.has_other_pages %}
+            <div class="news-admin__pagination">
+                {% if page_obj.has_previous %}
+                <a class="btn-admin btn-admin-light" href="?q={{ keyword|urlencode }}&publish_state={{ news_filter_state.publish_state|urlencode }}&published_from={{ news_filter_state.published_from|urlencode }}&published_to={{ news_filter_state.published_to|urlencode }}&sort={{ news_filter_state.sort|urlencode }}&page={{ page_obj.previous_page_number }}">
+                    <i class="fas fa-arrow-left"></i>
+                    <span>Trang trước</span>
+                </a>
+                {% endif %}
+                {% if page_obj.has_next %}
+                <a class="btn-admin btn-admin-primary" href="?q={{ keyword|urlencode }}&publish_state={{ news_filter_state.publish_state|urlencode }}&published_from={{ news_filter_state.published_from|urlencode }}&published_to={{ news_filter_state.published_to|urlencode }}&sort={{ news_filter_state.sort|urlencode }}&page={{ page_obj.next_page_number }}">
+                    <span>Trang sau</span>
+                    <i class="fas fa-arrow-right"></i>
+                </a>
+                {% endif %}
+            </div>
+            {% endif %}
+        </div>
+
+        <aside class="news-admin__tips">
+            <div>
+                <h3>Mẹo biên tập</h3>
+                <p>Bố cục quản trị mới ưu tiên quy trình rõ ràng hơn cho người nhập nội dung.</p>
+            </div>
+            <div class="news-admin__tips-list">
+                <div class="news-admin__tips-item">
+                    <i class="fas fa-layer-group"></i>
+                    <div>Dùng trạng thái nháp trước khi xuất bản để chuẩn bị nội dung dần dần.</div>
+                </div>
+                <div class="news-admin__tips-item">
+                    <i class="fas fa-image"></i>
+                    <div>Ảnh bìa giúp danh sách bài viết ngoài website dễ nhìn hơn rất nhiều.</div>
+                </div>
+                <div class="news-admin__tips-item">
+                    <i class="fas fa-sliders-h"></i>
+                    <div>Slug nên ngắn, rõ nghĩa để đường dẫn gọn và dễ kiểm tra.</div>
+                </div>
+            </div>
+        </aside>
+    </section>
+</div>
+{% endblock %}

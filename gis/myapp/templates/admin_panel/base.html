@@ -6,15 +6,31 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>{{ page_title }} | Quản trị hệ thống</title>
 
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Be+Vietnam+Pro:wght@400;500;600;700;800;900&family=Inter:wght@400;500;600;700&display=swap&subset=vietnamese">
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@4.6.2/dist/css/bootstrap.min.css">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.4/css/all.min.css">
-    <link rel="stylesheet" href="{% static 'css/admin-refresh.css' %}?v=20260401-7">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/choices.js/public/assets/styles/choices.min.css">
+    <link rel="stylesheet" href="{% static 'css/admin-refresh.css' %}?v=20260408-fix2">
+    <link rel="stylesheet" href="{% static 'css/ui-enhancements.css' %}?v=20260414-fix1">
     <link rel="stylesheet" href="{% static 'css/support-widget.css' %}?v=20260401-support1">
     {% block extra_head %}{% endblock %}
 </head>
-<body class="admin-body">
+<body class="admin-body" data-editor-upload-url="{% url 'editor_upload_api' %}">
     <div class="admin-shell">
-        <aside class="admin-sidebar">
+        <aside class="admin-sidebar" id="adminSidebar" aria-label="Điều hướng quản trị" aria-hidden="false">
+            <div class="admin-sidebar__mobile-head">
+                <span class="admin-sidebar__mobile-label">Menu quản trị</span>
+                <button
+                    type="button"
+                    class="admin-sidebar__close"
+                    data-admin-sidebar-close
+                    aria-label="Đóng menu quản trị"
+                >
+                    <i class="fas fa-times"></i>
+                </button>
+            </div>
             <a href="{% url 'custom_admin_dashboard' %}" class="admin-brand">
                 <div class="admin-brand__row">
                     <span class="admin-brand__mark"><i class="fas fa-clinic-medical"></i></span>
@@ -23,7 +39,7 @@
                         <span class="admin-brand__title">Bảng điều khiển</span>
                     </span>
                 </div>
-                <p class="admin-brand__copy">Quản lý sản phẩm, đơn hàng, chi nhánh và tài khoản trên cùng một khu vực làm việc gọn, rõ và dễ theo dõi.</p>
+                <p class="admin-brand__copy">Theo dõi nhanh các mục vận hành chính của hệ thống bán hàng và kho thuốc.</p>
             </a>
 
             <div class="admin-nav-group">
@@ -36,25 +52,95 @@
 
             <div class="admin-nav-group">
                 <span class="admin-nav-group__label">Vận hành</span>
+                {% if request.user.is_superuser or admin_permissions.order.view %}
                 <a href="{% url 'custom_admin_list' 'order' %}" class="admin-nav-link {% if current_model == 'order' %}is-active{% endif %}">
                     <i class="fas fa-file-invoice"></i>
                     <span>Đơn hàng</span>
                 </a>
+                {% endif %}
+                {% if request.user.is_superuser or admin_permissions.return_request.view %}
+                <a href="{% url 'custom_admin_list' 'return_request' %}" class="admin-nav-link {% if current_model == 'return_request' %}is-active{% endif %}">
+                    <i class="fas fa-undo-alt"></i>
+                    <span>Trả hàng / hoàn tiền</span>
+                </a>
+                {% endif %}
+                {% if request.user.is_superuser or admin_permissions.medicine.view %}
                 <a href="{% url 'custom_admin_list' 'medicine' %}" class="admin-nav-link {% if current_model == 'medicine' %}is-active{% endif %}">
                     <i class="fas fa-pills"></i>
                     <span>Sản phẩm thuốc</span>
                 </a>
-                {% if request.user.is_superuser %}
+                {% endif %}
+                {% if request.user.is_superuser or admin_permissions.purchase_import.view %}
+                <a href="{% url 'custom_admin_list' 'purchase_import' %}" class="admin-nav-link {% if current_model == 'purchase_import' %}is-active{% endif %}">
+                    <i class="fas fa-file-excel"></i>
+                    <span>Nhập hàng</span>
+                </a>
+                {% endif %}
+                {% if request.user.is_superuser or admin_permissions.stock_export.view %}
+                <a href="{% url 'custom_admin_list' 'stock_export' %}" class="admin-nav-link {% if current_model == 'stock_export' %}is-active{% endif %}">
+                    <i class="fas fa-file-export"></i>
+                    <span>Xuất kho</span>
+                </a>
+                {% endif %}
+                {% if request.user.is_superuser or admin_permissions.inventory_lot.view %}
+                <a href="{% url 'custom_admin_list' 'inventory_lot' %}" class="admin-nav-link {% if current_model == 'inventory_lot' %}is-active{% endif %}">
+                    <i class="fas fa-boxes"></i>
+                    <span>Tồn kho(theo lô)</span>
+                </a>
+                {% endif %}
+                {% if request.user.is_superuser or admin_permissions.promotion.view %}
+                <a href="{% url 'custom_admin_list' 'promotion' %}" class="admin-nav-link {% if current_model == 'promotion' %}is-active{% endif %}">
+                    <i class="fas fa-tags"></i>
+                    <span>Khuyến mãi sản phẩm</span>
+                </a>
+                {% endif %}
+                {% if request.user.is_superuser or admin_permissions.reports.view %}
+                <a href="{% url 'custom_admin_reports' %}" class="admin-nav-link {% if current_model == 'reports' %}is-active{% endif %}">
+                    <i class="fas fa-chart-line"></i>
+                    <span>Báo cáo &amp; thống kê</span>
+                </a>
+                {% endif %}
+                {% if request.user.is_superuser or admin_permissions.about_page.view %}
+                <a href="{% url 'custom_admin_about_page' %}" class="admin-nav-link {% if current_model == 'about_page' %}is-active{% endif %}">
+                    <i class="fas fa-info-circle"></i>
+                    <span>Trang giới thiệu</span>
+                </a>
+                {% endif %}
+                {% if request.user.is_superuser or admin_permissions.home_page.view %}
+                <a href="{% url 'custom_admin_home_page' %}" class="admin-nav-link {% if current_model == 'home_page' %}is-active{% endif %}">
+                    <i class="fas fa-home"></i>
+                    <span>Trang chủ</span>
+                </a>
+                {% endif %}
+                {% if request.user.is_superuser or admin_permissions.news.view %}
+                <a href="{% url 'custom_admin_list' 'news' %}" class="admin-nav-link {% if current_model == 'news' %}is-active{% endif %}">
+                    <i class="fas fa-newspaper"></i>
+                    <span>Tin tức</span>
+                </a>
+                {% endif %}
+                {% if request.user.is_superuser or admin_permissions.pharmacy.view %}
                 <a href="{% url 'custom_admin_list' 'pharmacy' %}" class="admin-nav-link {% if current_model == 'pharmacy' %}is-active{% endif %}">
                     <i class="fas fa-clinic-medical"></i>
                     <span>Chi nhánh</span>
                 </a>
+                {% endif %}
+                {% if request.user.is_superuser or admin_permissions.user.view %}
                 <a href="{% url 'custom_admin_list' 'user' %}" class="admin-nav-link {% if current_model == 'user' %}is-active{% endif %}">
                     <i class="fas fa-users-cog"></i>
                     <span>Tài khoản</span>
                 </a>
                 {% endif %}
             </div>
+
+            {% if request.user.is_superuser or admin_permissions.permission.view %}
+            <div class="admin-nav-group">
+                <span class="admin-nav-group__label">Phân quyền</span>
+                <a href="{% url 'custom_admin_permissions_center' %}" class="admin-nav-link {% if current_model == 'permission' %}is-active{% endif %}">
+                    <i class="fas fa-user-lock"></i>
+                    <span>Phân quyền tài khoản</span>
+                </a>
+            </div>
+            {% endif %}
 
             <div class="admin-nav-group">
                 <span class="admin-nav-group__label">Điều hướng</span>
@@ -73,9 +159,26 @@
             </div>
         </aside>
 
+        <button
+            type="button"
+            class="admin-sidebar-backdrop"
+            data-admin-sidebar-backdrop
+            aria-label="Đóng menu quản trị"
+        ></button>
+
         <main class="admin-main">
             <section class="admin-topbar">
-                <div>
+                <div class="admin-topbar__intro">
+                    <button
+                        type="button"
+                        class="admin-mobile-nav-trigger"
+                        data-admin-sidebar-open
+                        aria-controls="adminSidebar"
+                        aria-expanded="false"
+                    >
+                        <i class="fas fa-bars"></i>
+                        <span>Menu quản trị</span>
+                    </button>
                     <div class="admin-topbar__eyebrow">
                         <i class="fas fa-user-shield"></i>
                         <span>Khu vực quản trị</span>
@@ -96,11 +199,11 @@
             </section>
 
             {% if messages %}
-            <div class="admin-alert mb-4">
+            <div class="admin-alert mb-4" data-auto-dismiss-container>
                 {% for message in messages %}
-                <div class="alert {% if 'error' in message.tags %}alert-danger{% elif 'warning' in message.tags %}alert-warning{% else %}alert-success{% endif %} alert-dismissible fade show" role="alert">
+                <div class="alert js-auto-dismiss-alert {% if 'error' in message.tags %}alert-danger{% elif 'warning' in message.tags %}alert-warning{% else %}alert-success{% endif %} alert-dismissible fade show" role="alert" data-auto-dismiss-ms="3000">
                     {{ message }}
-                    <button type="button" class="close" data-dismiss="alert" aria-label="Close">
+                    <button type="button" class="close" data-dismiss="alert" aria-label="Đóng">
                         <span aria-hidden="true">&times;</span>
                     </button>
                 </div>
@@ -116,9 +219,62 @@
 
     <script src="https://code.jquery.com/jquery-3.5.1.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@4.6.2/dist/js/bootstrap.bundle.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/choices.js/public/assets/scripts/choices.min.js"></script>
+    <script src="{% static 'js/ui-enhancements.js' %}?v=20260414-fix1"></script>
     <script>
         (function () {
             var pendingRequest = null;
+            var sidebar = document.getElementById('adminSidebar');
+            var sidebarOpenButtons = Array.prototype.slice.call(document.querySelectorAll('[data-admin-sidebar-open]'));
+            var sidebarCloseButtons = Array.prototype.slice.call(document.querySelectorAll('[data-admin-sidebar-close]'));
+            var sidebarBackdrop = document.querySelector('[data-admin-sidebar-backdrop]');
+
+            function isMobileSidebarMode() {
+                return window.matchMedia('(max-width: 991px)').matches;
+            }
+
+            function setAdminSidebarOpen(isOpen) {
+                if (!sidebar) {
+                    return;
+                }
+
+                var resolvedOpen = isMobileSidebarMode() ? Boolean(isOpen) : false;
+                document.body.classList.toggle('admin-nav-open', resolvedOpen);
+                sidebar.setAttribute('aria-hidden', resolvedOpen ? 'false' : (isMobileSidebarMode() ? 'true' : 'false'));
+
+                sidebarOpenButtons.forEach(function (button) {
+                    button.setAttribute('aria-expanded', resolvedOpen ? 'true' : 'false');
+                });
+            }
+
+            function closeAlert(alertElement) {
+                if (!alertElement || alertElement.dataset.dismissed === '1') {
+                    return;
+                }
+
+                alertElement.dataset.dismissed = '1';
+                alertElement.classList.add('is-hiding');
+                window.setTimeout(function () {
+                    if (window.jQuery && typeof window.jQuery(alertElement).alert === 'function') {
+                        window.jQuery(alertElement).alert('close');
+                    } else if (alertElement.parentNode) {
+                        alertElement.parentNode.removeChild(alertElement);
+                    }
+                }, 420);
+            }
+
+            function initAutoDismissAlerts() {
+                document.querySelectorAll('.js-auto-dismiss-alert').forEach(function (alertElement) {
+                    if (alertElement.dataset.autoDismissReady === '1') {
+                        return;
+                    }
+                    alertElement.dataset.autoDismissReady = '1';
+                    var delay = parseInt(alertElement.getAttribute('data-auto-dismiss-ms') || '3000', 10);
+                    window.setTimeout(function () {
+                        closeAlert(alertElement);
+                    }, isNaN(delay) ? 3000 : delay);
+                });
+            }
 
             function replacePaginatedSection(section, htmlText, url) {
                 var parser = new DOMParser();
@@ -156,7 +312,47 @@
                 return true;
             }
 
+            initAutoDismissAlerts();
+
+            sidebarOpenButtons.forEach(function (button) {
+                button.addEventListener('click', function () {
+                    setAdminSidebarOpen(true);
+                });
+            });
+
+            sidebarCloseButtons.forEach(function (button) {
+                button.addEventListener('click', function () {
+                    setAdminSidebarOpen(false);
+                });
+            });
+
+            if (sidebarBackdrop) {
+                sidebarBackdrop.addEventListener('click', function () {
+                    setAdminSidebarOpen(false);
+                });
+            }
+
+            if (document.body && window.MutationObserver) {
+                new MutationObserver(function (mutations) {
+                    mutations.forEach(function (mutation) {
+                        mutation.addedNodes.forEach(function (node) {
+                            if (!node || node.nodeType !== 1) {
+                                return;
+                            }
+                            if ((node.matches && node.matches('.js-auto-dismiss-alert')) || (node.querySelectorAll && node.querySelectorAll('.js-auto-dismiss-alert').length)) {
+                                initAutoDismissAlerts();
+                            }
+                        });
+                    });
+                }).observe(document.body, { childList: true, subtree: true });
+            }
+
             document.addEventListener('click', function (event) {
+                var sidebarLink = event.target.closest('.admin-sidebar .admin-nav-link, .admin-sidebar .admin-brand');
+                if (sidebarLink && isMobileSidebarMode()) {
+                    setAdminSidebarOpen(false);
+                }
+
                 var paginationLink = event.target.closest('.admin-pagination a.admin-pagination__item');
                 if (!paginationLink) {
                     return;
@@ -206,6 +402,22 @@
                         section.classList.remove('is-loading');
                     });
             });
+
+            document.addEventListener('keydown', function (event) {
+                if (event.key === 'Escape') {
+                    setAdminSidebarOpen(false);
+                }
+            });
+
+            window.addEventListener('resize', function () {
+                if (!isMobileSidebarMode()) {
+                    setAdminSidebarOpen(false);
+                }
+            });
+
+            if (sidebar && isMobileSidebarMode()) {
+                sidebar.setAttribute('aria-hidden', 'true');
+            }
         })();
     </script>
     <script src="{% static 'js/support-widget.js' %}"></script>

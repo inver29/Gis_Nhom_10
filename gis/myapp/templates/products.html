@@ -3,6 +3,23 @@
 {% block header_search %}{% endblock %}
 {% block body_class %}site-page products-page{% endblock %}
 
+{% block extra_css %}
+<style>
+.products-page .catalog-hero-shell{overflow:hidden}
+.products-page .catalog-filter-form{padding:18px;border-radius:26px;background:linear-gradient(180deg,#f9fbff 0%,#f3f7ff 100%);border:1px solid rgba(17,70,184,.08);box-shadow:0 18px 40px rgba(17,70,184,.07)}
+.products-page .product-filter-shell__search{margin-bottom:16px}
+.products-page .product-filter-grid{display:grid;grid-template-columns:repeat(6,minmax(0,1fr));gap:14px;align-items:end}
+.products-page .product-filter-field label{display:block;margin-bottom:8px;font-size:.84rem;font-weight:800;color:#18355f}
+.products-page .product-filter-field .form-control{min-height:50px;border-radius:16px;border:1px solid rgba(17,70,184,.12);box-shadow:none}
+.products-page .product-filter-actions{display:flex;flex-wrap:wrap;gap:12px;margin-top:18px}
+.products-page .catalog-keyword-strip{margin-bottom:16px}
+.products-page .catalog-filter-bar{display:flex;align-items:center;justify-content:space-between;gap:16px;flex-wrap:wrap}
+@media (max-width:1199px){.products-page .product-filter-grid{grid-template-columns:repeat(3,minmax(0,1fr));}}
+@media (max-width:767px){.products-page .product-filter-grid{grid-template-columns:1fr 1fr;}.products-page .product-filter-actions>*{flex:1 1 100%;}.products-page .catalog-filter-bar{align-items:flex-start}}
+@media (max-width:540px){.products-page .product-filter-grid{grid-template-columns:1fr;}}
+</style>
+{% endblock %}
+
 {% block content_wrapper %}
 <div class="site-page-section">
     <div class="container">
@@ -10,13 +27,13 @@
             <div class="section-heading">
                 <div>
                     <div class="section-heading__eyebrow"><i class="fas fa-capsules"></i> Danh mục sản phẩm</div>
-                    <h1>Tra cứu thuốc theo tên, danh mục và chi nhánh</h1>
-                    <p>Gom tìm kiếm, bộ lọc tồn kho và danh sách sản phẩm trên cùng một màn hình để thao tác nhanh và bớt khô hơn.</p>
+                    <h1>Tra cứu thuốc theo nhu cầu và điểm bán</h1>
+                    <p>Chọn nhanh theo tên thuốc, danh mục, chi nhánh và trạng thái khuyến mãi ngay trong một cụm bộ lọc gọn hơn.</p>
                 </div>
                 <a href="{% url 'home' %}" class="section-link">Về trang chủ <i class="fas fa-arrow-right"></i></a>
             </div>
 
-            <form action="{% url 'product_list' %}" method="get" class="product-filter-shell catalog-filter-form">
+            <form action="{% url 'product_list' %}" method="get" class="product-filter-shell catalog-filter-form" novalidate>
                 <div class="site-search product-filter-shell__search">
                     <i class="fas fa-search"></i>
                     <input type="text" name="q" placeholder="Tìm tên thuốc, công dụng, thành phần..." value="{{ query }}">
@@ -38,8 +55,20 @@
 
                 <div class="product-filter-grid">
                     <div class="product-filter-field">
+                        <label for="product-type-select">Loại sản phẩm</label>
+                        <select id="product-type-select" name="product_type" class="form-control" data-searchable-select="1">
+                            <option value="">Tất cả loại sản phẩm</option>
+                            {% for value, label in product_type_options %}
+                            <option value="{{ value }}" {% if active_product_type == value %}selected{% endif %}>
+                                {{ label }}
+                            </option>
+                            {% endfor %}
+                        </select>
+                    </div>
+
+                    <div class="product-filter-field">
                         <label for="category-select">Danh mục</label>
-                        <select id="category-select" name="category" class="form-control">
+                        <select id="category-select" name="category" class="form-control" data-searchable-select="1">
                             <option value="">Tất cả danh mục</option>
                             {% for category in popular_categories %}
                             <option value="{{ category.category }}" {% if active_category == category.category %}selected{% endif %}>
@@ -51,7 +80,7 @@
 
                     <div class="product-filter-field">
                         <label for="pharmacy-select">Chi nhánh</label>
-                        <select id="pharmacy-select" name="pharmacy" class="form-control">
+                        <select id="pharmacy-select" name="pharmacy" class="form-control" data-searchable-select="1">
                             <option value="">Toàn hệ thống</option>
                             {% for pharmacy in pharmacy_options %}
                             <option value="{{ pharmacy.id }}" {% if active_pharmacy == pharmacy.id|stringformat:"s" %}selected{% endif %}>
@@ -66,6 +95,14 @@
                         <select id="availability-select" name="availability" class="form-control">
                             <option value="in_stock" {% if availability == "in_stock" %}selected{% endif %}>Chỉ hiện thuốc còn hàng</option>
                             <option value="all" {% if availability == "all" %}selected{% endif %}>Hiện cả thuốc tạm hết hàng</option>
+                        </select>
+                    </div>
+
+                    <div class="product-filter-field">
+                        <label for="sale-select">Khuyến mãi</label>
+                        <select id="sale-select" name="sale" class="form-control">
+                            <option value="" {% if not sale_filter %}selected{% endif %}>Tất cả sản phẩm</option>
+                            <option value="yes" {% if sale_filter == "yes" %}selected{% endif %}>Chỉ hiện sản phẩm giảm giá</option>
                         </select>
                     </div>
 
@@ -123,7 +160,7 @@
                     <h2>
                         {% if query %}
                             Danh sách phù hợp với "{{ query }}"
-                        {% elif active_category or active_pharmacy %}
+                        {% elif active_product_type or active_category or active_pharmacy %}
                             Danh sách sau khi áp dụng bộ lọc
                         {% else %}
                             Toàn bộ sản phẩm đang có trên hệ thống
@@ -134,6 +171,13 @@
 
             <div class="filter-bar catalog-filter-bar">
                 <div class="filter-pills">
+                    {% if active_product_type %}
+                    {% for value, label in product_type_options %}
+                    {% if active_product_type == value %}
+                    <span class="filter-pill is-active"><i class="fas fa-layer-group"></i> {{ label }}</span>
+                    {% endif %}
+                    {% endfor %}
+                    {% endif %}
                     {% if active_category %}
                     <span class="filter-pill is-active"><i class="fas fa-tags"></i> {{ active_category }}</span>
                     {% endif %}
@@ -143,7 +187,10 @@
                     {% if query %}
                     <span class="filter-pill is-active"><i class="fas fa-search"></i> {{ query }}</span>
                     {% endif %}
-                    {% if not active_category and not active_pharmacy and not query %}
+                    {% if sale_filter == 'yes' %}
+                    <span class="filter-pill is-active"><i class="fas fa-tags"></i> Đang giảm giá</span>
+                    {% endif %}
+                    {% if not active_product_type and not active_category and not active_pharmacy and not query and not sale_filter %}
                     <span class="filter-pill is-active"><i class="fas fa-th"></i> Toàn bộ sản phẩm</span>
                     {% endif %}
                 </div>
@@ -158,7 +205,11 @@
                     <div class="product-card__image">
                         <img src="{{ product.primary_image_url }}" alt="{{ product.name }}">
                         <div class="product-badge-row">
+                            <span class="product-badge">{{ product.product_type_label }}</span>
                             <span class="product-badge">{{ product.category }}</span>
+                            {% if product.has_discount %}
+                            <span class="product-badge product-badge--danger">-{{ product.discount_percent }}%</span>
+                            {% endif %}
                             <span class="product-badge {% if product.is_in_stock %}product-badge--success{% else %}product-badge--danger{% endif %}">
                                 {% if product.is_in_stock %}
                                     {{ product.in_stock_branch_count }} chi nhánh có hàng
@@ -174,13 +225,16 @@
                         <div class="product-card__title">
                             <a href="{% url 'medicine_detail' product.detail_id %}">{{ product.name }}</a>
                         </div>
-                        <div class="product-card__desc">{{ product.description|truncatechars:110 }}</div>
+                        <div class="product-card__desc">{{ product.description|default:"Thông tin sản phẩm đang được cập nhật."|striptags|truncatechars:110 }}</div>
 
                         <div class="price-stack">
                             <div class="price-stack__value">
                                 {{ product.min_price_text }}
                                 <span class="price-stack__unit">/ {{ product.unit }}</span>
                             </div>
+                            {% if product.has_discount %}
+                            <div class="price-stack__meta"><s>{{ product.min_original_price_text }}</s> · đang có ưu đãi</div>
+                            {% endif %}
                         </div>
 
                         <div class="product-card__actions">

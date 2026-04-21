@@ -1,0 +1,39 @@
+{% extends "base.html" %}
+{% block title %}Lấy lại tên đăng nhập{% endblock %}
+{% block body_class %}site-page login-page{% endblock %}
+
+{% block content_wrapper %}
+<div class="auth-layout auth-layout--recovery">
+    <div class="container">
+        <div class="recovery-shell recovery-shell--compact">
+            <section class="content-card auth-card recovery-card recovery-result-card">
+                <div class="recovery-card__header">
+                    <span class="recovery-card__eyebrow">
+                        <i class="fas fa-user-check"></i>
+                        <span>Khôi phục tài khoản thành công</span>
+                    </span>
+                    <h2>Đây là tên đăng nhập của bạn</h2>
+                    <p>Mã OTP đã được xác thực. Bạn có thể dùng tên đăng nhập này để quay lại màn hình đăng nhập.</p>
+                </div>
+
+                <p class="recovery-result-card__username">{{ recovered_username }}</p>
+
+                <p class="recovery-inline-note mt-3">
+                    Email xác thực: <strong>{{ recovery_email }}</strong>
+                </p>
+
+                <div class="recovery-action-row justify-content-center mt-4">
+                    <a href="{% url 'login' %}" class="pharma-btn" style="max-width:260px;">
+                        <i class="fas fa-sign-in-alt"></i>
+                        <span>Đăng nhập lại</span>
+                    </a>
+                    <a href="{% url 'password_reset' %}" class="recovery-link-btn recovery-link-btn--soft">
+                        <i class="fas fa-key"></i>
+                        <span>Đặt lại mật khẩu</span>
+                    </a>
+                </div>
+            </section>
+        </div>
+    </div>
+</div>
+{% endblock %}

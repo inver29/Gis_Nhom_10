@@ -1,0 +1,288 @@
+{% extends "base.html" %}
+{% load currency_filters %}
+{% block title %}Trả hàng / hoàn tiền{% endblock %}
+{% block body_class %}site-page history-page{% endblock %}
+
+{% block extra_css %}
+{{ block.super }}
+<style>
+    .proof-gallery-grid {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 16px;
+    }
+
+    .proof-gallery-card {
+        position: relative;
+        width: 180px;
+        padding: 12px;
+        border-radius: 18px;
+        background: #f8fbff;
+        border: 1px solid rgba(17,70,184,.08);
+        transition: opacity .18s ease, transform .18s ease;
+    }
+
+    .proof-gallery-card img {
+        width: 100%;
+        height: 130px;
+        object-fit: cover;
+        border-radius: 14px;
+        box-shadow: 0 10px 24px rgba(15,23,42,.12);
+    }
+
+    .proof-gallery-remove {
+        position: absolute;
+        top: 8px;
+        right: 8px;
+        width: 34px;
+        height: 34px;
+        border: 0;
+        border-radius: 999px;
+        background: rgba(12,23,43,.72);
+        color: #fff;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        box-shadow: 0 10px 20px rgba(15,23,42,.2);
+        cursor: pointer;
+    }
+
+    .proof-gallery-remove:hover {
+        background: #cf2e2e;
+    }
+
+    .proof-gallery-card.is-removed {
+        opacity: .5;
+        border-style: dashed;
+        transform: scale(.98);
+    }
+
+    .proof-gallery-status {
+        display: none;
+        margin-top: 10px;
+        padding: 6px 10px;
+        border-radius: 999px;
+        font-size: .78rem;
+        font-weight: 700;
+        color: #c23030;
+        background: rgba(207,46,46,.1);
+    }
+
+    .proof-gallery-card.is-removed .proof-gallery-status {
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+    }
+</style>
+{% endblock %}
+
+{% block content_wrapper %}
+<div class="history-layout">
+    <div class="container">
+        <section class="section-shell mb-4">
+            <div class="section-heading">
+                <div>
+                    <div class="section-heading__eyebrow"><i class="fas fa-undo-alt"></i> Trả hàng / hoàn tiền</div>
+                    <h1>{{ order.order_code }}</h1>
+                </div>
+                <a href="{% url 'order_history_detail' order.id %}" class="pharma-outline-btn" style="max-width:240px;">
+                    <i class="fas fa-arrow-left"></i>
+                    <span>Quay lại chi tiết đơn</span>
+                </a>
+            </div>
+        </section>
+
+        <section class="content-card history-card">
+            <div class="history-meta-grid mb-4">
+                <div class="history-meta-box"><small>Chi nhánh bán</small><strong>{{ order.pharmacy.name|default:"Chưa gán" }}</strong></div>
+                <div class="history-meta-box"><small>Tổng thanh toán</small><strong class="text-danger">{{ order.final_total_price|vnd }}</strong></div>
+                <div class="history-meta-box"><small>Người nhận</small><strong>{{ order.full_name }}</strong></div>
+                <div class="history-meta-box"><small>Trạng thái đơn</small><strong>{{ order.get_status_display }}</strong></div>
+            </div>
+
+            {% if return_request and return_request.status != 'processing' %}
+            <div class="alert {% if return_request.status == 'approved_refund' %}alert-success{% else %}alert-danger{% endif %}">
+                Yêu cầu này đã được cập nhật sang trạng thái {% if return_request.status == 'approved_refund' %}chấp nhận hoàn tiền{% else %}từ chối hoàn tiền{% endif %}. Bạn chỉ có thể xem lại thông tin đã gửi.
+                {% if return_request.admin_note %}<br><strong>Ghi chú xử lý:</strong> {{ return_request.admin_note }}{% endif %}
+            </div>
+            {% elif return_request %}
+            <div class="alert alert-warning">Bạn đã gửi yêu cầu này. Có thể bổ sung thêm ảnh chứng minh nếu cần.</div>
+            {% endif %}
+
+            <form method="post" enctype="multipart/form-data">
+                {% csrf_token %}
+                <div class="form-row">
+                    <div class="form-group col-lg-6">
+                        <label for="{{ form.contact_phone.id_for_label }}">{{ form.contact_phone.label }}</label>
+                        {{ form.contact_phone }}
+                        {% if form.contact_phone.errors %}<div class="text-danger small mt-2">{{ form.contact_phone.errors|join:', ' }}</div>{% endif %}
+                    </div>
+                    <div class="form-group col-lg-6">
+                        <label for="{{ form.contact_email.id_for_label }}">{{ form.contact_email.label }}</label>
+                        {{ form.contact_email }}
+                        {% if form.contact_email.errors %}<div class="text-danger small mt-2">{{ form.contact_email.errors|join:', ' }}</div>{% endif %}
+                    </div>
+                </div>
+
+                <div class="form-row">
+                    <div class="form-group col-lg-6">
+                        <label for="{{ form.bank_account_number.id_for_label }}">{{ form.bank_account_number.label }}</label>
+                        {{ form.bank_account_number }}
+                        {% if form.bank_account_number.errors %}<div class="text-danger small mt-2">{{ form.bank_account_number.errors|join:', ' }}</div>{% endif %}
+                    </div>
+                    <div class="form-group col-lg-6">
+                        <label for="{{ form.momo_account_number.id_for_label }}">{{ form.momo_account_number.label }}</label>
+                        {{ form.momo_account_number }}
+                        {% if form.momo_account_number.errors %}<div class="text-danger small mt-2">{{ form.momo_account_number.errors|join:', ' }}</div>{% endif %}
+                    </div>
+                </div>
+
+                <div class="form-group">
+                    <label for="{{ form.reason.id_for_label }}">{{ form.reason.label }}</label>
+                    {{ form.reason }}
+                    {% if form.reason.errors %}<div class="text-danger small mt-2">{{ form.reason.errors|join:', ' }}</div>{% endif %}
+                </div>
+
+                <div class="form-row">
+                    <div class="form-group col-lg-6">
+                        <label for="{{ form.bill_image.id_for_label }}">{{ form.bill_image.label }}</label>
+                        {{ form.bill_image }}
+                        <small class="form-text text-muted">Ảnh bill vừa chọn sẽ hiện ngay bên dưới để bạn kiểm tra trước khi gửi.</small>
+                        <div class="upload-preview-grid upload-preview-grid--single mt-3" id="bill-preview-grid">
+                            {% if return_request and return_request.bill_image %}
+                            <figure class="upload-preview-card">
+                                <img src="{{ return_request.bill_image.url }}" alt="Bill hiện tại">
+                                <figcaption>Ảnh bill hiện tại</figcaption>
+                            </figure>
+                            {% endif %}
+                        </div>
+                        {% if form.bill_image.errors %}<div class="text-danger small mt-2">{{ form.bill_image.errors|join:', ' }}</div>{% endif %}
+                    </div>
+                    <div class="form-group col-lg-6">
+                        <label for="{{ form.proof_images.id_for_label }}">{{ form.proof_images.label }}</label>
+                        {{ form.proof_images }}
+                        <small class="form-text text-muted">Tối đa 10 ảnh chứng minh cho mỗi yêu cầu. Bạn có thể thêm nhiều ảnh mới cùng lúc; với ảnh cũ chỉ cần bấm dấu × để gỡ ảnh sai rồi tải ảnh mới lên lại.</small>
+                        <div class="upload-preview-grid mt-3" id="proof-preview-grid"></div>
+                        {% if form.proof_images.errors %}<div class="text-danger small mt-2">{{ form.proof_images.errors|join:', ' }}</div>{% endif %}
+                    </div>
+                </div>
+
+                {% if form.non_field_errors %}
+                <div class="alert alert-danger">{{ form.non_field_errors }}</div>
+                {% endif %}
+
+                {% if evidence_images %}
+                <div class="mt-4">
+                    <h3 class="mb-3">Ảnh chứng minh đã gửi</h3>
+                    <div class="proof-gallery-grid">
+                        {% for evidence in evidence_images %}
+                        <div class="proof-gallery-card" data-evidence-card>
+                            <input type="hidden" name="evidence_keep_{{ evidence.pk }}" value="1" data-evidence-keep>
+                            <button type="button" class="proof-gallery-remove" data-evidence-remove aria-label="Gỡ ảnh chứng minh {{ forloop.counter }}">
+                                <i class="fas fa-times"></i>
+                            </button>
+                            <a href="{{ evidence.image.url }}" target="_blank" rel="noopener">
+                                <img src="{{ evidence.image.url }}" alt="Ảnh chứng minh {{ forloop.counter }}">
+                            </a>
+                            <div class="small text-muted mt-2">Ảnh {{ forloop.counter }} hiện tại</div>
+                            <span class="proof-gallery-status"><i class="fas fa-times-circle"></i> Ảnh sẽ được gỡ khi lưu</span>
+                        </div>
+                        {% endfor %}
+                    </div>
+                </div>
+                {% endif %}
+
+                {% if not return_request or return_request.status == 'processing' %}
+                <div class="d-flex flex-wrap" style="gap:12px; margin-top:20px;">
+                    <button type="submit" class="pharma-btn" style="max-width:260px;">
+                        <i class="fas fa-paper-plane"></i>
+                        <span>{% if return_request %}Cập nhật yêu cầu{% else %}Gửi yêu cầu xử lý{% endif %}</span>
+                    </button>
+                </div>
+                {% endif %}
+            </form>
+        </section>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+{{ block.super }}
+<script>
+(function () {
+    function buildPreviewCard(file, captionText) {
+        if (!file || !file.type || file.type.indexOf('image/') !== 0) {
+            return null;
+        }
+        var figure = document.createElement('figure');
+        figure.className = 'upload-preview-card';
+
+        var image = document.createElement('img');
+        image.src = URL.createObjectURL(file);
+        image.alt = captionText || file.name;
+        image.onload = function () {
+            URL.revokeObjectURL(image.src);
+        };
+
+        var caption = document.createElement('figcaption');
+        caption.textContent = captionText || file.name;
+
+        figure.appendChild(image);
+        figure.appendChild(caption);
+        return figure;
+    }
+
+    function wirePreview(inputId, targetId, singleMode) {
+        var input = document.getElementById(inputId);
+        var target = document.getElementById(targetId);
+        if (!input || !target) {
+            return;
+        }
+
+        var initialMarkup = target.innerHTML;
+        input.addEventListener('change', function () {
+            var files = Array.prototype.slice.call(input.files || []);
+            target.innerHTML = singleMode ? '' : initialMarkup;
+
+            if (!files.length) {
+                if (singleMode) {
+                    target.innerHTML = initialMarkup;
+                }
+                return;
+            }
+
+            if (singleMode) {
+                target.innerHTML = '';
+                var firstPreview = buildPreviewCard(files[0], 'Ảnh bill vừa chọn');
+                if (firstPreview) {
+                    target.appendChild(firstPreview);
+                }
+                return;
+            }
+
+            files.forEach(function (file, index) {
+                var previewCard = buildPreviewCard(file, 'Ảnh chứng minh ' + (index + 1));
+                if (previewCard) {
+                    target.appendChild(previewCard);
+                }
+            });
+        });
+    }
+
+    wirePreview('{{ form.bill_image.id_for_label }}', 'bill-preview-grid', true);
+    wirePreview('{{ form.proof_images.id_for_label }}', 'proof-preview-grid', false);
+
+    document.querySelectorAll('[data-evidence-remove]').forEach(function (button) {
+        button.addEventListener('click', function () {
+            var card = button.closest('[data-evidence-card]');
+            var input = card ? card.querySelector('[data-evidence-keep]') : null;
+            if (!card || !input) {
+                return;
+            }
+            input.value = '0';
+            card.classList.add('is-removed');
+        });
+    });
+})();
+</script>
+{% endblock %}

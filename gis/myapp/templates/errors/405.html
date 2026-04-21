@@ -1,0 +1,33 @@
+{% extends "base.html" %}
+{% block title %}Phương thức không được hỗ trợ{% endblock %}
+{% block header_search %}{% endblock %}
+{% block body_class %}site-page error-page page--hide-search{% endblock %}
+{% block content_wrapper %}
+<div class="site-page-section error-page-section">
+    <div class="container">
+        <div class="error-hero">
+            <div class="error-hero__copy">
+                <span class="error-hero__eyebrow"><i class="fas fa-random"></i> Sai phương thức truy cập{% if is_preview %} · Bản xem trước{% endif %}</span>
+                <h1>Trang này không chấp nhận cách gọi hiện tại</h1>
+                <p>Yêu cầu đã đi đúng đường dẫn nhưng sai phương thức thực thi, ví dụ một thao tác chỉ nhận POST nhưng lại được mở bằng GET.</p>
+                {% if requested_path %}<div class="error-hero__path">{{ requested_path }}</div>{% endif %}
+                <div class="error-hero__actions">
+                    <a href="javascript:history.back()" class="pharma-btn"><i class="fas fa-arrow-left"></i><span>Quay lại thao tác trước</span></a>
+                    <a href="{% url 'home' %}" class="pharma-outline-btn"><i class="fas fa-home"></i><span>Về trang chủ</span></a>
+                </div>
+            </div>
+            <div class="error-hero__visual">
+                <div class="error-hero__badge">405</div>
+                <div class="error-hero__card">
+                    <div class="error-hero__mini-map"></div>
+                    <div class="error-hero__pin"><i class="fas fa-exchange-alt"></i></div>
+                    <div class="error-hero__panel">
+                        <strong>Hãy thực hiện đúng luồng</strong>
+                        <span>Các nút gửi biểu mẫu, cập nhật giỏ hàng và đánh giá nên được thao tác từ giao diện chính thay vì gọi trực tiếp URL.</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

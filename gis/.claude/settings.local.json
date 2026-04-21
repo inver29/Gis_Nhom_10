@@ -1,0 +1,15 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(xargs cat *)",
+      "Bash(python manage.py makemigrations myapp --dry-run)",
+      "Bash(python manage.py makemigrations myapp)",
+      "Bash(python manage.py check)",
+      "Bash(python manage.py migrate myapp --plan)",
+      "Bash(python manage.py migrate myapp)",
+      "Bash(python manage.py check --deploy)",
+      "Bash(python -c \"from myapp.forms import AboutPageContentForm, HomePageContentForm, NewsArticleAdminForm; print\\('forms import OK'\\)\")",
+      "Bash(python manage.py shell -c \"from myapp.forms import AboutPageContentForm, HomePageContentForm, NewsArticleAdminForm; f = AboutPageContentForm\\(\\); print\\('About form OK:', len\\(f.fields\\), 'fields'\\); h = HomePageContentForm\\(\\); print\\('Home form OK:', len\\(h.fields\\), 'fields'\\); n = NewsArticleAdminForm\\(\\); print\\('News form OK:', len\\(n.fields\\), 'fields'\\)\")"
+    ]
+  }
+}

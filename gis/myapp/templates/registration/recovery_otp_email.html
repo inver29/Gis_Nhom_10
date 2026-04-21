@@ -1,0 +1,52 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>{% if is_username_recovery %}Mã OTP lấy lại tên đăng nhập{% else %}Mã OTP đặt lại mật khẩu{% endif %}</title>
+</head>
+<body style="margin:0;padding:24px;background:#eef4ff;font-family:Arial,sans-serif;color:#163057;">
+  <div style="max-width:680px;margin:0 auto;background:#ffffff;border-radius:28px;overflow:hidden;border:1px solid #dbe8ff;box-shadow:0 24px 48px rgba(17,70,184,0.12);">
+    <div style="padding:28px 28px 24px;background:radial-gradient(circle at top right,rgba(255,255,255,0.22) 0%,rgba(255,255,255,0) 30%),linear-gradient(145deg,#1146b8 0%,#1f64e0 52%,#0f8cc9 100%);color:#ffffff;">
+      <div style="display:inline-flex;align-items:center;gap:8px;padding:9px 14px;border-radius:999px;background:rgba(255,255,255,0.14);border:1px solid rgba(255,255,255,0.18);font-size:12px;font-weight:800;letter-spacing:.04em;text-transform:uppercase;">
+        {% if is_username_recovery %}Khôi phục tên đăng nhập{% else %}Đặt lại mật khẩu{% endif %}
+      </div>
+      <h1 style="margin:16px 0 10px;font-size:28px;line-height:1.18;">
+        {% if is_username_recovery %}Mã OTP lấy lại tài khoản{% else %}Mã OTP đặt lại mật khẩu{% endif %}
+      </h1>
+      <p style="margin:0;color:rgba(255,255,255,0.9);line-height:1.7;">
+        Chúng tôi đã nhận được yêu cầu xác thực tài khoản của bạn trên {{ site_name|default:"GIS Pharma" }}.
+      </p>
+    </div>
+
+    <div style="padding:28px;">
+      <p style="margin-top:0;font-size:16px;">Xin chào {{ user.get_username }},</p>
+      <p style="margin:0 0 18px;line-height:1.75;color:#4f6285;">
+        {% if is_username_recovery %}
+        Hãy nhập mã OTP dưới đây trên trang xác thực để xem lại tên đăng nhập của bạn.
+        {% else %}
+        Hãy nhập mã OTP dưới đây trên trang xác thực để đặt lại mật khẩu mới cho tài khoản của bạn.
+        {% endif %}
+      </p>
+
+      <div style="margin:0 0 18px;padding:18px;border-radius:22px;background:#f7faff;border:1px solid #d9e6ff;text-align:center;">
+        <div style="font-size:12px;color:#5d7090;text-transform:uppercase;letter-spacing:.04em;margin-bottom:8px;">Mã OTP của bạn</div>
+        <div style="font-size:34px;font-weight:900;color:#163057;letter-spacing:.22em;">{{ otp_code }}</div>
+      </div>
+
+      <div style="padding:16px 18px;border-radius:20px;background:#f9fbff;border:1px dashed #d4e2fb;margin-bottom:20px;color:#4f6285;line-height:1.7;">
+        Mã OTP có hiệu lực trong <strong>{{ otp_valid_minutes }} phút</strong>. Không chia sẻ mã này cho người khác.
+        {% if is_username_recovery %}
+        <br><br>Tên đăng nhập hiện tại của bạn: <strong>{{ username_snapshot }}</strong>
+        {% endif %}
+      </div>
+
+      <p style="margin:0 0 18px;">
+        <a href="{{ verify_url }}" style="display:inline-flex;align-items:center;justify-content:center;padding:14px 22px;border-radius:14px;background:#1f64e0;color:#ffffff;text-decoration:none;font-weight:800;">Mở trang nhập OTP</a>
+      </p>
+
+      <p style="margin:0;color:#5d7090;line-height:1.7;">Nếu bạn không thực hiện yêu cầu này, hãy bỏ qua email. Mọi thắc mắc có thể liên hệ {{ support_email|default:"bộ phận hỗ trợ" }}.</p>
+    </div>
+  </div>
+</body>
+</html>

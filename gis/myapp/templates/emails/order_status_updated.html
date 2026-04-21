@@ -1,0 +1,62 @@
+{% load currency_filters %}
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Cập nhật đơn hàng {{ order.order_code }}</title>
+</head>
+<body style="margin:0;padding:24px;background:#eef4ff;font-family:Arial,sans-serif;color:#163057;">
+  <div style="max-width:680px;margin:0 auto;background:#ffffff;border-radius:28px;overflow:hidden;border:1px solid #dbe8ff;box-shadow:0 24px 48px rgba(17,70,184,0.12);">
+    <div style="padding:28px 28px 24px;background:radial-gradient(circle at top right,rgba(255,255,255,0.22) 0%,rgba(255,255,255,0) 30%),linear-gradient(145deg,#1146b8 0%,#1f64e0 52%,#0f8cc9 100%);color:#ffffff;">
+      <div style="display:inline-flex;align-items:center;gap:8px;padding:9px 14px;border-radius:999px;background:rgba(255,255,255,0.14);border:1px solid rgba(255,255,255,0.18);font-size:12px;font-weight:800;letter-spacing:.04em;text-transform:uppercase;">
+        Theo dõi đơn hàng
+      </div>
+      <h1 style="margin:16px 0 10px;font-size:28px;line-height:1.18;">Đơn hàng {{ order.order_code }} đã được cập nhật</h1>
+      <p style="margin:0;color:rgba(255,255,255,0.9);line-height:1.7;">Trạng thái đơn của bạn vừa được thay đổi trên {{ site_name }}. Bạn có thể xem nhanh thông tin chính ngay trong email này.</p>
+    </div>
+
+    <div style="padding:28px;">
+      <p style="margin-top:0;font-size:16px;">{{ recipient_name }} thân mến,</p>
+      <p style="margin:0 0 20px;line-height:1.75;color:#4f6285;">Đơn hàng của bạn vừa được cập nhật bởi bộ phận xử lý. Dưới đây là những thông tin quan trọng nhất ở thời điểm hiện tại.</p>
+
+      <div style="display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:14px;margin-bottom:18px;">
+        <div style="padding:16px 18px;border-radius:20px;background:#f7faff;border:1px solid #d9e6ff;">
+          <div style="font-size:12px;color:#5d7090;text-transform:uppercase;letter-spacing:.04em;margin-bottom:8px;">Trạng thái trước đó</div>
+          <div style="font-size:18px;font-weight:800;color:#163057;">{{ previous_status_label }}</div>
+        </div>
+        <div style="padding:16px 18px;border-radius:20px;background:#eef5ff;border:1px solid #cfe0ff;">
+          <div style="font-size:12px;color:#5d7090;text-transform:uppercase;letter-spacing:.04em;margin-bottom:8px;">Trạng thái hiện tại</div>
+          <div style="font-size:18px;font-weight:900;color:#1f64e0;">{{ current_status_label }}</div>
+        </div>
+      </div>
+
+      <table style="width:100%;border-collapse:collapse;margin:0 0 18px;">
+        <tr>
+          <td style="padding:10px 0;color:#5d7090;border-bottom:1px solid #e7eefc;">Thanh toán</td>
+          <td style="padding:10px 0;text-align:right;font-weight:700;color:#163057;border-bottom:1px solid #e7eefc;">{{ payment_status_label }}</td>
+        </tr>
+        <tr>
+          <td style="padding:10px 0;color:#5d7090;border-bottom:1px solid #e7eefc;">Chi nhánh xử lý</td>
+          <td style="padding:10px 0;text-align:right;font-weight:700;color:#163057;border-bottom:1px solid #e7eefc;">{{ order.pharmacy.name|default:"Chưa gán chi nhánh" }}</td>
+        </tr>
+        <tr>
+          <td style="padding:10px 0;color:#5d7090;">Tổng thanh toán</td>
+          <td style="padding:10px 0;text-align:right;font-size:20px;font-weight:900;color:#d62839;">{{ order.final_total_price|vnd }}</td>
+        </tr>
+      </table>
+
+      <div style="padding:16px 18px;border-radius:20px;background:#f9fbff;border:1px dashed #d4e2fb;margin-bottom:20px;color:#4f6285;line-height:1.7;">
+        Bạn có thể mở lại trang chi tiết đơn để theo dõi tiến trình mới nhất, hoặc xem toàn bộ lịch sử mua hàng nếu muốn kiểm tra các đơn trước đó.
+      </div>
+
+      <div style="display:flex;flex-wrap:wrap;gap:12px;margin-bottom:18px;">
+        <a href="{{ order_detail_url }}" style="display:inline-flex;align-items:center;justify-content:center;padding:13px 20px;border-radius:14px;background:#1f64e0;color:#ffffff;text-decoration:none;font-weight:800;">Xem chi tiết đơn hàng</a>
+        <a href="{{ order_history_url }}" style="display:inline-flex;align-items:center;justify-content:center;padding:13px 20px;border-radius:14px;background:#edf4ff;color:#1146b8;text-decoration:none;font-weight:800;border:1px solid #d6e4ff;">Mở lịch sử đơn hàng</a>
+      </div>
+
+      <p style="margin:0;color:#5d7090;line-height:1.7;">Nếu cần hỗ trợ, vui lòng liên hệ <strong style="color:#163057;">{{ support_email }}</strong>.</p>
+    </div>
+  </div>
+</body>
+</html>
