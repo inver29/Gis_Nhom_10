@@ -1,0 +1,137 @@
+{% extends "base.html" %}
+{% load static %}
+{% block title %}Tin tức | GIS Pharma{% endblock %}
+{% block body_class %}site-page news-page{% endblock %}
+
+{% block extra_css %}
+<link rel="stylesheet" href="{% static 'css/news/list.css' %}">
+{% endblock %}
+
+{% block content_wrapper %}
+<div class="site-page-section">
+    <div class="container">
+        <div class="nw-wrap">
+
+            <section class="nw-hero" data-reveal="up">
+                <span class="nw-kicker"><i class="fas fa-newspaper"></i> Tin tức GIS Pharma</span>
+                <h1>Cập nhật mới nhất từ hệ thống và chuỗi nhà thuốc</h1>
+                <p>Tổng hợp thông tin, thông báo và chia sẻ chuyên môn dành cho khách hàng và đối tác của GIS Pharma.</p>
+                <div class="nw-hero__meta">
+                    <span><i class="fas fa-layer-group"></i> {{ page_obj.paginator.count }} bài đã xuất bản</span>
+                    <span><i class="fas fa-stream"></i> {{ page_obj.paginator.num_pages }} trang nội dung</span>
+                    {% if featured_article %}
+                    <span><i class="fas fa-star"></i> Bài nổi bật: {{ featured_article.title|truncatechars:40 }}</span>
+                    {% endif %}
+                </div>
+            </section>
+
+            {% if featured_article %}
+            <article class="nw-featured" data-reveal="up">
+                <div class="nw-featured__media">
+                    {% if featured_article.cover_image %}
+                    <img src="{{ featured_article.cover_image.url }}" alt="{{ featured_article.title }}">
+                    {% else %}
+                    <div class="nw-featured__placeholder"><i class="fas fa-notes-medical"></i></div>
+                    {% endif %}
+                </div>
+                <div class="nw-featured__body">
+                    <span class="nw-tag"><i class="fas fa-star"></i> Bài nổi bật</span>
+                    <h2>{{ featured_article.title }}</h2>
+                    <p>{{ featured_article.summary|striptags|truncatechars:240 }}</p>
+                    <div class="nw-meta">
+                        <span><i class="far fa-calendar-alt"></i> {{ featured_article.published_at|date:"d/m/Y" }}</span>
+                        <span><i class="fas fa-user-edit"></i> {{ featured_article.author_display_name }}</span>
+                    </div>
+                    <div>
+                        <a href="{% url 'news_detail' featured_article.slug %}" class="pharma-btn">
+                            <i class="fas fa-arrow-right"></i>
+                            <span>Đọc bài nổi bật</span>
+                        </a>
+                    </div>
+                </div>
+            </article>
+            {% endif %}
+
+            <section class="nw-main">
+                <div>
+                    <h2 class="nw-section-title">Tất cả bài viết</h2>
+                    <div class="nw-grid">
+                        {% for article in page_obj %}
+                        {% if not featured_article or page_obj.number != 1 or not forloop.first %}
+                        <article class="nw-card" data-reveal="up">
+                            <div class="nw-card__media">
+                                {% if article.cover_image %}
+                                <img src="{{ article.cover_image.url }}" alt="{{ article.title }}">
+                                {% else %}
+                                <div class="nw-card__placeholder"><i class="fas fa-file-medical-alt"></i></div>
+                                {% endif %}
+                            </div>
+                            <div class="nw-card__body">
+                                <div class="nw-meta">
+                                    <span><i class="far fa-calendar-alt"></i> {{ article.published_at|date:"d/m/Y" }}</span>
+                                </div>
+                                <h3>{{ article.title }}</h3>
+                                <p>{{ article.summary|striptags|truncatechars:140 }}</p>
+                                <div class="nw-card__foot">
+                                    <span class="nw-tag">Tin tức</span>
+                                    <a href="{% url 'news_detail' article.slug %}" class="nw-card__link">
+                                        Đọc thêm <i class="fas fa-arrow-right"></i>
+                                    </a>
+                                </div>
+                            </div>
+                        </article>
+                        {% endif %}
+                        {% empty %}
+                        <div class="nw-empty" style="grid-column:1/-1">
+                            <i class="fas fa-newspaper fa-3x text-primary"></i>
+                            <h3>Chưa có bài viết nào</h3>
+                            <p class="mb-0">Hãy quay lại sau khi đội biên tập đăng bài mới.</p>
+                        </div>
+                        {% endfor %}
+                    </div>
+
+                    {% if page_obj.has_other_pages %}
+                    <div class="nw-pagination">
+                        {% if page_obj.has_previous %}
+                        <a class="pharma-outline-btn" href="?page={{ page_obj.previous_page_number }}">
+                            <i class="fas fa-arrow-left"></i><span>Trang trước</span>
+                        </a>
+                        {% endif %}
+                        <span class="nw-stats"><span>Trang {{ page_obj.number }}/{{ page_obj.paginator.num_pages }}</span></span>
+                        {% if page_obj.has_next %}
+                        <a class="pharma-btn" href="?page={{ page_obj.next_page_number }}">
+                            <span>Trang sau</span><i class="fas fa-arrow-right"></i>
+                        </a>
+                        {% endif %}
+                    </div>
+                    {% endif %}
+                </div>
+
+                <aside class="nw-aside" data-reveal="up">
+                    <section class="nw-panel">
+                        <h4>Tổng quan</h4>
+                        <div class="nw-stats">
+                            <span><i class="fas fa-layer-group"></i> {{ page_obj.paginator.count }} bài</span>
+                            <span><i class="fas fa-stream"></i> {{ page_obj.paginator.num_pages }} trang</span>
+                        </div>
+                    </section>
+
+                    <section class="nw-panel">
+                        <h4>Bài viết gần đây</h4>
+                        <div class="nw-recent">
+                            {% for article in latest_articles %}
+                            <a href="{% url 'news_detail' article.slug %}">
+                                <strong>{{ article.title|truncatechars:60 }}</strong>
+                                <small><i class="far fa-clock"></i> {{ article.published_at|date:"d/m/Y" }}</small>
+                            </a>
+                            {% empty %}
+                            <p class="nw-panel-note">Chưa có bài viết nào được xuất bản.</p>
+                            {% endfor %}
+                        </div>
+                    </section>
+                </aside>
+            </section>
+        </div>
+    </div>
+</div>
+{% endblock %}

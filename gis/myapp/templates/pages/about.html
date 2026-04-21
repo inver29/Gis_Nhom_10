@@ -1,0 +1,264 @@
+{% extends "base.html" %}
+{% load static content_filters %}
+{% block title %}{{ about_content.page_title }}{% endblock %}
+{% block body_class %}site-page about-page{% endblock %}
+
+{% block extra_css %}
+<link rel="stylesheet" href="{% static 'css/pages/about.css' %}">
+{% endblock %}
+
+{% block content_wrapper %}
+<div class="site-page-section">
+    <div class="container">
+        <div class="about-shell">
+
+            <section class="about-hero about-surface" data-reveal="up">
+                <div>
+                    <span class="about-eyebrow"><i class="fas fa-clinic-medical"></i> {{ about_content.hero_kicker }}</span>
+                    <h1>{{ about_content.hero_title }}</h1>
+                    <div class="about-rich">{{ about_content.hero_intro|richtext }}</div>
+
+                    <div class="about-hero__chips">
+                        {% if about_content.hero_chip_1 %}<span><i class="fas fa-check-circle"></i> {{ about_content.hero_chip_1 }}</span>{% endif %}
+                        {% if about_content.hero_chip_2 %}<span><i class="fas fa-check-circle"></i> {{ about_content.hero_chip_2 }}</span>{% endif %}
+                        {% if about_content.hero_chip_3 %}<span><i class="fas fa-check-circle"></i> {{ about_content.hero_chip_3 }}</span>{% endif %}
+                    </div>
+
+                    <div class="about-hero__actions">
+                        <a href="{% url 'product_list' %}" class="pharma-btn">
+                            <i class="fas fa-capsules"></i>
+                            <span>{{ about_content.hero_primary_label }}</span>
+                        </a>
+                        <a href="{% url 'map_view' %}" class="pharma-outline-btn">
+                            <i class="fas fa-map-marked-alt"></i>
+                            <span>{{ about_content.hero_secondary_label }}</span>
+                        </a>
+                    </div>
+                </div>
+
+                <div class="about-visual">
+                    <div class="about-visual__slider">
+                        <div class="about-visual__frame">
+                            {% if about_slides %}
+                            <div class="splide site-splide" data-site-splide data-per-page="1" data-gap="0" data-autoplay="true" data-pagination="true" data-arrows="false">
+                                <div class="splide__track">
+                                    <ul class="splide__list">
+                                        {% for slide in about_slides %}
+                                        <li class="splide__slide">
+                                            {% if slide.link_url %}<a href="{{ slide.link_url }}">{% endif %}
+                                            {% if slide.image %}
+                                            <img src="{{ slide.image.url }}" alt="{{ slide.alt_text|default:'Slide giới thiệu' }}">
+                                            {% elif slide.legacy_static_path %}
+                                            <img src="{% static slide.legacy_static_path %}" alt="{{ slide.alt_text|default:'Slide giới thiệu' }}">
+                                            {% endif %}
+                                            {% if slide.link_url %}</a>{% endif %}
+                                        </li>
+                                        {% endfor %}
+                                    </ul>
+                                </div>
+                            </div>
+                            {% else %}
+                            <div class="about-visual__placeholder"><i class="fas fa-images"></i></div>
+                            {% endif %}
+                        </div>
+                    </div>
+                    <div class="about-visual__body">
+                        <strong>{{ about_content.visual_title }}</strong>
+                        <div class="about-rich">{{ about_content.visual_description|richtext }}</div>
+                    </div>
+                </div>
+            </section>
+
+            {% for section in about_sections %}
+                {% if section.kind == "builtin" %}
+                    {% if section.key == "stats" %}
+                    <section class="about-stats" data-reveal="up">
+                        <article class="about-stat">
+                            <span class="about-stat__icon"><i class="fas fa-store"></i></span>
+                            <strong>{{ pharmacy_total }}</strong>
+                            <span>{{ about_content.stat_pharmacy_label }}</span>
+                        </article>
+                        <article class="about-stat">
+                            <span class="about-stat__icon"><i class="fas fa-capsules"></i></span>
+                            <strong>{{ medicine_total }}</strong>
+                            <span>{{ about_content.stat_medicine_label }}</span>
+                        </article>
+                        <article class="about-stat">
+                            <span class="about-stat__icon"><i class="fas fa-shopping-bag"></i></span>
+                            <strong>{{ order_total }}</strong>
+                            <span>{{ about_content.stat_order_label }}</span>
+                        </article>
+                        <article class="about-stat">
+                            <span class="about-stat__icon"><i class="fas fa-star"></i></span>
+                            <strong>{{ review_total }}</strong>
+                            <span>{{ about_content.stat_review_label }}</span>
+                        </article>
+                    </section>
+                    {% elif section.key == "story" %}
+                    <section class="about-section about-surface" data-reveal="up">
+                        <div class="about-section__head">
+                            <span class="about-eyebrow"><i class="fas fa-book-open"></i> {{ about_content.story_tag }}</span>
+                            <h2>{{ about_content.story_title }}</h2>
+                            <div class="about-rich">{{ about_content.story_body|richtext }}</div>
+                        </div>
+                        <div class="about-grid-3">
+                            {% for item in about_story_items %}
+                            <article class="about-card">
+                                <span class="about-card__icon"><i class="{{ item.icon }}"></i></span>
+                                <h3>{{ item.title }}</h3>
+                                <div class="about-rich">{{ item.body|richtext }}</div>
+                            </article>
+                            {% endfor %}
+                        </div>
+                    </section>
+                    {% elif section.key == "value" %}
+                    <section class="about-section about-surface" data-reveal="up">
+                        <div class="about-section__head">
+                            <span class="about-eyebrow"><i class="fas fa-gem"></i> {{ about_content.value_tag }}</span>
+                            <h2>{{ about_content.value_title }}</h2>
+                            <div class="about-rich">{{ about_content.value_body|richtext }}</div>
+                        </div>
+                        <div class="about-grid-3 about-value-grid">
+                            {% for card in about_value_cards %}
+                            <article class="about-card">
+                                <span class="about-card__icon"><i class="{{ card.icon }}"></i></span>
+                                <h3>{{ card.title }}</h3>
+                                <div class="about-rich">{{ card.body|richtext }}</div>
+                            </article>
+                            {% endfor %}
+                        </div>
+                        {% if featured_categories %}
+                        <div class="about-inline-tags">
+                            {% for category in featured_categories %}
+                            <span><i class="fas fa-check-circle"></i> {{ category }}</span>
+                            {% endfor %}
+                        </div>
+                        {% endif %}
+                    </section>
+                    {% elif section.key == "journey" %}
+                    <section class="about-section about-surface" data-reveal="up">
+                        <div class="about-section__head">
+                            <span class="about-eyebrow"><i class="fas fa-stream"></i> {{ about_content.journey_tag }}</span>
+                            <h2>{{ about_content.journey_title }}</h2>
+                            <div class="about-rich">{{ about_content.journey_body|richtext }}</div>
+                        </div>
+                        <div class="about-grid-4">
+                            {% for step in about_journey_steps %}
+                            <article class="about-step">
+                                <span class="about-step__num">{{ step.number }}</span>
+                                <h3>{{ step.title }}</h3>
+                                <div class="about-rich">{{ step.body|richtext }}</div>
+                            </article>
+                            {% endfor %}
+                        </div>
+                    </section>
+                    {% elif section.key == "branch_role" %}
+                    <section class="about-section about-surface" data-reveal="up">
+                        <div class="about-section__head">
+                            <span class="about-eyebrow"><i class="fas fa-store-alt"></i> {{ about_content.branch_role_tag }}</span>
+                            <h2>{{ about_content.branch_role_title }}</h2>
+                            <div class="about-rich">{{ about_content.branch_role_body|richtext }}</div>
+                        </div>
+                        <div class="about-grid-3">
+                            {% for item in about_branch_role_items %}
+                            <article class="about-card">
+                                <span class="about-card__icon"><i class="{{ item.icon }}"></i></span>
+                                <h3>{{ item.title }}</h3>
+                                <div class="about-rich">{{ item.body|richtext }}</div>
+                            </article>
+                            {% endfor %}
+                        </div>
+                    </section>
+                    {% elif section.key == "branch_showcase" %}
+                    <section class="about-section about-surface" data-reveal="up">
+                        <div class="about-section__head">
+                            <span class="about-eyebrow"><i class="fas fa-map-marked-alt"></i> {{ about_content.branch_showcase_tag }}</span>
+                            <h2>{{ about_content.branch_showcase_title }}</h2>
+                            <div class="about-rich">{{ about_content.branch_showcase_body|richtext }}</div>
+                        </div>
+                        <div class="about-branches about-branch-grid">
+                            {% for item in about_branch_items %}
+                            <article class="about-branch">
+                                <div class="about-branch__media">
+                                    <span class="about-branch__badge"><i class="fas fa-map-pin"></i> {{ item.badge|default:about_content.branch_showcase_badge }}</span>
+                                    {% if item.image_url %}
+                                    <img src="{{ item.image_url }}" alt="{{ item.title }}">
+                                    {% else %}
+                                    <div class="about-branch__placeholder"><i class="{{ item.icon_class|default:'fas fa-clinic-medical' }}"></i></div>
+                                    {% endif %}
+                                </div>
+                                <div class="about-branch__body">
+                                    <h3>{{ item.title }}</h3>
+                                    {% if item.summary %}<p>{{ item.summary|linebreaksbr }}</p>{% endif %}
+                                    {% if item.address %}<p>{{ item.address }}</p>{% endif %}
+                                    <div class="about-branch__meta">
+                                        <span><i class="fas fa-clock text-primary"></i> {{ item.hours|default:"Đang cập nhật" }}</span>
+                                        <span><i class="fas fa-map text-primary"></i> {{ item.map_note|default:about_content.branch_showcase_map_note }}</span>
+                                    </div>
+                                    {% if item.link_url %}
+                                    <a href="{{ item.link_url }}" class="pharma-outline-btn">
+                                        <i class="fas fa-arrow-right"></i>
+                                        <span>{{ item.link_label|default:"Xem chi nhánh" }}</span>
+                                    </a>
+                                    {% endif %}
+                                </div>
+                            </article>
+                            {% empty %}
+                            <article class="about-branch">
+                                <div class="about-branch__media">
+                                    <span class="about-branch__badge"><i class="fas fa-clock"></i> {{ about_content.branch_empty_tag }}</span>
+                                    <div class="about-branch__placeholder"><i class="fas fa-store"></i></div>
+                                </div>
+                                <div class="about-branch__body">
+                                    <h3>{{ about_content.branch_empty_title }}</h3>
+                                    <div class="about-rich">{{ about_content.branch_empty_body|richtext }}</div>
+                                </div>
+                            </article>
+                            {% endfor %}
+                        </div>
+                    </section>
+                    {% elif section.key == "cta" %}
+                    <section class="about-cta about-surface" data-reveal="up">
+                        <div>
+                            <h2>{{ about_content.cta_title }}</h2>
+                            <div class="about-rich">{{ about_content.cta_body|richtext }}</div>
+                        </div>
+                        <div class="about-cta__actions">
+                            <a href="{% url 'product_list' %}" class="pharma-btn">
+                                <i class="fas fa-capsules"></i>
+                                <span>{{ about_content.cta_primary_label }}</span>
+                            </a>
+                            <a href="{% url 'map_view' %}" class="pharma-outline-btn">
+                                <i class="fas fa-map-marked-alt"></i>
+                                <span>{{ about_content.cta_secondary_label }}</span>
+                            </a>
+                        </div>
+                    </section>
+                    {% endif %}
+                {% elif section.kind == "custom" %}
+                    {% with block=section.block %}
+                    <section class="about-section about-surface" data-reveal="up">
+                        <div class="about-section__head">
+                            {% if block.kicker %}
+                            <span class="about-eyebrow"><i class="{{ block.icon_class|default:'fas fa-layer-group' }}"></i> {{ block.kicker }}</span>
+                            {% endif %}
+                            <h2>{{ block.title }}</h2>
+                            {% if block.body %}<div class="about-rich">{{ block.body|richtext }}</div>{% endif %}
+                            {% if block.link_url and block.link_label %}
+                            <div class="about-custom-block__actions">
+                                <a href="{{ block.link_url }}" class="pharma-outline-btn">
+                                    <i class="fas fa-arrow-right"></i>
+                                    <span>{{ block.link_label }}</span>
+                                </a>
+                            </div>
+                            {% endif %}
+                        </div>
+                    </section>
+                    {% endwith %}
+                {% endif %}
+            {% endfor %}
+
+        </div>
+    </div>
+</div>
+{% endblock %}

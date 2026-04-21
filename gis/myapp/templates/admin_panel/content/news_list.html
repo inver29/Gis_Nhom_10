@@ -1,0 +1,185 @@
+{% extends "admin_panel/base.html" %}
+
+{% load static %}
+{% block extra_head %}
+<link rel="stylesheet" href="{% static 'css/admin_panel/content/news_list.css' %}">
+{% endblock %}
+
+{% block admin_content %}
+<div class="news-admin">
+    <section class="news-admin__hero">
+        <div>
+            <h2>Quản lý trang Tin tức</h2>
+            <p>Khu này đã được tách riêng khỏi danh sách quản trị dùng chung để việc tìm bài, lọc trạng thái, cập nhật bài và kiểm tra hiển thị ngoài website dễ dùng hơn rõ rệt.</p>
+        </div>
+        <div class="news-admin__hero-actions">
+            <a href="{% url 'news_list' %}" class="btn-admin btn-admin-light" target="_blank" rel="noopener">
+                <i class="fas fa-external-link-alt"></i>
+                <span>Xem trang ngoài</span>
+            </a>
+            {% if create_allowed %}
+            <a href="{% url 'custom_admin_create' 'news' %}" class="btn-admin btn-admin-primary">
+                <i class="fas fa-plus"></i>
+                <span>{{ create_label }}</span>
+            </a>
+            {% endif %}
+        </div>
+    </section>
+
+    <section class="news-admin__summary">
+        {% for card in summary_cards %}
+        <article class="news-admin__summary-card">
+            <strong>{{ card.value }}</strong>
+            <span>{{ card.label }}</span>
+        </article>
+        {% endfor %}
+    </section>
+
+    <section class="news-admin__filters">
+        <div class="news-admin__filters-head">
+            <div>
+                <h3>Lọc và tra cứu nội dung</h3>
+                <p>Tìm nhanh theo tiêu đề hoặc slug, lọc theo trạng thái xuất bản và mốc thời gian.</p>
+            </div>
+        </div>
+        <form method="get" class="news-admin__filter-grid" novalidate>
+            <div class="news-admin__filter-field">
+                <label for="news-search">Từ khóa</label>
+                <input id="news-search" type="text" name="q" value="{{ keyword }}" placeholder="Nhập tiêu đề hoặc slug cần tìm...">
+            </div>
+            <div class="news-admin__filter-field">
+                <label for="news-publish-state">Trạng thái</label>
+                <select id="news-publish-state" name="publish_state">
+                    <option value="" {% if not news_filter_state.publish_state %}selected{% endif %}>Tất cả</option>
+                    <option value="published" {% if news_filter_state.publish_state == 'published' %}selected{% endif %}>Đã xuất bản</option>
+                    <option value="draft" {% if news_filter_state.publish_state == 'draft' %}selected{% endif %}>Nháp</option>
+                </select>
+            </div>
+            <div class="news-admin__filter-field">
+                <label for="news-from">Từ ngày</label>
+                <input id="news-from" type="date" name="published_from" value="{{ news_filter_state.published_from }}">
+            </div>
+            <div class="news-admin__filter-field">
+                <label for="news-to">Đến ngày</label>
+                <input id="news-to" type="date" name="published_to" value="{{ news_filter_state.published_to }}">
+            </div>
+            <div class="news-admin__filter-field">
+                <label for="news-sort">Sắp xếp</label>
+                <select id="news-sort" name="sort">
+                    {% for value, label in news_sort_options %}
+                    <option value="{{ value }}" {% if news_filter_state.sort == value %}selected{% endif %}>{{ label }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div class="news-admin__filter-actions">
+                <button type="submit" class="btn-admin btn-admin-primary">
+                    <i class="fas fa-search"></i>
+                    <span>Áp dụng</span>
+                </button>
+                <a href="{% url 'custom_admin_list' 'news' %}" class="btn-admin btn-admin-light">
+                    <i class="fas fa-rotate-left"></i>
+                    <span>Đặt lại</span>
+                </a>
+            </div>
+        </form>
+    </section>
+
+    <section class="news-admin__layout">
+        <div class="news-admin__cards">
+            {% for card in news_cards %}
+            <article class="news-admin__card">
+                <div class="news-admin__media">
+                    {% if card.article.cover_image %}
+                    <img src="{{ card.article.cover_image.url }}" alt="{{ card.article.title }}">
+                    {% else %}
+                    <div class="news-admin__placeholder">
+                        <i class="fas fa-image fa-2x"></i>
+                        <span>Chưa có ảnh bìa</span>
+                    </div>
+                    {% endif %}
+                </div>
+
+                <div class="news-admin__body">
+                    <div class="news-admin__topline">
+                        <span class="news-admin__status news-admin__status--{{ card.status_tone }}">
+                            <i class="fas fa-circle"></i>
+                            {{ card.status_label }}
+                        </span>
+                        <span class="news-admin__slug">/{{ card.article.slug }}</span>
+                    </div>
+                    <h3>{{ card.article.title }}</h3>
+                    <div class="news-admin__meta">
+                        <span><i class="far fa-calendar-alt"></i> {% if card.article.published_at %}{{ card.article.published_at|date:"d/m/Y H:i" }}{% else %}Chưa hẹn giờ{% endif %}</span>
+                        <span><i class="fas fa-user-edit"></i> {{ card.article.author_display_name }}</span>
+                        <span><i class="fas fa-clock"></i> Cập nhật {{ card.article.updated_at|date:"d/m/Y H:i" }}</span>
+                    </div>
+                    <div class="news-admin__copy">{{ card.article.summary|striptags|truncatechars:200 }}</div>
+                    <div class="news-admin__actions">
+                        {% if card.preview_url %}
+                        <a href="{{ card.preview_url }}" class="btn-admin btn-admin-light" target="_blank" rel="noopener">
+                            <i class="fas fa-eye"></i>
+                            <span>Xem ngoài site</span>
+                        </a>
+                        {% endif %}
+                        <a href="{{ card.edit_url }}" class="btn-admin btn-admin-primary">
+                            <i class="fas fa-pen"></i>
+                            <span>Chỉnh sửa</span>
+                        </a>
+                        {% if card.delete_url %}
+                        <a href="{{ card.delete_url }}" class="btn-admin btn-admin-danger">
+                            <i class="fas fa-trash"></i>
+                            <span>Xóa</span>
+                        </a>
+                        {% endif %}
+                    </div>
+                </div>
+            </article>
+            {% empty %}
+            <div class="news-admin__empty">
+                <div class="mb-3"><i class="fas fa-newspaper fa-3x text-primary"></i></div>
+                <h3>Chưa có bài viết nào</h3>
+                <p class="mb-0">Tạo bài viết đầu tiên để hệ thống bắt đầu hiển thị phần tin tức ngoài website.</p>
+            </div>
+            {% endfor %}
+
+            {% if page_obj.has_other_pages %}
+            <div class="news-admin__pagination">
+                {% if page_obj.has_previous %}
+                <a class="btn-admin btn-admin-light" href="?q={{ keyword|urlencode }}&publish_state={{ news_filter_state.publish_state|urlencode }}&published_from={{ news_filter_state.published_from|urlencode }}&published_to={{ news_filter_state.published_to|urlencode }}&sort={{ news_filter_state.sort|urlencode }}&page={{ page_obj.previous_page_number }}">
+                    <i class="fas fa-arrow-left"></i>
+                    <span>Trang trước</span>
+                </a>
+                {% endif %}
+                {% if page_obj.has_next %}
+                <a class="btn-admin btn-admin-primary" href="?q={{ keyword|urlencode }}&publish_state={{ news_filter_state.publish_state|urlencode }}&published_from={{ news_filter_state.published_from|urlencode }}&published_to={{ news_filter_state.published_to|urlencode }}&sort={{ news_filter_state.sort|urlencode }}&page={{ page_obj.next_page_number }}">
+                    <span>Trang sau</span>
+                    <i class="fas fa-arrow-right"></i>
+                </a>
+                {% endif %}
+            </div>
+            {% endif %}
+        </div>
+
+        <aside class="news-admin__tips">
+            <div>
+                <h3>Mẹo biên tập</h3>
+                <p>Bố cục quản trị mới ưu tiên quy trình rõ ràng hơn cho người nhập nội dung.</p>
+            </div>
+            <div class="news-admin__tips-list">
+                <div class="news-admin__tips-item">
+                    <i class="fas fa-layer-group"></i>
+                    <div>Dùng trạng thái nháp trước khi xuất bản để chuẩn bị nội dung dần dần.</div>
+                </div>
+                <div class="news-admin__tips-item">
+                    <i class="fas fa-image"></i>
+                    <div>Ảnh bìa giúp danh sách bài viết ngoài website dễ nhìn hơn rất nhiều.</div>
+                </div>
+                <div class="news-admin__tips-item">
+                    <i class="fas fa-sliders-h"></i>
+                    <div>Slug nên ngắn, rõ nghĩa để đường dẫn gọn và dễ kiểm tra.</div>
+                </div>
+            </div>
+        </aside>
+    </section>
+</div>
+{% endblock %}

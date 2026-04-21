@@ -1,0 +1,130 @@
+.about-editor{display:grid;gap:18px}
+    .about-editor__hero,
+    .about-editor__section,
+    .about-editor__item-card,
+    .about-editor__actions{
+        border-radius:28px;
+        background:#fff;
+        border:1px solid rgba(17,70,184,.08);
+        box-shadow:0 18px 42px rgba(17,70,184,.08);
+    }
+    .about-editor__hero{
+        display:grid;
+        grid-template-columns:minmax(0,1fr) auto;
+        gap:18px;
+        align-items:center;
+        padding:28px;
+        background:linear-gradient(145deg,#f7fbff 0%,#ffffff 58%,#eef5ff 100%);
+    }
+    .about-editor__hero h2{margin:0 0 8px;color:#17315d;font-size:1.5rem;font-weight:900}
+    .about-editor__hero p{margin:0;color:#5f7290;line-height:1.72;max-width:820px}
+    .about-editor__hero-actions{display:flex;flex-wrap:wrap;gap:10px}
+
+    .about-editor__section{padding:24px}
+    .about-editor__section-head{
+        display:flex;
+        justify-content:space-between;
+        align-items:flex-start;
+        gap:14px;
+        margin-bottom:16px;
+        padding-bottom:14px;
+        border-bottom:1px solid rgba(17,70,184,.08);
+    }
+    .about-editor__section-head h3{margin:0 0 8px;color:#17315d;font-size:1.14rem;font-weight:900}
+    .about-editor__section-head p{margin:0;color:#607392;line-height:1.68;max-width:780px}
+    .about-editor__section-actions{display:flex;flex-wrap:wrap;gap:10px;align-items:center}
+    .about-editor__grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:16px 18px}
+    .about-editor__field,
+    .about-editor__item-field{display:grid;gap:8px}
+    .about-editor__field--wide,
+    .about-editor__item-field--wide{grid-column:1/-1}
+    .about-editor__field label,
+    .about-editor__item-field label{margin:0;color:#27466f;font-weight:800}
+    .about-editor__field textarea[data-rich-editor="1"]{display:none}
+    .about-editor__field .admin-rich-editor__editable,
+    .about-editor__field .admin-rich-editor__source{min-height:220px}
+
+    .about-editor__hint{
+        padding:12px 14px;
+        border-radius:18px;
+        background:#f8fbff;
+        border:1px solid rgba(17,70,184,.08);
+        color:#607392;
+        line-height:1.66;
+        font-size:.95rem;
+    }
+    .about-editor__list{display:grid;gap:16px}
+    .about-editor__item-card{
+        display:grid;
+        grid-template-columns:220px minmax(0,1fr);
+        gap:18px;
+        padding:18px;
+        background:linear-gradient(180deg,#fff 0%,#f8fbff 100%);
+        transition:opacity .2s ease, transform .2s ease, box-shadow .2s ease;
+    }
+    .about-editor__item-card.is-marked-delete{
+        opacity:.62;
+        box-shadow:none;
+        border-style:dashed;
+    }
+    .about-editor__preview{
+        min-height:180px;
+        border-radius:22px;
+        overflow:hidden;
+        background:#eef4ff;
+        display:flex;
+        align-items:center;
+        justify-content:center;
+    }
+    .about-editor__preview img{display:block;width:100%;height:100%;object-fit:cover}
+    .about-editor__placeholder{
+        display:grid;
+        gap:8px;
+        justify-items:center;
+        padding:18px;
+        text-align:center;
+        color:#1b57c8;
+    }
+    .about-editor__item-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px 14px}
+    .about-editor__delete{
+        grid-column:1/-1;
+        display:flex;
+        align-items:center;
+        gap:10px;
+        padding:12px 14px;
+        border-radius:18px;
+        background:#fff6f6;
+        border:1px solid rgba(217,57,57,.14);
+        color:#8a2d34;
+        font-weight:700;
+    }
+    .about-editor__delete input{width:18px;height:18px}
+    .about-editor__item-field.is-hidden{display:none}
+
+    .about-editor__actions{
+        position:sticky;
+        bottom:16px;
+        z-index:4;
+        display:flex;
+        flex-wrap:wrap;
+        justify-content:space-between;
+        gap:12px;
+        padding:14px 16px;
+        background:rgba(255,255,255,.95);
+        backdrop-filter:blur(10px);
+    }
+    .about-editor__actions-group{display:flex;flex-wrap:wrap;gap:10px}
+
+    @media (max-width:991px){
+        .about-editor__hero,
+        .about-editor__item-card{grid-template-columns:1fr}
+        .about-editor__preview{min-height:220px}
+    }
+    @media (max-width:767px){
+        .about-editor__grid,
+        .about-editor__item-grid{grid-template-columns:1fr}
+        .about-editor__actions,
+        .about-editor__actions-group{justify-content:stretch}
+        .about-editor__actions .btn-admin,
+        .about-editor__section-actions .btn-admin{width:100%;justify-content:center}
+    }

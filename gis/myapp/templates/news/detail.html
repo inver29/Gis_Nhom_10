@@ -1,0 +1,90 @@
+{% extends "base.html" %}
+{% load static %}
+{% load content_filters %}
+{% block title %}{{ article.title }} | GIS Pharma{% endblock %}
+{% block body_class %}site-page news-detail-page{% endblock %}
+
+{% block extra_css %}
+<link rel="stylesheet" href="{% static 'css/news/detail.css' %}">
+{% endblock %}
+
+{% block content_wrapper %}
+<div class="site-page-section">
+    <div class="container">
+        <div class="nd-wrap">
+
+            <section class="nd-hero" data-reveal="up">
+                <a href="{% url 'news_list' %}" class="nd-back">
+                    <i class="fas fa-arrow-left"></i><span>Quay lại danh sách</span>
+                </a>
+                <span class="nd-kicker"><i class="fas fa-newspaper"></i> Bài viết</span>
+                <h1>{{ article.title }}</h1>
+                {% if article.summary %}
+                <p class="nd-lead">{{ article.summary|striptags|truncatechars:240 }}</p>
+                {% endif %}
+                <div class="nd-meta">
+                    <span><i class="far fa-calendar-alt"></i> {{ article.published_at|date:"d/m/Y H:i" }}</span>
+                    <span><i class="fas fa-user-edit"></i> {{ article.author_display_name }}</span>
+                </div>
+            </section>
+
+            <div class="nd-cover" data-reveal="up">
+                {% if article.cover_image %}
+                <img src="{{ article.cover_image.url }}" alt="{{ article.title }}">
+                {% else %}
+                <div class="nd-cover__placeholder"><i class="fas fa-notes-medical"></i></div>
+                {% endif %}
+            </div>
+
+            <section class="nd-layout">
+                <article class="nd-article" data-reveal="up">
+                    {% if article.summary %}
+                    <div class="nd-summary">{{ article.summary|richtext }}</div>
+                    {% endif %}
+                    <div class="nd-body">
+                        {{ article.content|richtext }}
+                    </div>
+                </article>
+
+                <aside class="nd-side" data-reveal="up">
+                    <section class="nd-panel">
+                        <h4>Thông tin bài viết</h4>
+                        <div class="nd-facts">
+                            <span><i class="far fa-calendar-alt"></i> Xuất bản {{ article.published_at|date:"d/m/Y H:i" }}</span>
+                            <span><i class="fas fa-user-edit"></i> {{ article.author_display_name }}</span>
+                            <span><i class="fas fa-layer-group"></i> Khu tin tức website</span>
+                        </div>
+                    </section>
+
+                    <section class="nd-panel">
+                        <h4>Bài viết liên quan</h4>
+                        <div class="nd-related">
+                            {% for item in related_articles %}
+                            <a href="{% url 'news_detail' item.slug %}">
+                                <strong>{{ item.title|truncatechars:60 }}</strong>
+                                <small><i class="far fa-clock"></i> {{ item.published_at|date:"d/m/Y" }}</small>
+                            </a>
+                            {% empty %}
+                            <p class="nd-note">Chưa có thêm bài viết liên quan.</p>
+                            {% endfor %}
+                        </div>
+                    </section>
+
+                    <section class="nd-panel">
+                        <h4>Khám phá thêm</h4>
+                        <p class="nd-note">Bạn có thể quay về danh sách tin tức hoặc khám phá các chi nhánh, sản phẩm của GIS Pharma.</p>
+                        <div style="margin-top:10px;display:flex;flex-direction:column;gap:8px">
+                            <a href="{% url 'news_list' %}" class="pharma-outline-btn" style="justify-content:center">
+                                <i class="fas fa-list"></i><span>Danh sách tin tức</span>
+                            </a>
+                            <a href="{% url 'about' %}" class="pharma-outline-btn" style="justify-content:center">
+                                <i class="fas fa-info-circle"></i><span>Về GIS Pharma</span>
+                            </a>
+                        </div>
+                    </section>
+                </aside>
+            </section>
+        </div>
+    </div>
+</div>
+{% endblock %}

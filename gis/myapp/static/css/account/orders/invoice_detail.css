@@ -1,0 +1,43 @@
+:root{--ink:#1a2f52;--muted:#6d7c97;--primary:#1146b8;--line:#dfe8f7;--soft:#f7faff;--total:#d62839}
+        *{box-sizing:border-box}
+        @page{size:A4 portrait;margin:10mm}
+        body{margin:0;background:#eef4ff;font-family:Arial,sans-serif;color:var(--ink)}
+        .invoice-shell{max-width:860px;margin:0 auto;padding:24px 16px 36px}
+        .invoice-toolbar{display:flex;justify-content:space-between;align-items:center;gap:12px;margin-bottom:16px;flex-wrap:wrap}
+        .invoice-btn{display:inline-flex;align-items:center;gap:8px;padding:11px 16px;border-radius:12px;border:1px solid rgba(17,70,184,.14);background:#fff;color:var(--primary);text-decoration:none;font-weight:700}
+        .invoice-btn.primary{background:linear-gradient(135deg,#1f64e0 0%,#1146b8 100%);color:#fff;border-color:transparent}
+        .invoice-paper{background:#fff;border:1px solid rgba(17,70,184,.10);box-shadow:0 20px 48px rgba(19,68,168,.11);border-radius:22px;padding:22px 24px}
+        .invoice-head{display:grid;grid-template-columns:minmax(0,1fr) 240px;gap:18px;padding-bottom:16px;border-bottom:2px solid #edf3ff}
+        .invoice-brand h1{margin:0 0 8px;font-size:28px;letter-spacing:.02em;color:#12376e}
+        .invoice-brand p{margin:4px 0;line-height:1.5}
+        .invoice-code-box{padding:14px 16px;border-radius:16px;background:var(--soft);border:1px solid var(--line)}
+        .invoice-code-row{display:flex;justify-content:space-between;gap:10px;padding:7px 0;border-bottom:1px dashed #d8e3f8}
+        .invoice-code-row:last-child{border-bottom:none;padding-bottom:0}
+        .invoice-code-row span{color:var(--muted)}
+        .invoice-code-row strong{text-align:right}
+        .invoice-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:14px;margin-top:16px}
+        .invoice-card{padding:14px 16px;border-radius:16px;background:var(--soft);border:1px solid var(--line)}
+        .invoice-card h3{margin:0 0 8px;font-size:1rem;color:#173153}
+        .invoice-card p{margin:4px 0;line-height:1.55}
+        .invoice-meta-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px;margin-top:14px}
+        .invoice-meta-item{padding:12px 14px;border-radius:14px;background:#fff;border:1px solid var(--line)}
+        .invoice-meta-item small{display:block;color:var(--muted);font-size:.79rem;text-transform:uppercase;letter-spacing:.04em;margin-bottom:6px}
+        .invoice-meta-item strong{display:block;line-height:1.45}
+        .invoice-table-wrap{margin-top:16px;overflow-x:auto}
+        table{width:100%;min-width:560px;border-collapse:collapse}
+        th,td{padding:10px 10px;border-bottom:1px solid #e8effb;text-align:left;vertical-align:top}
+        thead th{background:#f4f8ff;color:#59718f;font-size:11px;text-transform:uppercase;letter-spacing:.05em}
+        th:nth-child(1),td:nth-child(1){width:42px;text-align:center}
+        th:nth-child(3),td:nth-child(3),th:nth-child(4),td:nth-child(4),th:nth-child(5),td:nth-child(5){white-space:nowrap}
+        td:nth-child(5),th:nth-child(5){text-align:right}
+        .item-name{font-weight:700;color:#173153}
+        .invoice-summary{margin-top:16px;display:grid;justify-content:end}
+        .invoice-summary-box{width:min(100%,320px);padding:14px 16px;border-radius:16px;background:#fff;border:1px solid var(--line)}
+        .invoice-summary-row{display:flex;justify-content:space-between;gap:12px;padding:6px 0;color:#314a70}
+        .invoice-summary-row.total{margin-top:4px;padding-top:10px;border-top:1px solid #dce7f8;font-size:1.08rem;font-weight:800;color:var(--total)}
+        .invoice-foot{margin-top:20px;display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:18px}
+        .invoice-sign{padding-top:10px;border-top:1px solid #e6eefb;text-align:center}
+        .invoice-sign h4{margin:0 0 54px;font-size:.96rem;color:#173153}
+        .invoice-sign p{margin:0;font-weight:700}
+        @media print{body{background:#fff}.invoice-shell{max-width:none;padding:0}.invoice-toolbar{display:none}.invoice-paper{border:none;box-shadow:none;border-radius:0;padding:0}}
+        @media (max-width:720px){.invoice-head,.invoice-grid,.invoice-meta-grid,.invoice-foot{grid-template-columns:1fr}.invoice-paper{padding:18px}.invoice-brand h1{font-size:24px}.invoice-summary{justify-content:stretch}.invoice-summary-box{width:100%}}
