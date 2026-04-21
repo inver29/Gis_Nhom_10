@@ -2,71 +2,53 @@
 {% load static %}
 
 {% block extra_head %}
-<link rel="stylesheet" href="{% static 'css/admin_panel/inventory/purchase_import_form.css' %}">
+<link rel="stylesheet" href="{% static 'css/admin_panel/inventory/purchase_import_form.css' %}?v=20260422-import3">
 {% endblock %}
 
 {% block admin_content %}
 <section class="admin-section-head mb-4">
     <div>
-        <h2 class="admin-section-title">Nháº­p hÃ ng báº±ng Excel</h2>
-        <p class="admin-section-muted">Giá»¯ nguyÃªn toÃ n bá» logic nháº­p kho hiá»n cÃ³, bá» sung thÃªm luá»ng xem trÆ°á»c vÃ  popup nháº­n diá»n sáº£n pháº©m má»i trÆ°á»c khi lÆ°u vÃ o há» thá»ng.</p>
+        <h2 class="admin-section-title">Nhập hàng bằng Excel</h2>
+        <p class="admin-section-muted">Giữ nguyên toàn bộ logic nhập kho hiện có, bổ sung thêm luồng xem trước và popup nhận diện sản phẩm mới trước khi lưu vào hệ thống.</p>
     </div>
     <div class="admin-toolbar">
         <a href="{% url 'custom_admin_list' 'purchase_import' %}" class="btn-admin btn-admin-light">
             <i class="fas fa-arrow-left"></i>
-            <span>Quay láº¡i danh sÃ¡ch phiáº¿u nháº­p</span>
+            <span>Quay lại danh sách phiếu nhập</span>
         </a>
         <a href="{% static 'files/mau_nhap_hang_10_san_pham.xlsx' %}" class="btn-admin btn-admin-primary" download>
             <i class="fas fa-file-download"></i>
-            <span>Táº£i file Excel máº«u</span>
+            <span>Tải file Excel mẫu</span>
         </a>
     </div>
 </section>
 
 <section class="import-hero">
     <article class="import-hero-card">
-        <h2>Nháº­p kho nhanh nhÆ°ng váº«n kiá»m soÃ¡t ÄÆ°á»£c dá»¯ liá»u</h2>
-        <p>Há» thá»ng Äá»c file Excel, Äá»i chiáº¿u vá»i danh má»¥c sáº£n pháº©m Äang cÃ³ trong chi nhÃ¡nh, xem trÆ°á»c dá»¯ liá»u vÃ  thÃ´ng bÃ¡o ngay nhá»¯ng máº·t hÃ ng chÆ°a tá»n táº¡i trong pháº¡m vi nháº­p ÄÃ£ chá»n.</p>
+        <h2>Nhập kho nhanh nhưng vẫn kiểm soát được dữ liệu</h2>
+        <p>Hệ thống đọc file Excel, đối chiếu với danh mục sản phẩm đang có trong chi nhánh, xem trước dữ liệu và thông báo ngay những mặt hàng chưa tồn tại trong phạm vi nhập đã chọn.</p>
         <div class="import-step-grid">
             <div class="import-step">
-                <span>BÆ°á»c 1</span>
-                <strong>Chá»n pháº¡m vi nháº­p</strong>
+                <span>Bước 1</span>
+                <strong>Chọn phạm vi nhập</strong>
             </div>
             <div class="import-step">
-                <span>BÆ°á»c 2</span>
-                <strong>Xem trÆ°á»c vÃ  phÃ¢n tÃ­ch file</strong>
+                <span>Bước 2</span>
+                <strong>Xem trước và phân tích file</strong>
             </div>
             <div class="import-step">
-                <span>BÆ°á»c 3</span>
-                <strong>XÃ¡c nháº­n nháº­p kho</strong>
+                <span>Bước 3</span>
+                <strong>Xác nhận nhập kho</strong>
             </div>
         </div>
     </article>
 
-    <aside class="import-quick-card">
-        <div class="import-quick-card__badge">
-            <i class="fas fa-shield-alt"></i>
-            <span>Nháº­p kho cÃ³ kiá»m tra trÆ°á»c</span>
-        </div>
-        <div class="import-quick-card__stat">
-            <small>CÃ¡c cá»t há» thá»ng há» trá»£</small>
-            <div class="import-inline-pills">
-                {% for column in sample_columns %}
-                <span>{{ column }}</span>
-                {% endfor %}
-            </div>
-        </div>
-        <div class="import-quick-card__stat">
-            <small>LÆ°u Ã½ chÃ­nh</small>
-            <strong>File cáº§n cÃ³ Ã­t nháº¥t cá»t <code>quantity</code> vÃ  má»t trong hai cá»t <code>medicine_id</code> hoáº·c <code>medicine_name</code>.</strong>
-        </div>
-    </aside>
 </section>
 
 <section class="import-layout">
     <section class="import-form-card">
-        <h3>ThÃ´ng tin phiáº¿u nháº­p</h3>
-        <p class="import-card-muted">Pháº§n nÃ y váº«n giá»¯ nguyÃªn luá»ng nháº­p hÃ ng hiá»n cÃ³. Báº¡n cÃ³ thÃªm má»t nÃºt phÃ¢n tÃ­ch Äá» nhÃ¬n ngay sáº£n pháº©m má»i trÆ°á»c khi nháº­p.</p>
+        <h3>Thông tin phiếu nhập</h3>
+        <p class="import-card-muted">Phần này vẫn giữ nguyên luồng nhập hàng hiện có. Bạn có thêm một nút phân tích để nhìn ngay sản phẩm mới trước khi nhập.</p>
 
         <form method="post" enctype="multipart/form-data" novalidate id="purchase-import-form">
             {% csrf_token %}
@@ -92,15 +74,15 @@
             <div class="import-toolbar mt-4">
                 <button type="button" class="btn-admin btn-admin-light" id="excel-preview-trigger">
                     <i class="fas fa-table"></i>
-                    <span>Xem dá»¯ liá»u trong file</span>
+                    <span>Xem dữ liệu trong file</span>
                 </button>
                 <button type="button" class="btn-admin btn-admin-light" id="excel-new-products-trigger">
                     <i class="fas fa-search-plus"></i>
-                    <span>Sáº£n pháº©m má»i trong file</span>
+                    <span>Sản phẩm mới trong file</span>
                 </button>
                 <button type="submit" class="btn-admin btn-admin-primary">
                     <i class="fas fa-file-import"></i>
-                    <span>Thá»±c hiá»n nháº­p hÃ ng</span>
+                    <span>Thực hiện nhập hàng</span>
                 </button>
             </div>
         </form>
@@ -108,12 +90,12 @@
 
     <section class="import-preview-card is-empty" id="excel-preview-panel">
         <div>
-            <h3>Xem trÆ°á»c dá»¯ liá»u Excel</h3>
-            <p class="import-card-muted mb-0" id="excel-preview-summary">Chá»n file rá»i báº¥m xem dá»¯ liá»u Äá» kiá»m tra nhanh 10 dÃ²ng Äáº§u trÆ°á»c khi nháº­p kho tháº­t.</p>
+            <h3>Xem trước dữ liệu Excel</h3>
+            <p class="import-card-muted mb-0" id="excel-preview-summary">Chọn file rồi bấm xem dữ liệu để kiểm tra nhanh 10 dòng đầu trước khi nhập kho thật.</p>
         </div>
 
         <div class="import-preview-empty" id="excel-preview-empty">
-            Khu vá»±c nÃ y sáº½ hiá»n thá» dá»¯ liá»u Äá»c trá»±c tiáº¿p tá»« file Excel Äá» báº¡n Äá»i chiáº¿u láº¡i sá» lÆ°á»£ng, tÃªn thuá»c, háº¡n dÃ¹ng vÃ  giÃ¡ nháº­p trÆ°á»c khi lÆ°u vÃ o há» thá»ng.
+            Khu vực này sẽ hiển thị dữ liệu đọc trực tiếp từ file Excel để bạn đối chiếu lại số lượng, tên thuốc, hạn dùng và giá nhập trước khi lưu vào hệ thống.
         </div>
 
         <div class="import-preview-card__body">
@@ -187,20 +169,20 @@
         function renderPreview(rows) {
             previewTable.innerHTML = '';
             if (!rows.length) {
-                previewSummary.textContent = 'KhÃ´ng Äá»c ÄÆ°á»£c dá»¯ liá»u tá»« file Excel.';
+                previewSummary.textContent = 'Không đọc được dữ liệu từ file Excel.';
                 setPreviewVisible(false);
                 return;
             }
 
             var headers = rows[0];
             var bodyRows = rows.slice(1, 11);
-            previewSummary.textContent = 'Äang hiá»n thá» tá»i Äa 10 dÃ²ng Äáº§u Äá» kiá»m tra nhanh trÆ°á»c khi nháº­p kho.';
+            previewSummary.textContent = 'Đang hiển thị tối đa 10 dòng đầu để kiểm tra nhanh trước khi nhập kho.';
 
             var thead = document.createElement('thead');
             var headRow = document.createElement('tr');
             headers.forEach(function (header) {
                 var th = document.createElement('th');
-                th.textContent = String(header || '').trim() || 'Cá»t trá»ng';
+                th.textContent = String(header || '').trim() || 'Cột trống';
                 headRow.appendChild(th);
             });
             thead.appendChild(headRow);
@@ -300,15 +282,15 @@
 
         function analyzeProducts(rows) {
             if (!purchaseData) {
-                throw new Error('KhÃ´ng tÃ¬m tháº¥y dá»¯ liá»u Äá»i chiáº¿u danh má»¥c Äá» phÃ¢n tÃ­ch.');
+                throw new Error('Không tìm thấy dữ liệu đối chiếu danh mục để phân tích.');
             }
             if (!rows.length) {
-                throw new Error('KhÃ´ng Äá»c ÄÆ°á»£c dá»¯ liá»u tá»« file Excel.');
+                throw new Error('Không đọc được dữ liệu từ file Excel.');
             }
 
             var targetBranchIds = getTargetBranchIds();
             if (!targetBranchIds.length) {
-                throw new Error('HÃ£y chá»n chi nhÃ¡nh trÆ°á»c khi phÃ¢n tÃ­ch sáº£n pháº©m má»i.');
+                throw new Error('Hãy chọn chi nhánh trước khi phân tích sản phẩm mới.');
             }
 
             var branchLabelMap = getBranchLabelMap();
@@ -338,9 +320,9 @@
                 if (!distinctProducts[key]) {
                     distinctProducts[key] = {
                         medicineId: medicineId,
-                        displayName: resolvedName || 'Sáº£n pháº©m chÆ°a Äáº·t tÃªn',
-                        displayManufacturer: resolvedManufacturer || 'KhÃ´ng rÃµ nhÃ  sáº£n xuáº¥t',
-                        displayUnit: resolvedUnit || 'KhÃ´ng rÃµ ÄÆ¡n vá»',
+                        displayName: resolvedName || 'Sản phẩm chưa đặt tên',
+                        displayManufacturer: resolvedManufacturer || 'Không rõ nhà sản xuất',
+                        displayUnit: resolvedUnit || 'Không rõ đơn vị',
                         matchName: normalizeText(resolvedName),
                         matchManufacturer: normalizeText(resolvedManufacturer),
                         matchUnit: normalizeText(resolvedUnit)
@@ -369,7 +351,7 @@
                         displayManufacturer: product.displayManufacturer,
                         displayUnit: product.displayUnit,
                         missingBranches: missingBranches.map(function (branchId) {
-                            return branchLabelMap[branchId] || ('Chi nhÃ¡nh #' + branchId);
+                            return branchLabelMap[branchId] || ('Chi nhánh #' + branchId);
                         })
                     });
                 } else {
@@ -438,7 +420,7 @@
         previewButton.addEventListener('click', function () {
             var file = fileInput.files && fileInput.files[0];
             if (!file) {
-                previewSummary.textContent = 'HÃ£y chá»n file Excel trÆ°á»c khi xem dá»¯ liá»u.';
+                previewSummary.textContent = 'Hãy chọn file Excel trước khi xem dữ liệu.';
                 previewTable.innerHTML = '';
                 setPreviewVisible(false);
                 return;
@@ -447,7 +429,7 @@
             readWorkbookRows(file).then(function (rows) {
                 renderPreview(rows);
             }).catch(function () {
-                previewSummary.textContent = 'KhÃ´ng thá» Äá»c file Excel nÃ y. Vui lÃ²ng kiá»m tra láº¡i Äá»nh dáº¡ng.';
+                previewSummary.textContent = 'Không thể đọc file Excel này. Vui lòng kiểm tra lại định dạng.';
                 previewTable.innerHTML = '';
                 setPreviewVisible(false);
             });

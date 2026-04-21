@@ -90,7 +90,7 @@
     }
     .about-page .about-visual__slider{
         display:flex;
-        padding:20px 20px 0;
+        padding:18px 18px 0;
         min-height:0;
     }
     .about-page .about-visual__frame{
@@ -99,10 +99,10 @@
         display:flex;
         align-items:stretch;
         overflow:hidden;
-        border-radius:20px;
+        border-radius:24px;
         background:linear-gradient(180deg,#f4f8ff 0%,#e9f1ff 100%);
-        min-height:clamp(330px,30vw,430px);
-        aspect-ratio:16/7;
+        min-height:clamp(210px,24vw,280px);
+        aspect-ratio:1216/280;
     }
     .about-page .about-visual__frame .site-splide,
     .about-page .about-visual__frame .site-splide .splide__track,
@@ -114,8 +114,9 @@
     .about-page .about-visual__frame .site-splide .splide__track{padding:0}
     .about-page .about-visual__frame .site-splide .splide__slide{
         display:flex;
-        align-items:center;
-        justify-content:center;
+        align-items:stretch;
+        justify-content:stretch;
+        background:#edf3ff;
     }
     .about-page .about-visual__frame .splide__slide > a{
         display:flex;
@@ -123,13 +124,15 @@
         justify-content:center;
         width:100%;
         height:100%;
+        text-decoration:none;
     }
     .about-page .about-visual__frame img{
         display:block;
         width:100%;
         height:100%;
-        object-fit:cover;
+        object-fit:contain;
         object-position:center;
+        background:#edf3ff;
     }
     .about-page .about-visual__placeholder{
         display:flex;
@@ -323,7 +326,7 @@
     @media (max-width:1199px){
         .about-page .about-visual__body{padding:18px 22px 24px}
         .about-page .about-visual__frame,
-        .about-page .about-visual__placeholder{min-height:clamp(320px,48vw,420px);height:clamp(320px,48vw,420px)}
+        .about-page .about-visual__placeholder{min-height:clamp(200px,24vw,260px);height:auto}
     }
     @media (max-width:991px){
         .about-page .about-hero,
@@ -340,7 +343,7 @@
         .about-page .about-hero__content{padding:20px}
         .about-page .about-visual__slider{padding:14px 14px 0}
         .about-page .about-visual__frame,
-        .about-page .about-visual__placeholder{min-height:clamp(240px,60vw,320px);height:clamp(240px,60vw,320px)}
+        .about-page .about-visual__placeholder{min-height:clamp(140px,36vw,180px);height:auto}
         .about-page .about-visual__body{padding:16px 16px 18px}
         .about-page .about-stats,
         .about-page .about-grid-4{grid-template-columns:1fr}
