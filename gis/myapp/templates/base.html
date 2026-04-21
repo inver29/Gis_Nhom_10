@@ -6,11 +6,16 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>{% block title %}Hệ thống Dược phẩm GIS{% endblock %}</title>
 
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Be+Vietnam+Pro:wght@400;500;600;700;800;900&family=Inter:wght@400;500;600;700&display=swap&subset=vietnamese">
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@4.6.2/dist/css/bootstrap.min.css">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.4/css/all.min.css">
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@splidejs/splide@4.1.4/dist/css/splide.min.css">
-    <link rel="stylesheet" href="{% static 'css/style.css' %}?v=20260401-4">
-    <link rel="stylesheet" href="{% static 'css/pharma-refresh.css' %}?v=20260401-4">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/choices.js/public/assets/styles/choices.min.css">
+    <link rel="stylesheet" href="{% static 'css/style.css' %}?v=20260406-fix1">
+    <link rel="stylesheet" href="{% static 'css/pharma-refresh.css' %}?v=20260414-fix8">
+    <link rel="stylesheet" href="{% static 'css/ui-enhancements.css' %}?v=20260414-fix1">
     <link rel="stylesheet" href="{% static 'css/support-widget.css' %}?v=20260401-support1">
 
     <style>
@@ -514,7 +519,7 @@
                         </div>
                     </div>
 
-                    <a class="header-action header-action--primary" href="{% url 'cart_detail' %}">
+                    <a class="header-action header-action--primary site-cart-action" href="{% url 'cart_detail' %}">
                         <i class="fas fa-shopping-cart"></i>
                         <span>Giỏ hàng</span>
                         <span class="header-action__count" data-cart-count>{{ cart_items_count }}</span>
@@ -525,13 +530,24 @@
             <nav class="site-nav site-nav--compact">
                 <div class="site-nav__links">
                     <a class="site-chip-link {% if request.path == '/' %}is-active{% endif %}" href="{% url 'home' %}">
-                        <i class="fas fa-home"></i> Trang chủ
+                        <i class="fas fa-home"></i>
+                        <span>Trang chủ</span>
                     </a>
                     <a class="site-chip-link {% if '/products/' in request.path %}is-active{% endif %}" href="{% url 'product_list' %}">
-                        <i class="fas fa-capsules"></i> Sản phẩm
+                        <i class="fas fa-capsules"></i>
+                        <span>Sản phẩm</span>
                     </a>
                     <a class="site-chip-link {% if '/map/' in request.path %}is-active{% endif %}" href="{% url 'map_view' %}">
-                        <i class="fas fa-map-marked-alt"></i> Bản đồ nhà thuốc
+                        <i class="fas fa-map-marked-alt"></i>
+                        <span>Bản đồ</span>
+                    </a>
+                    <a class="site-chip-link {% if '/news/' in request.path %}is-active{% endif %}" href="{% url 'news_list' %}">
+                        <i class="fas fa-newspaper"></i>
+                        <span>Tin tức</span>
+                    </a>
+                    <a class="site-chip-link {% if '/about/' in request.path %}is-active{% endif %}" href="{% url 'about' %}">
+                        <i class="fas fa-info-circle"></i>
+                        <span>Giới thiệu</span>
                     </a>
                 </div>
             </nav>
@@ -539,10 +555,10 @@
     </header>
 
     {% if messages %}
-    <div class="site-alerts">
+    <div class="site-alerts" data-auto-dismiss-container>
         <div class="container py-3">
             {% for message in messages %}
-                <div class="alert {% if 'error' in message.tags %}alert-danger{% elif 'warning' in message.tags %}alert-warning{% else %}alert-success{% endif %} alert-dismissible fade show" role="alert">
+                <div class="alert js-auto-dismiss-alert {% if 'error' in message.tags %}alert-danger{% elif 'warning' in message.tags %}alert-warning{% else %}alert-success{% endif %} alert-dismissible fade show" role="alert" data-auto-dismiss-ms="3000">
                     {{ message }}
                     <button type="button" class="close" data-dismiss="alert">
                         <span>&times;</span>
@@ -580,6 +596,7 @@
                         <li><a href="{% url 'home' %}">Trang chủ</a></li>
                         <li><a href="{% url 'product_list' %}">Sản phẩm</a></li>
                         <li><a href="{% url 'map_view' %}">Bản đồ nhà thuốc</a></li>
+                        <li><a href="{% url 'about' %}">Giới thiệu</a></li>
                         <li><a href="{% url 'cart_detail' %}">Giỏ hàng</a></li>
                     </ul>
                 </div>
@@ -618,8 +635,72 @@
     <script src="https://code.jquery.com/jquery-3.5.1.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@4.6.2/dist/js/bootstrap.bundle.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/@splidejs/splide@4.1.4/dist/js/splide.min.js"></script>
-    <script src="{% static 'js/site.js' %}"></script>
+    <script src="https://cdn.jsdelivr.net/npm/choices.js/public/assets/scripts/choices.min.js"></script>
+    <script src="{% static 'js/site.js' %}?v=20260406c"></script>
+    <script src="{% static 'js/ui-enhancements.js' %}?v=20260414-fix1"></script>
     <script src="{% static 'js/support-widget.js' %}"></script>
+    <script>
+        (function () {
+            function closeAlert(alertElement) {
+                if (!alertElement || alertElement.dataset.dismissed === '1') {
+                    return;
+                }
+
+                alertElement.dataset.dismissed = '1';
+                alertElement.classList.add('is-hiding');
+                window.setTimeout(function () {
+                    if (window.jQuery && typeof window.jQuery(alertElement).alert === 'function') {
+                        window.jQuery(alertElement).alert('close');
+                    } else if (alertElement.parentNode) {
+                        alertElement.parentNode.removeChild(alertElement);
+                    }
+                }, 420);
+            }
+
+            function armAlert(alertElement) {
+                if (!alertElement || alertElement.dataset.autoDismissReady === '1') {
+                    return;
+                }
+
+                alertElement.dataset.autoDismissReady = '1';
+                var delay = parseInt(alertElement.getAttribute('data-auto-dismiss-ms') || '3000', 10);
+                window.setTimeout(function () {
+                    closeAlert(alertElement);
+                }, isNaN(delay) ? 3000 : delay);
+            }
+
+            function initAlerts(scope) {
+                (scope || document).querySelectorAll('.js-auto-dismiss-alert').forEach(armAlert);
+            }
+
+            if (document.readyState === 'loading') {
+                document.addEventListener('DOMContentLoaded', function () {
+                    initAlerts(document);
+                });
+            } else {
+                initAlerts(document);
+            }
+
+            if (document.body && window.MutationObserver) {
+                new MutationObserver(function (mutations) {
+                    mutations.forEach(function (mutation) {
+                        mutation.addedNodes.forEach(function (node) {
+                            if (!node || node.nodeType !== 1) {
+                                return;
+                            }
+                            if (node.matches && node.matches('.js-auto-dismiss-alert')) {
+                                armAlert(node);
+                                return;
+                            }
+                            if (node.querySelectorAll) {
+                                initAlerts(node);
+                            }
+                        });
+                    });
+                }).observe(document.body, { childList: true, subtree: true });
+            }
+        })();
+    </script>
     {% block extra_js %}{% endblock %}
 </body>
 </html>

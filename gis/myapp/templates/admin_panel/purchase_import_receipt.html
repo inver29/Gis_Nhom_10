@@ -1,0 +1,127 @@
+{% extends "admin_panel/base.html" %}
+{% load currency_filters %}
+
+{% block admin_content %}
+<section class="admin-section-head mb-4 no-print">
+    <div>
+        <h2 class="admin-section-title">Phiếu nhập hàng {{ purchase_batch.resolved_invoice_code }}</h2>
+        <p class="admin-section-muted">Biểu mẫu gọn để in hoặc lưu PDF đối soát nội bộ.</p>
+    </div>
+    <div class="admin-toolbar">
+        <a href="{% url 'custom_admin_purchase_import_detail' purchase_batch.pk %}" class="btn-admin btn-admin-light">
+            <i class="fas fa-arrow-left"></i>
+            <span>Quay lại chi tiết</span>
+        </a>
+        <button type="button" class="btn-admin btn-admin-primary" onclick="window.print()">
+            <i class="fas fa-print"></i>
+            <span>In / Lưu PDF</span>
+        </button>
+    </div>
+</section>
+
+<section class="admin-surface admin-section purchase-receipt-sheet">
+    <div class="purchase-receipt-head">
+        <div>
+            <div class="purchase-receipt-kicker">GIS PHARMA • PHIẾU NHẬP HÀNG</div>
+            <h3>{{ purchase_batch.resolved_invoice_code }}</h3>
+            <p>Chi nhánh {{ purchase_batch.pharmacy.name }} • Ngày nhập {{ purchase_batch.created_at|date:"d/m/Y H:i" }}</p>
+        </div>
+        <div class="purchase-receipt-meta">
+            <div><span>Người phụ trách</span><strong>{{ purchase_batch.resolved_imported_by_name }}</strong></div>
+            <div><span>Tổng số dòng</span><strong>{{ purchase_batch.total_lines }}</strong></div>
+            <div><span>Tổng số lượng</span><strong>{{ purchase_batch.total_quantity }}</strong></div>
+            <div><span>Tổng trị giá</span><strong>{% if total_amount %}{{ total_amount|vnd }}{% else %}-{% endif %}</strong></div>
+        </div>
+    </div>
+
+    <div class="purchase-receipt-note">
+        {% if purchase_batch.note %}<strong>Ghi chú:</strong> {{ purchase_batch.note }}{% else %}<strong>Ghi chú:</strong> Không có ghi chú bổ sung.{% endif %}
+    </div>
+
+    <div class="admin-table-wrap">
+        <table class="admin-table">
+            <thead>
+                <tr>
+                    <th>Thuốc</th>
+                    <th>ĐVT</th>
+                    <th>Tồn trước</th>
+                    <th>Nhập</th>
+                    <th>Tồn sau</th>
+                    <th>Giá nhập</th>
+                    <th>HSD</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for item in purchase_items %}
+                <tr>
+                    <td>
+                        <div class="admin-cell-title">{{ item.medicine_name }}</div>
+                        {% if item.manufacturer %}<div class="admin-cell-sub">{{ item.manufacturer }}</div>{% endif %}
+                    </td>
+                    <td>{{ item.unit|default:"-" }}</td>
+                    <td>{{ item.previous_quantity }}</td>
+                    <td><strong>+{{ item.imported_quantity }}</strong></td>
+                    <td>{{ item.new_quantity }}</td>
+                    <td>{% if item.import_price %}{{ item.import_price|vnd }}{% else %}-{% endif %}</td>
+                    <td>{% if item.expiry_date %}{{ item.expiry_date|date:"d/m/Y" }}{% else %}-{% endif %}</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+
+    <div class="purchase-receipt-sign">
+        <div>
+            <small>Người lập phiếu nhập</small>
+            <strong>{{ purchase_batch.resolved_imported_by_name }}</strong>
+        </div>
+        <div>
+            <small>Chi nhánh nhận hàng</small>
+            <strong>{{ purchase_batch.pharmacy.name }}</strong>
+        </div>
+    </div>
+</section>
+
+<style>
+.purchase-receipt-sheet { padding: 28px; }
+.purchase-receipt-head { display:flex; justify-content:space-between; gap:24px; flex-wrap:wrap; margin-bottom:20px; }
+.purchase-receipt-kicker { font-size:12px; font-weight:800; letter-spacing:.08em; color:#2563eb; margin-bottom:8px; }
+.purchase-receipt-head h3 { margin:0 0 6px; font-size:28px; }
+.purchase-receipt-head p { margin:0; color:#64748b; }
+.purchase-receipt-meta { display:grid; grid-template-columns:repeat(2,minmax(180px,1fr)); gap:12px; min-width:320px; }
+.purchase-receipt-meta div, .purchase-receipt-note { background:#f8fbff; border:1px solid #dbe7ff; border-radius:16px; padding:14px 16px; }
+.purchase-receipt-meta span { display:block; font-size:12px; color:#64748b; margin-bottom:6px; }
+.purchase-receipt-meta strong { font-size:16px; color:#0f172a; }
+.purchase-receipt-note { margin-bottom:20px; color:#334155; }
+.purchase-receipt-sign { display:grid; grid-template-columns:repeat(2,minmax(220px,1fr)); gap:18px; margin-top:24px; }
+.purchase-receipt-sign > div { border-top:1px solid #cbd5e1; padding-top:14px; }
+.purchase-receipt-sign small { display:block; color:#64748b; margin-bottom:8px; }
+.purchase-receipt-sign strong { color:#0f172a; }
+@media print {
+    .no-print,
+    .admin-sidebar,
+    .admin-topbar,
+    .site-header,
+    .site-footer,
+    .support-widget,
+    .chat-float,
+    .admin-page-banner {
+        display:none !important;
+    }
+    html, body, .admin-shell, .admin-main, .admin-content {
+        padding:0 !important;
+        margin:0 !important;
+        background:#fff !important;
+    }
+    .admin-main {
+        width:100% !important;
+        max-width:none !important;
+    }
+    .admin-surface {
+        box-shadow:none !important;
+        border-color:#cbd5e1 !important;
+    }
+    .purchase-receipt-sheet { padding: 8px; margin-top:0 !important; }
+}
+</style>
+{% endblock %}

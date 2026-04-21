@@ -12,7 +12,7 @@
                     <span>Tạo tài khoản mới</span>
                 </div>
                 <h1>Đăng ký để lưu đơn hàng, quản lý giỏ thuốc và sử dụng đầy đủ chức năng của hệ thống.</h1>
-                <p>Tài khoản giúp bạn theo dõi đơn dễ hơn và truy cập nhanh vào phần cá nhân trên website.</p>
+                <p>Tài khoản giúp bạn theo dõi đơn dễ hơn. Sau khi gửi đăng ký, hệ thống sẽ gửi email xác nhận để kích hoạt tài khoản.</p>
 
                 <div class="auth-benefits">
                     <div class="auth-benefit">
@@ -41,7 +41,7 @@
 
             <section class="content-card auth-card">
                 <h2>Đăng ký tài khoản</h2>
-                <p>Điền thông tin cơ bản để bắt đầu sử dụng hệ thống.</p>
+                <p>Điền thông tin cơ bản, sau đó mở email xác nhận trong Mailtrap/hộp thư để hoàn tất kích hoạt.</p>
 
                 <form method="post" autocomplete="off" class="auth-form-grid">
                     {% csrf_token %}
@@ -66,7 +66,7 @@
 
                     <button type="submit" class="pharma-btn">
                         <i class="fas fa-user-check"></i>
-                        <span>Tạo tài khoản</span>
+                        <span>Gửi email xác nhận</span>
                     </button>
                 </form>
 

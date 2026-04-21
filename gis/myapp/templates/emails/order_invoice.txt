@@ -1,12 +1,20 @@
-Hóa đơn tạm tính - đơn hàng #{{ order.id }}
+Hóa đơn - {{ order.resolved_invoice_code }}
+Đơn hàng: {{ order.order_code }}
+Phương thức thanh toán: {{ order.get_payment_method_display }}
+Nhân viên lập hóa đơn: {{ order.resolved_invoice_staff_name|default:"Nhân viên quầy thuốc" }}
 
 {% for item in order_items %}
 - {{ item.medicine_name }} x{{ item.quantity }}: {{ item.line_total|floatformat:0 }} VND
 {% endfor %}
 
-Tiền hàng: {{ order.total_product_price|floatformat:0 }} VND
-Phí ship: {{ order.shipping_fee|floatformat:0 }} VND
+Tạm tính sau khuyến mãi hệ thống: {{ order.product_subtotal_before_tier_discount|floatformat:0 }} VND
+{% if order.has_customer_tier_discount %}Ưu đãi hạng {{ order.customer_tier_name }}: -{{ order.customer_tier_discount_total|floatformat:0 }} VND
+{% endif %}Phí ship: {{ order.shipping_fee|floatformat:0 }} VND
+Nội dung thanh toán: {{ order.resolved_payment_reference }}
 Tổng thanh toán: {{ order.final_total_price|floatformat:0 }} VND
 
 Xem lại đơn hàng:
 {{ order_history_url }}
+
+Mở hóa đơn chi tiết:
+{{ invoice_url }}

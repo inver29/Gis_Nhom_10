@@ -1,0 +1,36 @@
+{% extends "base.html" %}
+{% block title %}Không có quyền truy cập{% endblock %}
+{% block header_search %}{% endblock %}
+{% block body_class %}site-page error-page page--hide-search{% endblock %}
+{% block content_wrapper %}
+<div class="site-page-section error-page-section">
+    <div class="container">
+        <div class="error-hero">
+            <div class="error-hero__copy">
+                <span class="error-hero__eyebrow"><i class="fas fa-user-shield"></i> Truy cập bị từ chối</span>
+                <h1>Bạn không có quyền mở trang này</h1>
+                <p>Hệ thống đã chặn yêu cầu vì tài khoản hiện tại không có đủ quyền cho thao tác vừa chọn. Bạn có thể quay lại khu vực phù hợp với vai trò của mình hoặc đăng nhập bằng tài khoản có quyền cao hơn.</p>
+                {% if error_message %}
+                <div class="error-hero__path">{{ error_message }}</div>
+                {% endif %}
+                <div class="error-hero__actions">
+                    <a href="{% url 'custom_admin_dashboard' %}" class="pharma-btn"><i class="fas fa-chart-line"></i><span>Về trang quản trị</span></a>
+                    <a href="{% url 'home' %}" class="pharma-outline-btn"><i class="fas fa-home"></i><span>Về trang chủ</span></a>
+                    <a href="{% url 'account' %}" class="pharma-outline-btn"><i class="fas fa-user-circle"></i><span>Thông tin tài khoản</span></a>
+                </div>
+            </div>
+            <div class="error-hero__visual">
+                <div class="error-hero__badge">403</div>
+                <div class="error-hero__card">
+                    <div class="error-hero__mini-map"></div>
+                    <div class="error-hero__pin"><i class="fas fa-lock"></i></div>
+                    <div class="error-hero__panel">
+                        <strong>Quyền truy cập không hợp lệ</strong>
+                        <span>Hãy dùng đúng tài khoản được phân quyền hoặc quay lại trang trước đó để tiếp tục thao tác an toàn.</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

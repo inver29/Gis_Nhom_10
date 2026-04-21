@@ -33,7 +33,7 @@
                         <i class="fas fa-id-card"></i>
                         <div>
                             <strong>Tài khoản cá nhân</strong>
-                            <div>Xem thông tin tài khoản và các chức năng theo quyền truy cập.</div>
+                            <div>Xem thông tin tài khoản, đơn hàng và các tiện ích cá nhân.</div>
                         </div>
                     </div>
                 </div>
@@ -72,14 +72,14 @@
                         <span class="auth-recovery-card__icon"><i class="fas fa-key"></i></span>
                         <span class="auth-recovery-card__content">
                             <strong>Quên mật khẩu?</strong>
-                            <small>Nhập email để nhận liên kết đặt lại mật khẩu.</small>
+                            <small>Nhập email để nhận mã OTP và đặt lại mật khẩu ngay trên web.</small>
                         </span>
                     </a>
                     <a href="{% url 'password_reset' %}?recovery=username" class="auth-recovery-card">
                         <span class="auth-recovery-card__icon"><i class="fas fa-user-search"></i></span>
                         <span class="auth-recovery-card__content">
                             <strong>Quên tên đăng nhập?</strong>
-                            <small>Dùng email khôi phục. Email gửi về sẽ kèm lại tên đăng nhập của bạn.</small>
+                            <small>Dùng email khôi phục để nhận mã OTP rồi xem lại tên đăng nhập.</small>
                         </span>
                     </a>
                 </div>

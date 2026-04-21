@@ -1,0 +1,843 @@
+{% extends "admin_panel/base.html" %}
+
+{% block extra_head %}
+<style>
+    .perm-page{
+        --perm-ink:#17315d;
+        --perm-blue:#1146b8;
+        --perm-blue-2:#2b71e0;
+        --perm-soft:#f4f8ff;
+        --perm-line:rgba(17,70,184,.10);
+        --perm-mute:#5f7290;
+        --perm-shadow:0 18px 42px rgba(17,70,184,.08);
+        --perm-shadow-lg:0 26px 58px rgba(17,70,184,.14);
+        display:grid;gap:22px;position:relative;
+    }
+    .perm-page::before{
+        content:"";position:absolute;
+        inset:-40px -40px auto auto;width:340px;height:340px;
+        border-radius:50%;pointer-events:none;z-index:0;
+        background:radial-gradient(circle,rgba(17,70,184,.14) 0%,rgba(17,70,184,0) 66%);
+    }
+    .perm-page > *{position:relative;z-index:1}
+
+    /* ================= Hero ================= */
+    .perm-hero{
+        display:grid;grid-template-columns:minmax(0,1.35fr) minmax(0,1fr);
+        gap:20px;align-items:stretch;
+    }
+    .perm-hero__intro{
+        padding:28px 30px;border-radius:28px;
+        color:#fff;overflow:hidden;position:relative;
+        background:
+            radial-gradient(circle at 90% 10%,rgba(255,216,110,.22),transparent 32%),
+            linear-gradient(135deg,#112b5c 0%,#1e56c7 52%,#2e78ee 100%);
+        box-shadow:0 30px 64px rgba(17,70,184,.24);
+    }
+    .perm-hero__intro::before{
+        content:"";position:absolute;
+        inset:auto -40px -80px auto;width:240px;height:240px;
+        border-radius:50%;
+        background:radial-gradient(circle,rgba(255,255,255,.16) 0%,rgba(255,255,255,0) 70%);
+        pointer-events:none;
+    }
+    .perm-hero__eyebrow{
+        display:inline-flex;align-items:center;gap:8px;
+        padding:7px 14px;border-radius:999px;
+        background:rgba(255,255,255,.16);color:#fff4c7;
+        font-size:.78rem;font-weight:900;letter-spacing:.08em;text-transform:uppercase;
+    }
+    .perm-hero__intro h2{
+        margin:14px 0 10px;color:#fff;
+        font-size:clamp(1.5rem,2.4vw,2rem);font-weight:900;letter-spacing:-.02em;
+    }
+    .perm-hero__intro p{margin:0;color:rgba(255,255,255,.88);line-height:1.72}
+    .perm-hero__steps{
+        display:grid;grid-template-columns:repeat(3,minmax(0,1fr));
+        gap:10px;margin-top:20px;
+    }
+    .perm-hero__step{
+        padding:14px 16px;border-radius:18px;
+        background:rgba(255,255,255,.12);
+        border:1px solid rgba(255,255,255,.18);
+        backdrop-filter:blur(6px);
+    }
+    .perm-hero__step-num{
+        display:inline-flex;align-items:center;justify-content:center;
+        width:26px;height:26px;border-radius:50%;
+        background:#ffd86e;color:#17315d;
+        font-weight:900;font-size:.84rem;margin-bottom:8px;
+    }
+    .perm-hero__step strong{
+        display:block;margin-bottom:4px;color:#fff;font-size:.94rem;font-weight:900;
+    }
+    .perm-hero__step span{display:block;color:rgba(255,255,255,.8);font-size:.82rem;line-height:1.5}
+
+    /* ================= Summary cards ================= */
+    .perm-summary{
+        display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px;
+    }
+    .perm-summary__card{
+        padding:18px 20px;border-radius:22px;
+        background:#fff;border:1px solid var(--perm-line);
+        box-shadow:var(--perm-shadow);
+        display:grid;gap:6px;
+        position:relative;overflow:hidden;
+        transition:transform .2s ease,box-shadow .2s ease;
+    }
+    .perm-summary__card:hover{transform:translateY(-2px);box-shadow:var(--perm-shadow-lg)}
+    .perm-summary__card::before{
+        content:"";position:absolute;left:0;top:0;bottom:0;width:4px;
+        background:linear-gradient(180deg,var(--perm-blue),var(--perm-blue-2));
+    }
+    .perm-summary__label{
+        color:var(--perm-mute);font-weight:800;font-size:.78rem;
+        text-transform:uppercase;letter-spacing:.06em;
+    }
+    .perm-summary__value{color:var(--perm-ink);font-weight:900;font-size:1.42rem;word-break:break-word}
+    .perm-summary__card.is-primary{
+        color:#fff;border-color:transparent;
+        background:linear-gradient(135deg,#1f64e0 0%,#1146b8 100%);
+        box-shadow:0 20px 46px rgba(17,70,184,.3);
+    }
+    .perm-summary__card.is-primary::before{background:#ffd86e}
+    .perm-summary__card.is-primary .perm-summary__label,
+    .perm-summary__card.is-primary .perm-summary__value{color:#fff}
+
+    /* ================= Spotlight ================= */
+    .perm-spotlight{
+        display:grid;grid-template-columns:minmax(0,1.1fr) minmax(320px,.9fr);gap:18px;
+    }
+    .perm-spotlight__main,
+    .perm-spotlight__stats{
+        padding:24px 26px;border-radius:28px;
+        border:1px solid var(--perm-line);
+        box-shadow:var(--perm-shadow);background:#fff;
+    }
+    .perm-spotlight__main{
+        background:
+            radial-gradient(circle at 94% 12%,rgba(17,70,184,.12),transparent 40%),
+            linear-gradient(145deg,#ffffff 0%,#f5f9ff 100%);
+        position:relative;overflow:hidden;
+    }
+    .perm-spotlight__eyebrow{
+        display:inline-flex;align-items:center;gap:8px;
+        padding:7px 14px;border-radius:999px;
+        background:#eef4ff;color:var(--perm-blue);
+        font-size:.78rem;font-weight:900;letter-spacing:.07em;text-transform:uppercase;
+    }
+    .perm-spotlight__head{display:flex;align-items:center;gap:16px;margin-top:14px}
+    .perm-spotlight__avatar{
+        flex-shrink:0;width:60px;height:60px;border-radius:50%;
+        background:linear-gradient(135deg,var(--perm-blue),var(--perm-blue-2));
+        color:#fff;display:flex;align-items:center;justify-content:center;
+        font-weight:900;font-size:1.4rem;letter-spacing:-.02em;
+        box-shadow:0 14px 30px rgba(17,70,184,.28);
+    }
+    .perm-spotlight__head h3{margin:0;color:var(--perm-ink);font-size:1.45rem;font-weight:900;letter-spacing:-.02em}
+    .perm-spotlight__head small{display:block;margin-top:2px;color:var(--perm-mute);font-weight:700}
+    .perm-spotlight__main p{margin:14px 0 0;color:var(--perm-mute);line-height:1.7}
+    .perm-spotlight__chips{display:flex;flex-wrap:wrap;gap:10px;margin-top:18px}
+    .perm-spotlight__chips span{
+        display:inline-flex;align-items:center;gap:8px;
+        padding:9px 14px;border-radius:999px;
+        background:#fff;border:1px solid var(--perm-line);
+        color:#24466d;font-weight:800;font-size:.9rem;
+    }
+    .perm-spotlight__stats{
+        display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px;align-content:start;
+    }
+    .perm-spotlight__stat{
+        padding:16px 18px;border-radius:20px;
+        background:var(--perm-soft);border:1px solid var(--perm-line);
+        transition:transform .2s ease;
+    }
+    .perm-spotlight__stat:hover{transform:translateY(-2px)}
+    .perm-spotlight__stat small{
+        display:block;color:var(--perm-mute);font-weight:800;
+        text-transform:uppercase;letter-spacing:.06em;font-size:.74rem;
+    }
+    .perm-spotlight__stat strong{
+        display:block;margin-top:6px;color:var(--perm-ink);font-size:1.32rem;font-weight:900;
+    }
+    .perm-spotlight__stat i{color:var(--perm-blue);margin-right:6px}
+
+    /* ================= Layout ================= */
+    .perm-layout{
+        display:grid;grid-template-columns:minmax(280px,320px) minmax(0,1fr);
+        gap:22px;align-items:start;
+    }
+    .perm-pane{display:grid;gap:16px}
+    .perm-card{
+        padding:22px;border-radius:26px;
+        background:linear-gradient(180deg,#ffffff 0%,#fbfdff 100%);
+        border:1px solid var(--perm-line);box-shadow:var(--perm-shadow);
+        position:relative;overflow:hidden;
+    }
+    .perm-card__head{
+        display:flex;justify-content:space-between;gap:12px;
+        align-items:flex-start;margin-bottom:14px;
+    }
+    .perm-card__head h3{margin:0;color:var(--perm-ink);font-weight:900;font-size:1.05rem;letter-spacing:-.01em}
+    .perm-card__head p{margin:4px 0 0;color:var(--perm-mute);font-size:.88rem;line-height:1.55}
+    .perm-card__icon{
+        flex-shrink:0;width:36px;height:36px;border-radius:12px;
+        background:linear-gradient(135deg,#eef4ff 0%,#dbe7ff 100%);
+        color:var(--perm-blue);
+        display:flex;align-items:center;justify-content:center;font-size:1rem;
+    }
+
+    /* ================= Search & Chips ================= */
+    .perm-search{
+        display:flex;align-items:center;gap:10px;padding:0 14px;
+        border-radius:14px;border:1px solid var(--perm-line);
+        background:#fcfdff;transition:border-color .2s ease,box-shadow .2s ease;
+    }
+    .perm-search:focus-within{
+        border-color:var(--perm-blue);
+        box-shadow:0 0 0 3px rgba(17,70,184,.12);
+    }
+    .perm-search i{color:var(--perm-blue)}
+    .perm-search input{
+        flex:1;min-height:44px;border:none;background:transparent;outline:none;
+        color:var(--perm-ink);font-weight:700;
+    }
+    .perm-chips{display:flex;flex-wrap:wrap;gap:8px}
+    .perm-chip{
+        border:1px solid transparent;padding:8px 14px;border-radius:999px;
+        background:#eef4ff;color:var(--perm-blue);
+        font-weight:800;font-size:.84rem;cursor:pointer;
+        transition:all .18s ease;
+    }
+    .perm-chip:hover{
+        background:#fff;border-color:rgba(17,70,184,.22);
+        transform:translateY(-1px);box-shadow:0 6px 14px rgba(17,70,184,.1);
+    }
+    .perm-chip.is-active,
+    .perm-chip:active{
+        background:linear-gradient(135deg,var(--perm-blue-2) 0%,var(--perm-blue) 100%);
+        color:#fff;border-color:transparent;
+        box-shadow:0 10px 22px rgba(17,70,184,.28);
+    }
+    .perm-chip[data-preset="warehouse"]{background:#fff4e1;color:#9a5a00}
+    .perm-chip[data-preset="warehouse"]:hover{background:#fff7eb}
+    .perm-chip[data-preset="branch"]{background:#e7f6ec;color:#177a3a}
+    .perm-chip[data-preset="branch"]:hover{background:#eefae9}
+    .perm-chip[data-preset="content"]{background:#efe7ff;color:#5029b8}
+    .perm-chip[data-preset="content"]:hover{background:#f4ecff}
+    .perm-chip[data-preset="clear"]{background:#ffeaea;color:#a31818}
+    .perm-chip[data-preset="clear"]:hover{background:#fff1f1}
+    .perm-chip[data-preset="view"]{background:#e3f3ff;color:#0b5a9a}
+
+    /* ================= User list ================= */
+    .perm-user-list{
+        display:grid;gap:10px;max-height:600px;overflow-y:auto;padding-right:6px;
+        scrollbar-width:thin;scrollbar-color:#c7d6ee transparent;
+    }
+    .perm-user-list::-webkit-scrollbar{width:6px}
+    .perm-user-list::-webkit-scrollbar-thumb{background:#c7d6ee;border-radius:999px}
+    .perm-user-card{
+        display:grid;gap:10px;padding:14px 16px;border-radius:18px;
+        background:#fff;border:1px solid var(--perm-line);
+        text-decoration:none;color:inherit;
+        transition:all .18s ease;position:relative;
+        box-shadow:0 6px 16px rgba(17,70,184,.04);
+    }
+    .perm-user-card.is-hidden{display:none}
+    .perm-user-card:hover{
+        transform:translateY(-2px);
+        border-color:rgba(17,70,184,.25);
+        box-shadow:0 12px 26px rgba(17,70,184,.14);
+    }
+    .perm-user-card.is-active{
+        border-color:var(--perm-blue);
+        background:linear-gradient(180deg,#eef5ff 0%,#dceaff 100%);
+        box-shadow:0 16px 34px rgba(17,70,184,.22);
+    }
+    .perm-user-card.is-active::before{
+        content:"";position:absolute;left:0;top:14px;bottom:14px;width:4px;
+        border-radius:0 4px 4px 0;background:var(--perm-blue);
+    }
+    .perm-user-card__row{display:flex;justify-content:space-between;align-items:center;gap:10px}
+    .perm-user-card__info{display:flex;align-items:center;gap:10px;min-width:0;flex:1}
+    .perm-user-avatar{
+        flex-shrink:0;width:36px;height:36px;border-radius:50%;
+        background:linear-gradient(135deg,#eef4ff 0%,#dbe7ff 100%);
+        color:var(--perm-blue);
+        display:flex;align-items:center;justify-content:center;
+        font-weight:900;font-size:.9rem;
+    }
+    .perm-user-card.is-active .perm-user-avatar{
+        background:linear-gradient(135deg,var(--perm-blue) 0%,var(--perm-blue-2) 100%);color:#fff;
+    }
+    .perm-user-card__text{min-width:0;flex:1}
+    .perm-user-card__text strong{display:block;color:var(--perm-ink);font-size:.96rem;font-weight:900;word-break:break-word}
+    .perm-user-card__text small{color:var(--perm-mute);font-weight:700}
+    .perm-user-card__count{
+        display:inline-flex;min-width:34px;justify-content:center;
+        padding:3px 10px;border-radius:999px;
+        background:linear-gradient(135deg,var(--perm-blue),var(--perm-blue-2));
+        color:#fff;font-weight:900;font-size:.8rem;
+        box-shadow:0 8px 18px rgba(17,70,184,.22);
+    }
+    .perm-user-card__meta{
+        display:flex;justify-content:space-between;align-items:center;gap:10px;
+        font-size:.8rem;color:#6a7d9d;font-weight:700;
+    }
+
+    /* ================= Module groups ================= */
+    .perm-group{display:grid;gap:14px;margin-bottom:20px}
+    .perm-group__title{
+        display:flex;align-items:center;gap:12px;padding:14px 18px;border-radius:18px;
+        background:linear-gradient(180deg,#f7fbff 0%,#eef4fb 100%);
+        border:1px solid var(--perm-line);color:var(--perm-ink);font-weight:900;
+        box-shadow:0 8px 20px rgba(17,70,184,.06);
+    }
+    .perm-group__title i{
+        flex-shrink:0;width:32px;height:32px;border-radius:10px;
+        background:linear-gradient(135deg,var(--perm-blue) 0%,var(--perm-blue-2) 100%);
+        color:#fff;display:flex;align-items:center;justify-content:center;font-size:.9rem;
+        box-shadow:0 8px 16px rgba(17,70,184,.22);
+    }
+    .perm-group__title span{font-size:1.02rem;letter-spacing:-.01em}
+    .perm-group__title small{margin-left:auto;color:var(--perm-mute);font-weight:700;font-size:.82rem}
+
+    .perm-modules{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:14px}
+    .perm-module{
+        padding:18px;border-radius:22px;
+        background:linear-gradient(180deg,#ffffff 0%,#f9fbff 100%);
+        border:1px solid var(--perm-line);
+        transition:all .22s ease;position:relative;overflow:hidden;
+    }
+    .perm-module::before{
+        content:"";position:absolute;left:0;top:0;bottom:0;width:3px;
+        background:transparent;transition:background .22s ease;
+    }
+    .perm-module:hover{
+        transform:translateY(-2px);
+        box-shadow:0 14px 30px rgba(17,70,184,.1);
+    }
+    .perm-module.is-enabled{
+        border-color:rgba(17,70,184,.32);
+        box-shadow:0 14px 30px rgba(17,70,184,.12);
+        background:linear-gradient(180deg,#ffffff 0%,#eef5ff 100%);
+    }
+    .perm-module.is-enabled::before{
+        background:linear-gradient(180deg,var(--perm-blue),var(--perm-blue-2));
+    }
+    .perm-module.is-hidden{display:none}
+    .perm-module__head{display:flex;justify-content:space-between;gap:10px;align-items:flex-start;margin-bottom:12px}
+    .perm-module__head h4{margin:0;color:var(--perm-ink);font-size:1rem;font-weight:900;letter-spacing:-.01em}
+    .perm-module__head p{margin:4px 0 0;color:var(--perm-mute);font-size:.84rem;line-height:1.52}
+    .perm-module__badge{
+        display:inline-flex;min-width:28px;justify-content:center;padding:3px 10px;
+        border-radius:999px;background:#eef4ff;color:var(--perm-blue);
+        font-weight:900;font-size:.78rem;
+    }
+    .perm-module.is-enabled .perm-module__badge{
+        background:linear-gradient(135deg,var(--perm-blue) 0%,var(--perm-blue-2) 100%);
+        color:#fff;box-shadow:0 8px 18px rgba(17,70,184,.26);
+    }
+    .perm-actions{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:6px}
+    .perm-toggle{
+        display:flex;align-items:center;justify-content:space-between;gap:8px;
+        padding:9px 12px;border-radius:12px;
+        background:#f6f9ff;border:1px solid transparent;font-size:.86rem;
+        transition:background .18s ease;
+    }
+    .perm-toggle:hover{background:#eef4ff}
+    .perm-toggle.is-disabled{opacity:.45;background:#f0f2f6}
+    .perm-toggle.is-disabled:hover{background:#f0f2f6}
+    .perm-toggle__label{color:#27446f;font-weight:800}
+
+    .perm-switch{position:relative;display:inline-flex;align-items:center;flex-shrink:0}
+    .perm-switch input{position:absolute;opacity:0;pointer-events:none}
+    .perm-switch span{
+        position:relative;display:inline-flex;align-items:center;
+        width:42px;height:24px;border-radius:999px;background:#dce6f7;
+        transition:background .18s ease;cursor:pointer;
+    }
+    .perm-switch span::after{
+        content:"";position:absolute;left:3px;top:3px;width:18px;height:18px;
+        border-radius:50%;background:#fff;
+        box-shadow:0 2px 6px rgba(17,70,184,.22);transition:transform .18s ease;
+    }
+    .perm-switch input:checked + span{background:linear-gradient(135deg,var(--perm-blue) 0%,var(--perm-blue-2) 100%)}
+    .perm-switch input:checked + span::after{transform:translateX(18px)}
+    .perm-switch input:disabled + span{cursor:not-allowed;opacity:.6}
+    .perm-module__quick{
+        display:flex;flex-wrap:wrap;gap:6px;margin-top:12px;
+        padding-top:12px;border-top:1px dashed rgba(17,70,184,.1);
+    }
+    .perm-module__quick .perm-chip{padding:5px 11px;font-size:.76rem}
+
+    /* ================= Action bar ================= */
+    .perm-actionbar{
+        position:sticky;bottom:16px;z-index:4;
+        display:flex;flex-wrap:wrap;align-items:center;gap:14px;
+        justify-content:space-between;padding:16px 20px;border-radius:22px;
+        background:rgba(255,255,255,.96);border:1px solid var(--perm-line);
+        box-shadow:0 22px 50px rgba(17,70,184,.18);backdrop-filter:blur(12px);
+    }
+    .perm-actionbar__left{display:flex;flex-wrap:wrap;gap:8px;align-items:center}
+    .perm-actionbar__counter{color:var(--perm-mute);font-weight:700;font-size:.92rem}
+    .perm-actionbar__counter strong{
+        color:var(--perm-ink);font-weight:900;
+        padding:2px 8px;border-radius:8px;background:#eef4ff;margin:0 2px;
+    }
+
+    .perm-note{
+        padding:20px 22px;border-radius:20px;background:#f8fbff;
+        border:1px solid var(--perm-line);color:var(--perm-mute);line-height:1.7;
+    }
+
+    @media (max-width:1199px){
+        .perm-hero{grid-template-columns:1fr}
+        .perm-layout,.perm-spotlight{grid-template-columns:1fr}
+        .perm-user-list{max-height:none}
+    }
+    @media (max-width:767px){
+        .perm-hero__steps,.perm-summary,.perm-modules,.perm-spotlight__stats{grid-template-columns:1fr}
+        .perm-actions{grid-template-columns:1fr}
+        .perm-hero__intro{padding:22px}
+    }
+</style>
+{% endblock %}
+
+{% block admin_content %}
+{% if selected_permission_user %}
+    {% if selected_permission_user.is_superuser %}
+        {% with is_superuser_view=1 %}{% endwith %}
+    {% endif %}
+{% endif %}
+
+<div class="perm-page">
+    <!-- Nhóm 1 · Tổng quan và vận hành chính -->
+    <!-- Nhóm 2 · Sản phẩm, kho và báo cáo -->
+    <!-- Nhóm 3 · Tài khoản và phân quyền -->
+    <section class="perm-hero">
+        <div class="perm-hero__intro">
+            <span class="perm-hero__eyebrow"><i class="fas fa-shield-halved"></i> Trung tâm phân quyền</span>
+            <h2>Phân quyền tài khoản quản trị</h2>
+            <p>Chọn một tài khoản ở cột trái, sau đó bật đúng phần việc mà họ cần dùng. Các quyền được nhóm theo lĩnh vực công việc để người mới cũng biết nên bật gì.</p>
+            <div class="perm-hero__steps">
+                <div class="perm-hero__step">
+                    <span class="perm-hero__step-num">1</span>
+                    <strong>Chọn người</strong>
+                    <span>Tìm theo tên đăng nhập hoặc chi nhánh phụ trách.</span>
+                </div>
+                <div class="perm-hero__step">
+                    <span class="perm-hero__step-num">2</span>
+                    <strong>Dùng preset</strong>
+                    <span>Áp nhanh các bộ quyền mẫu cho đúng vai trò.</span>
+                </div>
+                <div class="perm-hero__step">
+                    <span class="perm-hero__step-num">3</span>
+                    <strong>Tinh chỉnh</strong>
+                    <span>Bật/tắt từng quyền bên trong mỗi module nếu cần.</span>
+                </div>
+            </div>
+        </div>
+
+        <div class="perm-summary">
+            <article class="perm-summary__card is-primary">
+                <span class="perm-summary__label">Tài khoản đang chọn</span>
+                <span class="perm-summary__value">{% if selected_permission_user %}{{ selected_permission_user.username }}{% else %}—{% endif %}</span>
+            </article>
+            <article class="perm-summary__card">
+                <span class="perm-summary__label">Vai trò</span>
+                <span class="perm-summary__value">{% if selected_permission_user %}{% if selected_permission_user.is_superuser %}Quản trị viên cấp cao{% else %}Nhân viên{% endif %}{% else %}—{% endif %}</span>
+            </article>
+            <article class="perm-summary__card">
+                <span class="perm-summary__label">Module đang bật</span>
+                <span class="perm-summary__value">{{ selected_module_count|default:0 }}</span>
+            </article>
+            <article class="perm-summary__card">
+                <span class="perm-summary__label">Tổng quyền đang bật</span>
+                <span class="perm-summary__value">{{ selected_enabled_count|default:0 }}</span>
+            </article>
+        </div>
+    </section>
+
+    {% if selected_permission_user %}
+    <section class="perm-spotlight">
+        <article class="perm-spotlight__main">
+            <span class="perm-spotlight__eyebrow"><i class="fas fa-user-shield"></i> Tài khoản đang chọn</span>
+            <div class="perm-spotlight__head">
+                <div class="perm-spotlight__avatar">{{ selected_permission_user.username|slice:":1"|upper }}</div>
+                <div>
+                    <h3>{{ selected_permission_user.username }}</h3>
+                    <small>{% if selected_permission_user.is_superuser %}Quản trị viên cấp cao{% else %}Nhân viên – {{ selected_profile.managed_pharmacy.name|default:"chưa gán chi nhánh" }}{% endif %}</small>
+                </div>
+            </div>
+            <p>
+                {% if selected_permission_user.is_superuser %}
+                Tài khoản quản trị viên cấp cao. Nhóm này có toàn quyền nên khu phân quyền chỉ dùng để theo dõi, không cần chỉnh chi tiết.
+                {% else %}
+                {{ selected_profile.managed_pharmacy.name|default:"Chưa gán chi nhánh" }} là phạm vi làm việc hiện tại của tài khoản này. Bạn có thể dùng preset rồi tinh chỉnh từng module ngay bên dưới.
+                {% endif %}
+            </p>
+            <div class="perm-spotlight__chips">
+                <span><i class="fas fa-user-tag"></i> {% if selected_permission_user.is_superuser %}Quản trị viên{% else %}Nhân viên{% endif %}</span>
+                <span><i class="fas fa-clinic-medical"></i> {{ selected_profile.managed_pharmacy.name|default:"Chưa gán chi nhánh" }}</span>
+                <span>{% if selected_permission_user.is_active %}<i class="fas fa-circle" style="color:#22a35f;font-size:.6rem"></i> Hoạt động{% else %}<i class="fas fa-lock" style="color:#a31818"></i> Đã khóa{% endif %}</span>
+            </div>
+        </article>
+
+        <div class="perm-spotlight__stats">
+            <div class="perm-spotlight__stat">
+                <small><i class="fas fa-cubes"></i>Module đang bật</small>
+                <strong>{{ selected_module_count|default:0 }}</strong>
+            </div>
+            <div class="perm-spotlight__stat">
+                <small><i class="fas fa-key"></i>Tổng quyền bật</small>
+                <strong>{{ selected_enabled_count|default:0 }}</strong>
+            </div>
+            <div class="perm-spotlight__stat">
+                <small><i class="fas fa-user-tag"></i>Loại tài khoản</small>
+                <strong>{% if selected_permission_user.is_superuser %}Superuser{% else %}Staff{% endif %}</strong>
+            </div>
+            <div class="perm-spotlight__stat">
+                <small><i class="fas fa-clinic-medical"></i>Chi nhánh</small>
+                <strong>{{ selected_profile.managed_pharmacy.name|default:"Chưa gán" }}</strong>
+            </div>
+        </div>
+    </section>
+    {% endif %}
+
+    <div class="perm-layout">
+        <aside class="perm-pane">
+            <section class="perm-card">
+                <div class="perm-card__head">
+                    <div>
+                        <h3>Lọc tài khoản</h3>
+                        <p>Tìm nhanh theo tên hoặc chi nhánh.</p>
+                    </div>
+                    <div class="perm-card__icon"><i class="fas fa-filter"></i></div>
+                </div>
+                <div class="perm-search">
+                    <i class="fas fa-search"></i>
+                    <input type="text" id="perm-user-search" placeholder="Nhập từ khóa…" aria-label="Tìm tài khoản">
+                </div>
+                <div class="perm-chips" role="tablist" aria-label="Lọc vai trò" style="margin-top:12px">
+                    <button type="button" class="perm-chip is-active" data-role-filter="all">Tất cả</button>
+                    <button type="button" class="perm-chip" data-role-filter="staff">Nhân viên</button>
+                    <button type="button" class="perm-chip" data-role-filter="superuser">Quản trị viên</button>
+                </div>
+            </section>
+
+            <section class="perm-card">
+                <div class="perm-card__head">
+                    <div>
+                        <h3>Danh sách tài khoản</h3>
+                        <p>Bấm vào một thẻ để chỉnh quyền cho tài khoản đó.</p>
+                    </div>
+                    <div class="perm-card__icon"><i class="fas fa-users"></i></div>
+                </div>
+                <div class="perm-user-list" id="perm-user-list">
+                    {% for item in permission_user_cards %}
+                    <a href="{% url 'custom_admin_permissions_center' %}?user={{ item.user.pk }}"
+                       class="perm-user-card {% if selected_permission_user and selected_permission_user.pk == item.user.pk %}is-active{% endif %}"
+                       data-user-card
+                       data-role="{% if item.user.is_superuser %}superuser{% else %}staff{% endif %}"
+                       data-search="{{ item.user.username|lower }} {{ item.role_label|lower }} {{ item.managed_branch_label|lower }}">
+                        <div class="perm-user-card__row">
+                            <div class="perm-user-card__info">
+                                <div class="perm-user-avatar">{{ item.user.username|slice:":1"|upper }}</div>
+                                <div class="perm-user-card__text">
+                                    <strong>{{ item.user.username }}</strong>
+                                    <small>{{ item.role_label }}</small>
+                                </div>
+                            </div>
+                            <span class="perm-user-card__count" title="Số quyền đang bật">{{ item.enabled_count }}</span>
+                        </div>
+                        <div class="perm-user-card__meta">
+                            <span><i class="fas fa-clinic-medical"></i> {{ item.managed_branch_label }}</span>
+                            <span>{% if item.user.is_active %}<i class="fas fa-circle" style="color:#22a35f;font-size:.55rem"></i> Hoạt động{% else %}<i class="fas fa-lock" style="color:#a31818"></i> Đã khóa{% endif %}</span>
+                        </div>
+                    </a>
+                    {% empty %}
+                    <div class="perm-note">Chưa có tài khoản nhân viên nào.</div>
+                    {% endfor %}
+                </div>
+            </section>
+        </aside>
+
+        <section class="perm-pane">
+            {% if not selected_permission_user %}
+                <div class="perm-card">
+                    <div class="perm-note">Chưa có tài khoản nào được chọn. Hãy chọn một tài khoản ở cột trái để xem và chỉnh quyền.</div>
+                </div>
+            {% elif selected_permission_user.is_superuser %}
+                <div class="perm-card">
+                    <div class="perm-card__head">
+                        <div>
+                            <h3>{{ selected_permission_user.username }}</h3>
+                            <p>Quản trị viên cấp cao (superuser).</p>
+                        </div>
+                    </div>
+                    <div class="perm-note">
+                        Tài khoản này luôn có toàn quyền và không cần cấu hình chi tiết ở đây. Nếu muốn giới hạn,
+                        hãy chuyển sang dùng tài khoản nhân viên rồi cấp quyền theo từng module.
+                    </div>
+                </div>
+            {% else %}
+            <form method="post" novalidate id="perm-form">
+                {% csrf_token %}
+                <input type="hidden" name="user_id" value="{{ selected_permission_user.pk }}">
+
+                <section class="perm-card">
+                    <div class="perm-card__head">
+                        <div>
+                            <h3>Tìm module &amp; bộ quyền mẫu</h3>
+                            <p>Dùng ô tìm kiếm bên dưới hoặc các nút preset để bật quyền nhanh theo vai trò.</p>
+                        </div>
+                        <div class="perm-card__icon"><i class="fas fa-wand-magic-sparkles"></i></div>
+                    </div>
+                    <div class="perm-search">
+                        <i class="fas fa-filter"></i>
+                        <input type="text" id="perm-module-search" placeholder="Lọc module theo tên (vd: tin tức, đơn hàng…)" aria-label="Lọc module">
+                    </div>
+                    <div class="perm-chips" style="margin-top:12px">
+                        <button type="button" class="perm-chip" data-preset="view" title="Chỉ bật quyền xem trên tất cả module"><i class="fas fa-eye"></i> Bộ xem báo cáo</button>
+                        <button type="button" class="perm-chip" data-preset="warehouse" title="Nhân viên kho: sản phẩm, nhập/xuất, tồn, báo cáo"><i class="fas fa-warehouse"></i> Nhân viên kho</button>
+                        <button type="button" class="perm-chip" data-preset="branch" title="Quản lý chi nhánh: vận hành và sản phẩm"><i class="fas fa-clinic-medical"></i> Quản lý chi nhánh</button>
+                        <button type="button" class="perm-chip" data-preset="content" title="Quyền nội dung website: trang chủ, giới thiệu, tin tức"><i class="fas fa-pen-nib"></i> Biên tập nội dung</button>
+                        <button type="button" class="perm-chip" data-preset="clear" title="Bỏ hết tất cả quyền"><i class="fas fa-eraser"></i> Bỏ hết</button>
+                    </div>
+                </section>
+
+                {% for group in permission_groups %}
+                <div class="perm-group">
+                    <div class="perm-group__title">
+                        <i class="{{ group.icon }}"></i>
+                        <span>{{ group.label }}</span>
+                        <small>{{ group.description }}</small>
+                    </div>
+                    <div class="perm-modules">
+                        {% for row in group.rows %}
+                        <article class="perm-module {% if row.enabled_count %}is-enabled{% endif %}"
+                                 data-module="{{ row.key }}"
+                                 data-module-search="{{ row.label|lower }} {{ row.description|lower }}">
+                            <div class="perm-module__head">
+                                <div>
+                                    <h4>{{ row.label }}</h4>
+                                    <p>{{ row.description }}</p>
+                                </div>
+                                <span class="perm-module__badge" data-module-count="{{ row.key }}">{{ row.enabled_count }}</span>
+                            </div>
+                            <div class="perm-actions">
+                                {% for action in row.actions %}
+                                <label class="perm-toggle {% if not action.supported %}is-disabled{% endif %}">
+                                    <span class="perm-toggle__label">{{ action.label|default:"—" }}</span>
+                                    {% if action.supported %}
+                                    <span class="perm-switch">
+                                        <input type="checkbox"
+                                               name="permission__{{ row.key }}__{{ action.key }}"
+                                               value="1"
+                                               data-module-input="{{ row.key }}"
+                                               {% if action.checked %}checked{% endif %}
+                                               {% if not can_update_permissions %}disabled{% endif %}>
+                                        <span></span>
+                                    </span>
+                                    {% else %}
+                                    <span style="color:#9aa6bc;font-size:.8rem">Không áp dụng</span>
+                                    {% endif %}
+                                </label>
+                                {% endfor %}
+                            </div>
+                            <div class="perm-module__quick">
+                                <button type="button" class="perm-chip" data-row-mode="all" data-row-module="{{ row.key }}">Bật hết</button>
+                                <button type="button" class="perm-chip" data-row-mode="view" data-row-module="{{ row.key }}">Chỉ xem</button>
+                                <button type="button" class="perm-chip" data-row-mode="clear" data-row-module="{{ row.key }}">Bỏ</button>
+                            </div>
+                        </article>
+                        {% endfor %}
+                    </div>
+                </div>
+                {% endfor %}
+
+                <div class="perm-actionbar">
+                    <div class="perm-actionbar__left">
+                        <span class="perm-actionbar__counter">
+                            Đang bật <strong id="perm-live-count">{{ selected_enabled_count|default:0 }}</strong> quyền trên
+                            <strong id="perm-live-modules">{{ selected_module_count|default:0 }}</strong> module
+                        </span>
+                    </div>
+                    {% if can_update_permissions %}
+                    <div style="display:flex;gap:10px;flex-wrap:wrap">
+                        <button type="button" class="btn-admin btn-admin-light" id="perm-reset">
+                            <i class="fas fa-rotate-left"></i>
+                            <span>Đặt lại</span>
+                        </button>
+                        <button type="submit" class="btn-admin btn-admin-primary">
+                            <i class="fas fa-save"></i>
+                            <span>Lưu phân quyền</span>
+                        </button>
+                    </div>
+                    {% else %}
+                    <span class="admin-badge admin-badge-warning">Tài khoản bạn đang dùng không có quyền cập nhật phân quyền.</span>
+                    {% endif %}
+                </div>
+            </form>
+            {% endif %}
+        </section>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_scripts %}
+<script>
+(function () {
+    var searchInput = document.getElementById('perm-user-search');
+    var roleButtons = Array.prototype.slice.call(document.querySelectorAll('[data-role-filter]'));
+    var userCards = Array.prototype.slice.call(document.querySelectorAll('[data-user-card]'));
+    var currentRole = 'all';
+
+    function filterUsers() {
+        var keyword = String(searchInput ? searchInput.value : '').trim().toLowerCase();
+        userCards.forEach(function (card) {
+            var roleMatch = currentRole === 'all' || card.dataset.role === currentRole;
+            var keywordMatch = !keyword || String(card.dataset.search || '').indexOf(keyword) !== -1;
+            card.classList.toggle('is-hidden', !(roleMatch && keywordMatch));
+        });
+    }
+    roleButtons.forEach(function (btn) {
+        btn.addEventListener('click', function () {
+            currentRole = btn.getAttribute('data-role-filter') || 'all';
+            roleButtons.forEach(function (b) { b.classList.toggle('is-active', b === btn); });
+            filterUsers();
+        });
+    });
+    if (searchInput) searchInput.addEventListener('input', filterUsers);
+    filterUsers();
+
+    var form = document.getElementById('perm-form');
+    if (!form) return;
+
+    var moduleSearch = document.getElementById('perm-module-search');
+    var moduleEls = Array.prototype.slice.call(form.querySelectorAll('[data-module]'));
+    var liveCountEl = document.getElementById('perm-live-count');
+    var liveModulesEl = document.getElementById('perm-live-modules');
+    var initialState = serializeForm();
+
+    function serializeForm() {
+        var state = {};
+        Array.prototype.forEach.call(form.querySelectorAll('input[type="checkbox"]'), function (input) {
+            state[input.name] = input.checked;
+        });
+        return state;
+    }
+
+    function moduleInputs(moduleKey) {
+        return form.querySelectorAll('input[data-module-input="' + moduleKey + '"]');
+    }
+
+    function refreshModule(moduleKey) {
+        var inputs = moduleInputs(moduleKey);
+        var enabled = 0;
+        Array.prototype.forEach.call(inputs, function (input) { if (input.checked) enabled++; });
+        var badge = form.querySelector('[data-module-count="' + moduleKey + '"]');
+        if (badge) badge.textContent = enabled;
+        var moduleEl = form.querySelector('[data-module="' + moduleKey + '"]');
+        if (moduleEl) moduleEl.classList.toggle('is-enabled', enabled > 0);
+    }
+
+    function refreshCounters() {
+        var total = 0, activeModules = 0;
+        moduleEls.forEach(function (moduleEl) {
+            var moduleKey = moduleEl.getAttribute('data-module');
+            var inputs = moduleInputs(moduleKey);
+            var enabled = 0;
+            Array.prototype.forEach.call(inputs, function (input) { if (input.checked) enabled++; });
+            total += enabled;
+            if (enabled > 0) activeModules++;
+        });
+        if (liveCountEl) liveCountEl.textContent = total;
+        if (liveModulesEl) liveModulesEl.textContent = activeModules;
+    }
+
+    function refreshAllModules() {
+        moduleEls.forEach(function (el) { refreshModule(el.getAttribute('data-module')); });
+        refreshCounters();
+    }
+
+    function setRow(moduleKey, mode) {
+        Array.prototype.forEach.call(moduleInputs(moduleKey), function (input) {
+            if (input.disabled) return;
+            var action = input.name.split('__')[2];
+            if (mode === 'all') input.checked = true;
+            else if (mode === 'view') input.checked = action === 'view';
+            else input.checked = false;
+        });
+        refreshModule(moduleKey);
+        refreshCounters();
+    }
+
+    var PRESETS = {
+        warehouse: { modules: ['medicine','purchase_import','stock_export','inventory_lot','reports'], views: ['reports'] },
+        branch:    { modules: ['dashboard','medicine','order','return_request','purchase_import','stock_export','inventory_lot','promotion','reports','pharmacy'], views: ['dashboard','reports'] },
+        content:   { modules: ['dashboard','home_page','about_page','news'], views: ['dashboard'] }
+    };
+
+    function applyPreset(mode) {
+        if (mode === 'clear') {
+            Array.prototype.forEach.call(form.querySelectorAll('input[type="checkbox"]'), function (input) {
+                if (!input.disabled) input.checked = false;
+            });
+        } else if (mode === 'view') {
+            Array.prototype.forEach.call(form.querySelectorAll('input[type="checkbox"]'), function (input) {
+                if (input.disabled) return;
+                input.checked = input.name.endsWith('__view');
+            });
+        } else if (PRESETS[mode]) {
+            Array.prototype.forEach.call(form.querySelectorAll('input[type="checkbox"]'), function (input) {
+                if (!input.disabled) input.checked = false;
+            });
+            PRESETS[mode].modules.forEach(function (m) { setRow(m, 'all'); });
+            PRESETS[mode].views.forEach(function (m) { setRow(m, 'view'); });
+        }
+        refreshAllModules();
+    }
+
+    Array.prototype.forEach.call(form.querySelectorAll('[data-preset]'), function (btn) {
+        btn.addEventListener('click', function () { applyPreset(btn.getAttribute('data-preset')); });
+    });
+    Array.prototype.forEach.call(form.querySelectorAll('[data-row-module]'), function (btn) {
+        btn.addEventListener('click', function () {
+            setRow(btn.getAttribute('data-row-module'), btn.getAttribute('data-row-mode'));
+        });
+    });
+    Array.prototype.forEach.call(form.querySelectorAll('input[type="checkbox"]'), function (input) {
+        input.addEventListener('change', function () {
+            var key = (input.name || '').split('__')[1];
+            if (key) refreshModule(key);
+            refreshCounters();
+        });
+    });
+
+    if (moduleSearch) {
+        moduleSearch.addEventListener('input', function () {
+            var keyword = moduleSearch.value.trim().toLowerCase();
+            moduleEls.forEach(function (moduleEl) {
+                var hay = String(moduleEl.getAttribute('data-module-search') || '');
+                moduleEl.classList.toggle('is-hidden', keyword && hay.indexOf(keyword) === -1);
+            });
+        });
+    }
+
+    var resetBtn = document.getElementById('perm-reset');
+    if (resetBtn) {
+        resetBtn.addEventListener('click', function () {
+            Array.prototype.forEach.call(form.querySelectorAll('input[type="checkbox"]'), function (input) {
+                if (input.disabled) return;
+                input.checked = !!initialState[input.name];
+            });
+            refreshAllModules();
+        });
+    }
+
+    refreshAllModules();
+})();
+</script>
+{% endblock %}

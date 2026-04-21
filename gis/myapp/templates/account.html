@@ -3,13 +3,25 @@
 {% block title %}Tài khoản cá nhân{% endblock %}
 {% block body_class %}site-page account-page{% endblock %}
 
+{% block extra_css %}
+<style>
+    .account-password-trigger{max-width:240px}
+    .account-password-modal .modal-content{border:none;border-radius:26px;overflow:hidden;box-shadow:0 22px 52px rgba(17,70,184,.16)}
+    .account-password-modal .modal-header{padding:20px 24px;background:linear-gradient(135deg,#1f64e0 0%,#1146b8 100%);color:#fff;border-bottom:none}
+    .account-password-modal .modal-title{font-weight:900}
+    .account-password-modal .modal-body{padding:24px}
+    .account-password-modal .modal-footer{padding:0 24px 24px;border-top:none}
+    .account-password-modal .account-form__field{margin-bottom:16px}
+</style>
+{% endblock %}
+
 {% block content_wrapper %}
 <div class="account-layout">
     <div class="container">
         <div class="section-heading mb-4">
             <div>
                 <div class="section-heading__eyebrow"><i class="fas fa-id-card"></i> Tài khoản cá nhân</div>
-                <h1>Quản lý thông tin và các chức năng theo quyền truy cập</h1>
+                <h1>Thông tin tài khoản và lịch sử mua hàng</h1>
             </div>
         </div>
 
@@ -44,6 +56,12 @@
                         <span>Ngày tham gia</span>
                         <strong>{{ user.date_joined|date:"d/m/Y" }}</strong>
                     </div>
+                    {% if managed_work_pharmacy %}
+                    <div class="account-info-row">
+                        <span>Cửa hàng đang làm việc</span>
+                        <strong>{{ managed_work_pharmacy.name }}</strong>
+                    </div>
+                    {% endif %}
                 </div>
 
                 {% if is_customer %}
@@ -57,6 +75,67 @@
                     {% else %}
                         <div class="text-muted">Bạn chưa lưu địa chỉ mặc định.</div>
                     {% endif %}
+                </div>
+
+                <div class="account-loyalty-card account-loyalty-card--{{ loyalty_context.code }} mb-4">
+                    <div class="account-loyalty-card__head">
+                        <div class="account-loyalty-card__icon">
+                            {% if loyalty_context.code == 'diamond' %}
+                                <i class="fas fa-gem"></i>
+                            {% elif loyalty_context.code == 'gold' %}
+                                <i class="fas fa-crown"></i>
+                            {% elif loyalty_context.code == 'silver' %}
+                                <i class="fas fa-medal"></i>
+                            {% elif loyalty_context.code == 'bronze' %}
+                                <i class="fas fa-award"></i>
+                            {% else %}
+                                <i class="fas fa-star"></i>
+                            {% endif %}
+                        </div>
+                        <div class="account-loyalty-card__intro">
+                            <span class="account-loyalty-card__eyebrow">Hạng khách hàng</span>
+                            <h3>{{ loyalty_context.label }}</h3>
+                            <p>Ưu đãi riêng chỉ hiển thị trong giỏ hàng và bước thanh toán.</p>
+                        </div>
+                        <div class="account-loyalty-card__discount">
+                            <small>Mức giảm riêng</small>
+                            <strong>{{ loyalty_context.discount_percent }}%</strong>
+                            <span>trên đơn hàng</span>
+                        </div>
+                    </div>
+                    <div class="account-loyalty-card__stats">
+                        <div class="account-loyalty-card__stat">
+                            <span><i class="fas fa-wallet"></i> Tổng tiền hàng đã mua thành công</span>
+                            <strong>{{ loyalty_context.total_spent|vnd }}</strong>
+                        </div>
+                        <div class="account-loyalty-card__stat">
+                            <span><i class="fas fa-tags"></i> Cách áp dụng</span>
+                            <strong>Giảm trực tiếp trên phần tạm tính đơn hàng khi vào giỏ hàng và thanh toán.</strong>
+                        </div>
+                    </div>
+                    <div class="account-loyalty-card__footer">
+                        {% if loyalty_context.next_tier %}
+                        <div class="account-loyalty-card__next">
+                            <i class="fas fa-angle-double-up"></i>
+                            <span>Mua thêm <strong>{{ loyalty_context.amount_to_next_tier|vnd }}</strong> để lên hạng <strong>{{ loyalty_context.next_tier.label }}</strong> và nhận <strong>{{ loyalty_context.next_tier.discount_percent }}%</strong>.</span>
+                        </div>
+                        {% else %}
+                        <div class="account-loyalty-card__next account-loyalty-card__next--done">
+                            <i class="fas fa-check-circle"></i>
+                            <span>Bạn đang ở hạng cao nhất và nhận mức ưu đãi tối đa của hệ thống.</span>
+                        </div>
+                        {% endif %}
+                    </div>
+                </div>
+                {% endif %}
+
+                {% if managed_work_pharmacy %}
+                <div class="account-address-preview mb-4">
+                    <strong>Chi nhánh phụ trách</strong>
+                    <div>{{ managed_work_pharmacy.name }}</div>
+                    <small class="text-muted d-block mt-2">
+                        Bạn chỉ được quản lý sản phẩm và đơn hàng thuộc chi nhánh này trong khu vực quản trị.
+                    </small>
                 </div>
                 {% endif %}
 
@@ -86,6 +165,7 @@
                     <h2>Cập nhật thông tin</h2>
                     <form method="post" class="account-form">
                         {% csrf_token %}
+                        <input type="hidden" name="form_action" value="profile">
                         <div class="account-form__grid">
                             <div class="account-form__field">
                                 <label for="{{ account_form.full_name.id_for_label }}">Họ tên</label>
@@ -133,6 +213,10 @@
                             <button type="submit" class="pharma-btn" style="max-width:240px;">
                                 <i class="fas fa-save"></i>
                                 <span>Lưu thông tin</span>
+                            </button>
+                            <button type="button" class="pharma-outline-btn account-password-trigger" data-toggle="modal" data-target="#accountPasswordModal">
+                                <i class="fas fa-key"></i>
+                                <span>Đổi mật khẩu</span>
                             </button>
                             {% if is_customer %}
                             <a href="{% url 'map_view' %}" class="pharma-outline-btn" style="max-width:260px;">
@@ -195,7 +279,7 @@
                                 <div class="history-item__code">Đơn #{{ order.id }}</div>
                                 <div class="history-item__meta">{{ order.created_at|date:"d/m/Y H:i" }}</div>
                             </div>
-                            <span class="history-status history-status--{{ order.status }}">{{ order.get_status_display }}</span>
+                            <span class="history-status {{ order.customer_status_badge_class }}">{{ order.customer_status_short_label }}</span>
                         </div>
                         <div class="history-meta-grid mt-3">
                             <div class="history-meta-item">
@@ -215,4 +299,71 @@
         </div>
     </div>
 </div>
+
+<div class="modal fade account-password-modal" id="accountPasswordModal" tabindex="-1" role="dialog" aria-labelledby="accountPasswordModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered" role="document">
+        <div class="modal-content">
+            <form method="post" novalidate>
+                {% csrf_token %}
+                <input type="hidden" name="form_action" value="change_password">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="accountPasswordModalLabel">Đổi mật khẩu tài khoản</h5>
+                    <button type="button" class="close text-white" data-dismiss="modal" aria-label="Đóng">
+                        <span aria-hidden="true">&times;</span>
+                    </button>
+                </div>
+                <div class="modal-body">
+                    {% if password_change_form.non_field_errors %}
+                    <div class="alert alert-danger">{{ password_change_form.non_field_errors }}</div>
+                    {% endif %}
+                    <div class="account-form__field">
+                        <label for="{{ password_change_form.old_password.id_for_label }}">Mật khẩu hiện tại</label>
+                        {{ password_change_form.old_password }}
+                        {% if password_change_form.old_password.errors %}
+                        <div class="text-danger small mt-2">{{ password_change_form.old_password.errors|join:", " }}</div>
+                        {% endif %}
+                    </div>
+                    <div class="account-form__field">
+                        <label for="{{ password_change_form.new_password1.id_for_label }}">Mật khẩu mới</label>
+                        {{ password_change_form.new_password1 }}
+                        {% if password_change_form.new_password1.errors %}
+                        <div class="text-danger small mt-2">{{ password_change_form.new_password1.errors|join:", " }}</div>
+                        {% endif %}
+                    </div>
+                    <div class="account-form__field mb-0">
+                        <label for="{{ password_change_form.new_password2.id_for_label }}">Nhập lại mật khẩu mới</label>
+                        {{ password_change_form.new_password2 }}
+                        {% if password_change_form.new_password2.errors %}
+                        <div class="text-danger small mt-2">{{ password_change_form.new_password2.errors|join:", " }}</div>
+                        {% endif %}
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="pharma-outline-btn" data-dismiss="modal">
+                        <i class="fas fa-times"></i>
+                        <span>Đóng</span>
+                    </button>
+                    <button type="submit" class="pharma-btn">
+                        <i class="fas fa-check"></i>
+                        <span>Xác nhận đổi mật khẩu</span>
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    (function () {
+        {% if show_password_modal %}
+        if (window.jQuery) {
+            window.jQuery(function () {
+                window.jQuery('#accountPasswordModal').modal('show');
+            });
+        }
+        {% endif %}
+    })();
+</script>
 {% endblock %}

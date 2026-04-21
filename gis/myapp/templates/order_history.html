@@ -15,21 +15,64 @@
             </div>
         </section>
 
+        <section class="content-card history-card mb-4">
+            <form method="get" class="history-filter-grid">
+                <div class="history-filter-grid__item">
+                    <label for="history-status-filter">Trạng thái đơn</label>
+                    <select id="history-status-filter" name="status" class="form-control">
+                        <option value="">Tất cả</option>
+                        {% for value, label in status_choices %}
+                        <option value="{{ value }}" {% if filter_state.status == value %}selected{% endif %}>{{ label }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div class="history-filter-grid__item">
+                    <label for="history-payment-filter">Phương thức thanh toán</label>
+                    <select id="history-payment-filter" name="payment_method" class="form-control">
+                        <option value="">Tất cả</option>
+                        {% for value, label in payment_method_choices %}
+                        <option value="{{ value }}" {% if filter_state.payment_method == value %}selected{% endif %}>{{ label }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div class="history-filter-grid__item">
+                    <label for="history-refund-filter">Trả hàng / hoàn tiền</label>
+                    <select id="history-refund-filter" name="refund_status" class="form-control">
+                        <option value="">Tất cả</option>
+                        {% for value, label in refund_status_choices %}
+                        <option value="{{ value }}" {% if filter_state.refund_status == value %}selected{% endif %}>{{ label }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div class="history-filter-grid__actions">
+                    <button type="submit" class="pharma-btn" style="max-width:180px;">
+                        <i class="fas fa-filter"></i>
+                        <span>Lọc đơn hàng</span>
+                    </button>
+                    <a href="{% url 'order_history' %}" class="pharma-outline-btn" style="max-width:180px;">
+                        <i class="fas fa-sync-alt"></i>
+                        <span>Xóa bộ lọc</span>
+                    </a>
+                </div>
+            </form>
+        </section>
+
         <section class="content-card history-card">
             {% if orders %}
+                <div class="history-results-head">
+                    <div class="site-nav__hint">
+                        Trang <strong>{{ page_obj.number }}</strong> / <strong>{{ page_obj.paginator.num_pages }}</strong>
+                    </div>
+                </div>
                 {% for order in orders %}
                 <article class="history-item">
                     <div class="history-item__head">
                         <div>
-                            <div class="history-item__code">Đơn #{{ order.id }}</div>
-                            <div class="history-item__meta">
-                                Đặt lúc {{ order.created_at|date:"d/m/Y H:i" }} bởi {{ order.full_name }}
-                            </div>
+                            <div class="history-item__code">{{ order.order_code }} · {{ order.resolved_invoice_code }}</div>
+                            <div class="history-item__meta">Đặt lúc {{ order.created_at|date:"d/m/Y H:i" }} · {{ order.full_name }}</div>
                         </div>
                         <div>
-                            <span class="history-status history-status--{{ order.status }}">
-                                {{ order.get_status_display }}
-                            </span>
+                            <span class="history-status {{ order.customer_status_badge_class }}">{{ order.customer_status_label }}</span>
                         </div>
                     </div>
 
@@ -43,32 +86,88 @@
                             <strong>{{ order.pharmacy.name|default:"Chưa gán chi nhánh" }}</strong>
                         </div>
                         <div class="history-meta-box">
-                            <small>Phí ship</small>
-                            <strong>{{ order.shipping_fee|vnd }}</strong>
+                            <small>Thanh toán</small>
+                            <strong>{{ order.get_payment_method_display }}</strong>
+                        </div>
+                        <div class="history-meta-box">
+                            <small>Hoàn tất tự động sau</small>
+                            <strong>{% if order.auto_complete_deadline_at %}{{ order.auto_complete_deadline_at|date:"d/m/Y H:i" }}{% else %}-{% endif %}</strong>
                         </div>
                     </div>
 
-                    <details class="history-item__details">
-                        <summary><strong>Xem chi tiết giao hàng và sản phẩm</strong></summary>
-                        <div class="mt-3">
-                            <p class="mb-2"><strong>Người nhận:</strong> {{ order.full_name }} - {{ order.phone }}</p>
-                            <p class="mb-2"><strong>Địa chỉ giao:</strong> {{ order.address_text }}</p>
-                            <p class="mb-2"><strong>Ghi chú:</strong> {{ order.note|default:"Không có ghi chú thêm." }}</p>
-                            <p class="mb-2"><strong>Khoảng cách:</strong> {{ order.distance_km }} km</p>
-                            <ul class="history-line-items">
-                                {% for item in order.items.all %}
-                                <li>{{ item.medicine_name }} x{{ item.quantity }} - {{ item.line_total|vnd }}</li>
-                                {% endfor %}
-                            </ul>
-                        </div>
-                    </details>
+                    {% if order.user_return_request %}
+                    <div class="alert {% if order.user_return_request.status == 'processing' %}alert-warning{% elif order.user_return_request.status == 'approved_refund' %}alert-success{% else %}alert-danger{% endif %} mt-3 mb-0">
+                        <strong>Trả hàng / hoàn tiền:</strong>
+                        {% if order.user_return_request.status == 'processing' %}Đang xử lý{% elif order.user_return_request.status == 'approved_refund' %}Chấp nhận hoàn tiền{% else %}Từ chối hoàn tiền{% endif %}
+                        {% if order.user_return_request.processed_at %} · cập nhật lúc {{ order.user_return_request.processed_at|date:"d/m/Y H:i" }}{% endif %}
+                    </div>
+                    {% endif %}
+
+                    <div class="d-flex flex-wrap" style="gap:12px; margin-top:18px;">
+                        <a href="{% url 'order_history_detail' order.id %}" class="pharma-btn" style="max-width:260px;">
+                            <i class="fas fa-eye"></i>
+                            <span>Xem chi tiết lịch sử đơn hàng</span>
+                        </a>
+                        <a href="{% url 'order_invoice_view' order.id %}" class="pharma-outline-btn" target="_blank" rel="noopener" style="max-width:240px;">
+                            <i class="fas fa-file-invoice"></i>
+                            <span>Xem hóa đơn</span>
+                        </a>
+
+                        {% if order.can_customer_cancel %}
+                        <form method="post" action="{% url 'cancel_order' order.id %}" onsubmit="return confirm('Bạn chắc chắn muốn hủy đơn hàng này?');" style="margin:0;">
+                            {% csrf_token %}
+                            <button type="submit" class="pharma-outline-btn" style="max-width:220px; border-color:#ef4444; color:#ef4444;">
+                                <i class="fas fa-times-circle"></i>
+                                <span>Hủy đơn hàng</span>
+                            </button>
+                        </form>
+                        {% endif %}
+
+                        {% if order.can_customer_confirm_received %}
+                        <form method="post" action="{% url 'confirm_order_received' order.id %}" onsubmit="return confirm('Xác nhận bạn đã nhận đủ hàng cho đơn này?');" style="margin:0;">
+                            {% csrf_token %}
+                            <button type="submit" class="pharma-outline-btn" style="max-width:250px; border-color:#16a34a; color:#15803d;">
+                                <i class="fas fa-check-circle"></i>
+                                <span>Xác nhận đã nhận hàng</span>
+                            </button>
+                        </form>
+                        {% endif %}
+                    </div>
                 </article>
                 {% endfor %}
+
+                {% if page_obj.paginator.num_pages > 1 %}
+                <nav class="site-pagination" aria-label="Phân trang lịch sử đơn hàng">
+                    {% if page_obj.has_previous %}
+                    <a class="site-pagination__item" href="?{% if query_string %}{{ query_string }}&{% endif %}page={{ page_obj.previous_page_number }}">
+                        <i class="fas fa-chevron-left"></i> Trước
+                    </a>
+                    {% else %}
+                    <span class="site-pagination__item is-disabled"><i class="fas fa-chevron-left"></i> Trước</span>
+                    {% endif %}
+
+                    {% for page_number in page_obj.paginator.page_range %}
+                        {% if page_number >= page_obj.number|add:'-2' and page_number <= page_obj.number|add:'2' %}
+                        <a class="site-pagination__item {% if page_number == page_obj.number %}is-active{% endif %}" href="?{% if query_string %}{{ query_string }}&{% endif %}page={{ page_number }}">
+                            {{ page_number }}
+                        </a>
+                        {% endif %}
+                    {% endfor %}
+
+                    {% if page_obj.has_next %}
+                    <a class="site-pagination__item" href="?{% if query_string %}{{ query_string }}&{% endif %}page={{ page_obj.next_page_number }}">
+                        Sau <i class="fas fa-chevron-right"></i>
+                    </a>
+                    {% else %}
+                    <span class="site-pagination__item is-disabled">Sau <i class="fas fa-chevron-right"></i></span>
+                    {% endif %}
+                </nav>
+                {% endif %}
             {% else %}
                 <div class="site-empty">
                     <div class="site-empty__icon"><i class="fas fa-receipt"></i></div>
-                    <h3>Bạn chưa có đơn hàng nào</h3>
-                    <p>Hãy thêm sản phẩm vào giỏ để bắt đầu đơn đầu tiên.</p>
+                    <h3>Không tìm thấy đơn hàng phù hợp</h3>
+                    <p>Hãy đổi bộ lọc hoặc tiếp tục mua sắm để tạo đơn hàng mới.</p>
                     <a href="{% url 'product_list' %}" class="pharma-btn" style="max-width:280px; margin:0 auto;">
                         Xem sản phẩm ngay
                     </a>

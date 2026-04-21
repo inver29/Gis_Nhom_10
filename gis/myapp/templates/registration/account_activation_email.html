@@ -1,0 +1,37 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Xác nhận đăng ký tài khoản</title>
+</head>
+<body style="margin:0;padding:24px;background:#eef4ff;font-family:Arial,sans-serif;color:#163057;">
+  <div style="max-width:680px;margin:0 auto;background:#ffffff;border-radius:28px;overflow:hidden;border:1px solid #dbe8ff;box-shadow:0 24px 48px rgba(17,70,184,0.12);">
+    <div style="padding:28px 28px 24px;background:radial-gradient(circle at top right,rgba(255,255,255,0.22) 0%,rgba(255,255,255,0) 30%),linear-gradient(145deg,#1146b8 0%,#1f64e0 52%,#0f8cc9 100%);color:#ffffff;">
+      <div style="display:inline-flex;align-items:center;gap:8px;padding:9px 14px;border-radius:999px;background:rgba(255,255,255,0.14);border:1px solid rgba(255,255,255,0.18);font-size:12px;font-weight:800;letter-spacing:.04em;text-transform:uppercase;">
+        Xác nhận email
+      </div>
+      <h1 style="margin:16px 0 10px;font-size:28px;line-height:1.18;">Kích hoạt tài khoản {{ site_name|default:"GIS Pharma" }}</h1>
+      <p style="margin:0;color:rgba(255,255,255,0.9);line-height:1.7;">Chỉ cần xác nhận email này là tài khoản của bạn có thể đăng nhập và sử dụng.</p>
+    </div>
+
+    <div style="padding:28px;">
+      <p style="margin-top:0;font-size:16px;">Xin chào {{ recipient_name }},</p>
+      <p style="margin:0 0 18px;line-height:1.75;color:#4f6285;">
+        Cảm ơn bạn đã đăng ký tài khoản tại {{ site_name|default:"GIS Pharma" }}. Để hoàn tất đăng ký, vui lòng bấm nút bên dưới để xác nhận email và kích hoạt tài khoản.
+      </p>
+
+      <p style="margin:0 0 22px;">
+        <a href="{{ activation_url }}" style="display:inline-flex;align-items:center;justify-content:center;padding:14px 22px;border-radius:14px;background:#1f64e0;color:#ffffff;text-decoration:none;font-weight:800;">Xác nhận và kích hoạt tài khoản</a>
+      </p>
+
+      <div style="padding:16px 18px;border-radius:20px;background:#f9fbff;border:1px dashed #d4e2fb;margin-bottom:20px;color:#4f6285;line-height:1.7;">
+        Nếu nút trên không mở được, hãy sao chép đường dẫn này và dán vào trình duyệt:<br>
+        <a href="{{ activation_url }}" style="color:#1f64e0;word-break:break-all;">{{ activation_url }}</a>
+      </div>
+
+      <p style="margin:0;color:#5d7090;line-height:1.7;">Nếu bạn không thực hiện đăng ký này, hãy bỏ qua email. Mọi thắc mắc có thể liên hệ {{ support_email|default:"bộ phận hỗ trợ" }}.</p>
+    </div>
+  </div>
+</body>
+</html>

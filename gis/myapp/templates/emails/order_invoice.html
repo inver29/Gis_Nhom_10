@@ -3,9 +3,12 @@
 <body style="margin:0;padding:24px;background:#f7faff;font-family:Arial,sans-serif;color:#163057;">
   <div style="max-width:680px;margin:0 auto;background:#ffffff;border-radius:20px;overflow:hidden;border:1px solid #dbe8ff;">
     <div style="padding:20px 24px;background:linear-gradient(135deg,#1f64e0 0%,#1146b8 100%);color:#ffffff;">
-      <h1 style="margin:0;font-size:24px;">Hóa đơn tạm tính đơn hàng #{{ order.id }}</h1>
+      <h1 style="margin:0;font-size:24px;">Hóa đơn đơn hàng {{ order.resolved_invoice_code }}</h1>
+      <p style="margin:8px 0 0;opacity:.9;">Mã đơn {{ order.order_code }} · {{ order.get_payment_method_display }}</p>
     </div>
     <div style="padding:24px;">
+      <p style="margin:0 0 12px;">Chi nhánh xử lý: <strong>{{ order.pharmacy.name|default:"Chưa gán chi nhánh" }}</strong></p>
+      <p style="margin:0 0 12px;">Nhân viên lập hóa đơn: <strong>{{ order.resolved_invoice_staff_name|default:"Nhân viên quầy thuốc" }}</strong></p>
       <table style="width:100%;border-collapse:collapse;">
         <thead>
           <tr>
@@ -25,11 +28,15 @@
         </tbody>
       </table>
       <div style="margin-top:22px;">
-        <p style="margin:8px 0;">Tiền hàng: <strong>{{ order.total_product_price|vnd }}</strong></p>
+        <p style="margin:8px 0;">Tạm tính sau khuyến mãi hệ thống: <strong>{{ order.product_subtotal_before_tier_discount|vnd }}</strong></p>{% if order.has_customer_tier_discount %}<p style="margin:8px 0;">Ưu đãi hạng {{ order.customer_tier_name }}: <strong>-{{ order.customer_tier_discount_total|vnd }}</strong></p>{% endif %}
         <p style="margin:8px 0;">Phí ship: <strong>{{ order.shipping_fee|vnd }}</strong></p>
+        <p style="margin:8px 0;">Nội dung thanh toán: <strong>{{ order.resolved_payment_reference }}</strong></p>
         <p style="margin:8px 0;font-size:18px;">Tổng thanh toán: <strong style="color:#d62839;">{{ order.final_total_price|vnd }}</strong></p>
       </div>
-      <p style="margin-top:20px;"><a href="{{ order_history_url }}" style="display:inline-block;padding:12px 18px;border-radius:12px;background:#1f64e0;color:#ffffff;text-decoration:none;font-weight:700;">Xem đơn hàng</a></p>
+      <p style="margin-top:20px;display:flex;gap:10px;flex-wrap:wrap;">
+        <a href="{{ order_history_url }}" style="display:inline-block;padding:12px 18px;border-radius:12px;background:#1f64e0;color:#ffffff;text-decoration:none;font-weight:700;">Xem đơn hàng</a>
+        <a href="{{ invoice_url }}" style="display:inline-block;padding:12px 18px;border-radius:12px;background:#ffffff;color:#1f64e0;text-decoration:none;font-weight:700;border:1px solid #c9d8ff;">Mở hóa đơn chi tiết</a>
+      </p>
     </div>
   </div>
 </body>

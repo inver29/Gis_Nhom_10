@@ -1,0 +1,159 @@
+{% extends "base.html" %}
+{% load currency_filters %}
+{% block title %}Chi tiết đơn hàng{% endblock %}
+{% block body_class %}site-page history-page{% endblock %}
+
+{% block content_wrapper %}
+<div class="history-layout">
+    <div class="container">
+        <section class="section-shell mb-4">
+            <div class="section-heading">
+                <div>
+                    <div class="section-heading__eyebrow"><i class="fas fa-box-open"></i> Chi tiết lịch sử đơn hàng</div>
+                    <h1>{{ order.order_code }}</h1>
+                </div>
+                <a href="{% url 'order_history' %}" class="pharma-outline-btn" style="max-width:220px;">
+                    <i class="fas fa-arrow-left"></i>
+                    <span>Quay lại lịch sử đơn</span>
+                </a>
+            </div>
+        </section>
+
+        <section class="content-card history-card">
+            <div class="history-item__head">
+                <div>
+                    <div class="history-item__code">{{ order.order_code }} · {{ order.resolved_invoice_code }}</div>
+                    <div class="history-item__meta">Đặt lúc {{ order.created_at|date:"d/m/Y H:i" }} · {{ order.full_name }} · {{ order.phone }}</div>
+                </div>
+                <div>
+                    <span class="history-status {{ order.customer_status_badge_class }}">{{ order.customer_status_label }}</span>
+                </div>
+            </div>
+
+            <div class="history-meta-grid">
+                <div class="history-meta-box"><small>Chi nhánh bán</small><strong>{{ order.pharmacy.name|default:"Chưa gán chi nhánh" }}</strong></div>
+                <div class="history-meta-box"><small>Thời gian giao dự kiến</small><strong>{% if order.estimated_delivery_at %}{{ order.estimated_delivery_at|date:"d/m/Y H:i" }}{% else %}-{% endif %}</strong></div>
+                <div class="history-meta-box"><small>Trạng thái thanh toán</small><strong>{{ order.get_payment_status_display }}</strong></div>
+                <div class="history-meta-box"><small>Nội dung thanh toán</small><strong>{{ order.resolved_payment_reference }}</strong></div>
+            </div>
+
+            <div class="mt-4">
+                <p class="mb-2"><strong>Địa chỉ giao hàng:</strong> {{ order.address_text }}</p>
+                <p class="mb-2"><strong>Ghi chú:</strong> {{ order.note|default:"Không có ghi chú thêm." }}</p>
+                <p class="mb-2"><strong>Nhân viên phụ trách hóa đơn:</strong> {{ order.resolved_invoice_staff_name|default:"Nhân viên quầy thuốc" }}</p>
+            </div>
+
+            <div class="table-responsive mt-4">
+                <table class="table table-bordered bg-white">
+                    <thead>
+                        <tr>
+                            <th>Sản phẩm</th>
+                            <th>Đơn giá</th>
+                            <th>Số lượng</th>
+                            <th>Thành tiền</th>
+                            <th>Đánh giá</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for item in order_items %}
+                        <tr>
+                            <td>
+                                <div class="font-weight-bold">{{ item.medicine_name }}</div>
+                                {% if item.medicine %}<div class="text-muted small">Mã SP #{{ item.medicine.id }}</div>{% endif %}
+                                {% if item.lot_allocations.all %}
+                                <div class="text-muted small mt-2">
+                                    {% for allocation in item.lot_allocations.all %}
+                                    <div>
+                                        Lô: {{ allocation.lot_source_label|default:"Lô FEFO" }} · SL: {{ allocation.quantity }}
+                                        {% if allocation.lot_expiry_date %}· HSD: {{ allocation.lot_expiry_date|date:"d/m/Y" }}{% endif %}
+                                    </div>
+                                    {% endfor %}
+                                </div>
+                                {% endif %}
+                            </td>
+                            <td>{{ item.price|vnd }}</td>
+                            <td>{{ item.quantity }}</td>
+                            <td><strong>{{ item.line_total|vnd }}</strong></td>
+                            <td>
+                                {% if order.status == 'completed' and item.medicine_id %}
+                                <a href="{% url 'order_item_review_redirect' order.id item.id %}" class="pharma-outline-btn" style="max-width:220px; min-width:180px;">
+                                    <i class="fas fa-star"></i>
+                                    <span>Đánh giá sản phẩm</span>
+                                </a>
+                                {% elif order.status == 'completed' and not item.medicine_id %}
+                                <button type="button" class="pharma-outline-btn" disabled style="max-width:220px; min-width:180px; opacity:.5; cursor:not-allowed;">
+                                    <i class="fas fa-ban"></i>
+                                    <span>Sản phẩm gốc không còn tồn tại</span>
+                                </button>
+                                {% else %}
+                                <button type="button" class="pharma-outline-btn" disabled style="max-width:220px; min-width:180px; opacity:.5; cursor:not-allowed;">
+                                    <i class="fas fa-lock"></i>
+                                    <span>Chờ hoàn tất đơn hàng</span>
+                                </button>
+                                {% endif %}
+                            </td>
+                        </tr>
+                        {% empty %}
+                        <tr><td colspan="5">Đơn hàng chưa có sản phẩm.</td></tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+
+            <div class="history-meta-grid mt-4">
+                <div class="history-meta-box"><small>Tạm tính sau khuyến mãi hệ thống</small><strong>{{ order.product_subtotal_before_tier_discount|vnd }}</strong></div>
+                {% if order.has_customer_tier_discount %}<div class="history-meta-box"><small>Ưu đãi hạng {{ order.customer_tier_name }}</small><strong class="text-primary">-{{ order.customer_tier_discount_total|vnd }}</strong></div>{% endif %}<div class="history-meta-box"><small>Phí giao</small><strong>{{ order.shipping_fee|vnd }}</strong></div>
+                <div class="history-meta-box"><small>Khoảng cách</small><strong>{{ order.distance_km }} km</strong></div>
+                <div class="history-meta-box"><small>Tổng thanh toán</small><strong class="text-danger">{{ order.final_total_price|vnd }}</strong></div>
+            </div>
+
+            {% if return_request %}
+            <div class="alert {% if return_request.status == 'processing' %}alert-warning{% elif return_request.status == 'approved_refund' %}alert-success{% else %}alert-danger{% endif %} mt-4">
+                <strong>Yêu cầu trả hàng / hoàn tiền:</strong> {% if return_request.status == 'processing' %}Đang xử lý{% elif return_request.status == 'approved_refund' %}Chấp nhận hoàn tiền{% else %}Từ chối hoàn tiền{% endif %}.
+                {% if return_request.processed_by %} Người xử lý: {{ return_request.processed_by_display_name|default:return_request.processed_by.username }}.{% endif %}
+                {% if return_request.admin_note %}<br><strong>Ghi chú xử lý:</strong> {{ return_request.admin_note }}{% endif %}
+            </div>
+            {% endif %}
+
+            <div class="d-flex flex-wrap" style="gap:12px; margin-top:18px;">
+                <a href="{% url 'order_invoice_view' order.id %}" class="pharma-btn" target="_blank" rel="noopener" style="max-width:220px;">
+                    <i class="fas fa-file-invoice"></i>
+                    <span>Xem hóa đơn</span>
+                </a>
+
+                {% if order.can_customer_cancel %}
+                <form method="post" action="{% url 'cancel_order' order.id %}" onsubmit="return confirm('Bạn chắc chắn muốn hủy đơn hàng này?');" style="margin:0;">
+                    {% csrf_token %}
+                    <button type="submit" class="pharma-outline-btn" style="max-width:210px; border-color:#ef4444; color:#ef4444;">
+                        <i class="fas fa-times-circle"></i>
+                        <span>Hủy đơn hàng</span>
+                    </button>
+                </form>
+                {% endif %}
+
+                {% if order.can_customer_confirm_received %}
+                <form method="post" action="{% url 'confirm_order_received' order.id %}" onsubmit="return confirm('Xác nhận bạn đã nhận đủ hàng cho đơn này?');" style="margin:0;">
+                    {% csrf_token %}
+                    <button type="submit" class="pharma-outline-btn" style="max-width:240px; border-color:#16a34a; color:#15803d;">
+                        <i class="fas fa-check-circle"></i>
+                        <span>Xác nhận đã nhận hàng</span>
+                    </button>
+                </form>
+                {% endif %}
+
+                {% if order.can_request_return_refund %}
+                <a href="{% url 'return_request' order.id %}" class="pharma-outline-btn" style="max-width:250px;">
+                    <i class="fas fa-undo-alt"></i>
+                    <span>{% if return_request %}Xem / cập nhật trả hàng{% else %}Trả hàng / hoàn tiền{% endif %}</span>
+                </a>
+                {% else %}
+                <button type="button" class="pharma-outline-btn" disabled style="max-width:250px; opacity:.5; cursor:not-allowed;">
+                    <i class="fas fa-undo-alt"></i>
+                    <span>Chỉ mở sau khi đơn hoàn thành</span>
+                </button>
+                {% endif %}
+            </div>
+        </section>
+    </div>
+</div>
+{% endblock %}
