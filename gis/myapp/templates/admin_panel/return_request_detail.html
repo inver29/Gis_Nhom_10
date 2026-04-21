@@ -1,0 +1,134 @@
+{% extends "admin_panel/base.html" %}
+{% load currency_filters %}
+
+{% block admin_content %}
+<section class="admin-section-head mb-4">
+    <div>
+        <h2 class="admin-section-title">Yêu cầu trả hàng / hoàn tiền #{{ return_request.pk }}</h2>
+        <p class="admin-section-muted">Theo dõi lý do khách hàng gửi, thông tin hoàn tiền và toàn bộ ảnh chứng minh liên quan đến đơn hàng.</p>
+    </div>
+    <div class="admin-toolbar">
+        <a href="{% url 'custom_admin_list' 'return_request' %}" class="btn-admin btn-admin-light">
+            <i class="fas fa-arrow-left"></i>
+            <span>Quay lại danh sách</span>
+        </a>
+        {% if can_delete_return_request %}
+        <a href="{% url 'custom_admin_delete' 'return_request' return_request.pk %}" class="btn-admin btn-admin-danger">
+            <i class="fas fa-trash"></i>
+            <span>Xóa yêu cầu</span>
+        </a>
+        {% endif %}
+    </div>
+</section>
+
+<section class="admin-detail-grid">
+    <div>
+        <div class="admin-surface admin-section mb-4">
+            <div class="admin-section-head">
+                <div>
+                    <h3>Thông tin khách hàng và đơn hàng</h3>
+                    <p>Dùng để đối chiếu nhanh trước khi ra quyết định xử lý.</p>
+                </div>
+            </div>
+            <div class="admin-meta-grid">
+                <div class="admin-meta-item"><div class="admin-meta-item__label">Đơn hàng</div><div class="admin-meta-item__value">{{ return_request.order.order_code }}</div></div>
+                <div class="admin-meta-item"><div class="admin-meta-item__label">Khách hàng</div><div class="admin-meta-item__value">{{ return_request.order.full_name }}</div></div>
+                <div class="admin-meta-item"><div class="admin-meta-item__label">Điện thoại liên hệ</div><div class="admin-meta-item__value">{{ return_request.contact_phone|default:return_request.order.phone }}</div></div>
+                <div class="admin-meta-item"><div class="admin-meta-item__label">Email liên hệ</div><div class="admin-meta-item__value">{{ return_request.contact_email|default:'-' }}</div></div>
+                <div class="admin-meta-item"><div class="admin-meta-item__label">Chi nhánh</div><div class="admin-meta-item__value">{{ return_request.order.pharmacy.name|default:'Chưa gán' }}</div></div>
+                <div class="admin-meta-item"><div class="admin-meta-item__label">Tổng thanh toán</div><div class="admin-meta-item__value">{{ return_request.order.final_total_price|vnd }}</div></div>
+            </div>
+
+            <div class="admin-meta-item mt-3">
+                <div class="admin-meta-item__label">Lý do khách gửi</div>
+                <div class="admin-meta-item__value">{{ return_request.reason|linebreaksbr }}</div>
+            </div>
+        </div>
+
+        <div class="admin-surface admin-section mb-4">
+            <div class="admin-section-head">
+                <div>
+                    <h3>Thông tin nhận tiền hoàn</h3>
+                    <p>Kiểm tra thông tin tài khoản mà khách hàng đã cung cấp.</p>
+                </div>
+            </div>
+            <div class="admin-meta-grid">
+                <div class="admin-meta-item"><div class="admin-meta-item__label">Tài khoản ngân hàng</div><div class="admin-meta-item__value">{{ return_request.bank_account_number|default:'Không cung cấp' }}</div></div>
+                <div class="admin-meta-item"><div class="admin-meta-item__label">Tài khoản MoMo</div><div class="admin-meta-item__value">{{ return_request.momo_account_number|default:'Không cung cấp' }}</div></div>
+                <div class="admin-meta-item"><div class="admin-meta-item__label">Ngày gửi yêu cầu</div><div class="admin-meta-item__value">{{ return_request.created_at|date:"d/m/Y H:i" }}</div></div>
+                <div class="admin-meta-item"><div class="admin-meta-item__label">Cập nhật gần nhất</div><div class="admin-meta-item__value">{{ return_request.updated_at|date:"d/m/Y H:i" }}</div></div>
+            </div>
+        </div>
+
+        <div class="admin-surface admin-section">
+            <div class="admin-section-head">
+                <div>
+                    <h3>Ảnh bill và ảnh chứng minh</h3>
+                    <p>Toàn bộ dữ liệu người dùng gửi lên để đối chiếu.</p>
+                </div>
+            </div>
+            {% if return_request.bill_image %}
+            <div class="mb-4">
+                <div class="admin-meta-item__label mb-2">Bill thanh toán / hóa đơn</div>
+                <a href="{{ return_request.bill_image.url }}" target="_blank" rel="noopener">
+                    <img src="{{ return_request.bill_image.url }}" alt="Bill thanh toán" style="max-width:280px; border-radius:18px; box-shadow:0 16px 32px rgba(15,23,42,.12);">
+                </a>
+            </div>
+            {% endif %}
+
+            <div class="admin-meta-item__label mb-2">Ảnh chứng minh</div>
+            {% if evidence_images %}
+            <div class="d-flex flex-wrap" style="gap:12px;">
+                {% for evidence in evidence_images %}
+                <a href="{{ evidence.image.url }}" target="_blank" rel="noopener">
+                    <img src="{{ evidence.image.url }}" alt="Ảnh chứng minh {{ forloop.counter }}" style="width:160px; height:160px; object-fit:cover; border-radius:16px; box-shadow:0 16px 32px rgba(15,23,42,.12);">
+                </a>
+                {% endfor %}
+            </div>
+            {% else %}
+            <div class="admin-empty-state">Khách hàng chưa tải ảnh chứng minh bổ sung.</div>
+            {% endif %}
+        </div>
+    </div>
+
+    <div>
+        <div class="admin-surface admin-section mb-4">
+            <div class="admin-section-head">
+                <div>
+                    <h3>Cập nhật xử lý yêu cầu</h3>
+                    <p>Nhân viên hoặc quản trị viên đều có thể cập nhật trạng thái xử lý.</p>
+                </div>
+            </div>
+            <form method="post">
+                {% csrf_token %}
+                {% for field in update_form %}
+                <div class="admin-field">
+                    <label>{{ field.label }}</label>
+                    {{ field }}
+                    {% if field.errors %}<div class="admin-field-error">{{ field.errors }}</div>{% endif %}
+                </div>
+                {% endfor %}
+                <button type="submit" class="btn-admin btn-admin-primary">
+                    <i class="fas fa-save"></i>
+                    <span>Lưu cập nhật</span>
+                </button>
+            </form>
+        </div>
+
+        <div class="admin-surface admin-section">
+            <div class="admin-section-head">
+                <div>
+                    <h3>Trạng thái hiện tại</h3>
+                    <p>Tóm tắt nhanh để bàn giao xử lý nội bộ.</p>
+                </div>
+            </div>
+            <div class="admin-meta-grid">
+                <div class="admin-meta-item"><div class="admin-meta-item__label">Trạng thái</div><div class="admin-meta-item__value">{% if return_request.status == 'processing' %}<span class="admin-badge admin-badge-warning">Đang xử lý</span>{% elif return_request.status == 'approved_refund' %}<span class="admin-badge admin-badge-success">Chấp nhận hoàn tiền</span>{% else %}<span class="admin-badge admin-badge-danger">Từ chối hoàn tiền</span>{% endif %}</div></div>
+                <div class="admin-meta-item"><div class="admin-meta-item__label">Người xử lý</div><div class="admin-meta-item__value">{% if return_request.processed_by %}{{ return_request.processed_by_display_name|default:"-" }}{% else %}-{% endif %}</div></div>
+                <div class="admin-meta-item"><div class="admin-meta-item__label">Thời gian xử lý</div><div class="admin-meta-item__value">{% if return_request.processed_at %}{{ return_request.processed_at|date:"d/m/Y H:i" }}{% else %}-{% endif %}</div></div>
+                <div class="admin-meta-item"><div class="admin-meta-item__label">Mã đơn liên quan</div><div class="admin-meta-item__value"><a href="{% url 'custom_admin_order_detail' return_request.order.pk %}">{{ return_request.order.order_code }}</a></div></div>
+            </div>
+        </div>
+    </div>
+</section>
+{% endblock %}

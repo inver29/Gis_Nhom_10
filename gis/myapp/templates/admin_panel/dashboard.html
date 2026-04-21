@@ -1,0 +1,354 @@
+{% extends "admin_panel/base.html" %}
+{% load currency_filters %}
+
+{% block admin_content %}
+<div class="admin-dashboard">
+{% if managed_pharmacy %}
+<section class="admin-surface admin-section mb-4">
+    <div class="admin-section-head mb-0">
+        <div>
+            <h2>Chi nhánh đang phụ trách</h2>
+            <p>Bạn chỉ được xử lý sản phẩm và đơn hàng thuộc chi nhánh này trong khu vực quản trị.</p>
+        </div>
+        <span class="admin-badge admin-badge-info">{{ managed_pharmacy.name }}</span>
+    </div>
+</section>
+{% endif %}
+<section class="admin-stat-grid">
+    <article class="admin-surface admin-stat-card tone-primary">
+        <div class="admin-stat-card__label">Tổng chi nhánh</div>
+        <div class="admin-stat-card__value">{{ pharmacy_count }}</div>
+        <div class="admin-stat-card__meta">Điểm bán đang được quản lý trên hệ thống.</div>
+    </article>
+    <article class="admin-surface admin-stat-card tone-primary">
+        <div class="admin-stat-card__label">Tổng sản phẩm</div>
+        <div class="admin-stat-card__value">{{ medicine_count }}</div>
+        <div class="admin-stat-card__meta">Số mặt hàng đang được niêm yết.</div>
+    </article>
+    <article class="admin-surface admin-stat-card tone-warning">
+        <div class="admin-stat-card__label">Chờ xử lý</div>
+        <div class="admin-stat-card__value">{{ pending_order_count }}</div>
+        <div class="admin-stat-card__meta">Đơn hàng mới cần xác nhận và chuẩn bị.</div>
+    </article>
+    <article class="admin-surface admin-stat-card tone-info">
+        <div class="admin-stat-card__label">Đang giao</div>
+        <div class="admin-stat-card__value">{{ shipping_order_count }}</div>
+        <div class="admin-stat-card__meta">Đơn đang ở trạng thái vận chuyển.</div>
+    </article>
+    <article class="admin-surface admin-stat-card tone-warning">
+        <div class="admin-stat-card__label">Sắp hết hàng</div>
+        <div class="admin-stat-card__value">{{ low_stock_count }}</div>
+        <div class="admin-stat-card__meta">Mặt hàng nên ưu tiên bổ sung kho.</div>
+    </article>
+    <article class="admin-surface admin-stat-card tone-danger">
+        <div class="admin-stat-card__label">Hết hàng</div>
+        <div class="admin-stat-card__value">{{ out_of_stock_count }}</div>
+        <div class="admin-stat-card__meta">Sản phẩm đang không thể bán ra.</div>
+    </article>
+</section>
+
+<section class="admin-surface admin-section admin-section--orders mb-4" data-pagination-key="dashboard-orders">
+    <div class="admin-section-head">
+        <div>
+            <h2>Đơn hàng mới nhất</h2>
+            <p>Theo dõi các đơn vừa phát sinh để kiểm tra chi nhánh xử lý và tiến độ vận hành.</p>
+        </div>
+        <a href="{% url 'custom_admin_list' 'order' %}" class="btn-admin btn-admin-light">
+            <i class="fas fa-list"></i>
+            <span>Xem toàn bộ đơn</span>
+        </a>
+    </div>
+
+    <div class="admin-table-wrap">
+        <table class="admin-table admin-table--dashboard-orders">
+            <thead>
+                <tr>
+                    <th>Mã đơn</th>
+                    <th>Khách hàng</th>
+                    <th>Chi nhánh</th>
+                    <th>Trạng thái</th>
+                    <th>Tổng tiền</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for order in recent_orders %}
+                <tr>
+                    <td>
+                        <div class="admin-cell-title">#{{ order.id }}</div>
+                        <div class="admin-cell-sub">{{ order.created_at|date:"d/m/Y H:i" }}</div>
+                    </td>
+                    <td>
+                        <div class="admin-cell-title">{{ order.full_name }}</div>
+                        <div class="admin-cell-sub">{{ order.phone }}</div>
+                    </td>
+                    <td>
+                        {% if order.pharmacy %}
+                            <div class="admin-cell-title">{{ order.pharmacy.name }}</div>
+                        {% else %}
+                            <span class="admin-badge admin-badge-secondary">Chưa gán</span>
+                        {% endif %}
+                    </td>
+                    <td>
+                        {% if order.status == 'pending' %}
+                            <span class="admin-badge admin-badge-warning">Chờ xử lý</span>
+                        {% elif order.status == 'shipping' %}
+                            <span class="admin-badge admin-badge-info">Đang giao</span>
+                        {% elif order.status == 'completed' %}
+                            <span class="admin-badge admin-badge-success">Hoàn thành</span>
+                        {% else %}
+                            <span class="admin-badge admin-badge-danger">Đã hủy</span>
+                        {% endif %}
+                    </td>
+                    <td><strong>{{ order.final_total_price|vnd }}</strong></td>
+                </tr>
+                {% empty %}
+                <tr>
+                    <td colspan="5">
+                        <div class="admin-empty-state">Chưa có đơn hàng nào để hiển thị.</div>
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+
+    {% if recent_orders_page_obj.has_other_pages %}
+    <nav class="admin-pagination" aria-label="Phân trang đơn hàng mới nhất">
+        <div class="admin-pagination__controls">
+            {% if recent_orders_page_obj.has_previous %}
+            <a class="admin-pagination__item admin-pagination__item--nav" href="?orders_page={{ recent_orders_page_obj.previous_page_number }}&stock_page={{ low_stock_page_obj.number }}&branch_page={{ branch_overview_page_obj.number }}">Trước</a>
+            {% else %}
+            <span class="admin-pagination__item admin-pagination__item--nav is-disabled">Trước</span>
+            {% endif %}
+
+            {% for page_number in recent_orders_page_obj.paginator.page_range %}
+                {% if page_number >= recent_orders_page_obj.number|add:'-2' and page_number <= recent_orders_page_obj.number|add:'2' %}
+                <a class="admin-pagination__item {% if page_number == recent_orders_page_obj.number %}is-active{% endif %}" href="?orders_page={{ page_number }}&stock_page={{ low_stock_page_obj.number }}&branch_page={{ branch_overview_page_obj.number }}">{{ page_number }}</a>
+                {% endif %}
+            {% endfor %}
+
+            {% if recent_orders_page_obj.has_next %}
+            <a class="admin-pagination__item admin-pagination__item--nav" href="?orders_page={{ recent_orders_page_obj.next_page_number }}&stock_page={{ low_stock_page_obj.number }}&branch_page={{ branch_overview_page_obj.number }}">Sau</a>
+            {% else %}
+            <span class="admin-pagination__item admin-pagination__item--nav is-disabled">Sau</span>
+            {% endif %}
+        </div>
+    </nav>
+    {% endif %}
+</section>
+
+<section class="admin-grid-two admin-grid-two--dashboard mb-4">
+    <div class="admin-surface admin-section admin-section--expiry" data-pagination-key="dashboard-expiring">
+        <div class="admin-section-head">
+            <div>
+                <h3>Hạn sử dụng ≤ 6 tháng</h3>
+                <p>Các thuốc cần ưu tiên theo dõi và bán trước theo nguyên tắc FEFO.</p>
+            </div>
+            <span class="admin-badge admin-badge-warning">{{ expiring_soon_count }}</span>
+        </div>
+
+        <div class="admin-record-list">
+            {% for medicine in expiring_soon_medicines %}
+            <article class="admin-record-item">
+                <div>
+                    <div class="admin-record-item__title">{{ medicine.name }}</div>
+                    <div class="admin-record-item__meta">{{ medicine.pharmacy.name }} • HSD {{ medicine.expiry_date|date:"d/m/Y" }} • Tồn {{ medicine.quantity }}</div>
+                </div>
+                <span class="admin-badge admin-badge-warning">Cần chú ý</span>
+            </article>
+            {% empty %}
+            <div class="admin-empty-state">Không có thuốc nào rơi vào ngưỡng cảnh báo 6 tháng.</div>
+            {% endfor %}
+        </div>
+
+        {% if expiring_soon_page_obj.has_other_pages %}
+        <nav class="admin-pagination" aria-label="Phân trang thuốc sắp hết hạn">
+            <div class="admin-pagination__controls">
+                {% if expiring_soon_page_obj.has_previous %}
+                <a class="admin-pagination__item admin-pagination__item--nav" href="?orders_page={{ recent_orders_page_obj.number }}&stock_page={{ low_stock_page_obj.number }}&expiry_page={{ expiring_soon_page_obj.previous_page_number }}&expired_page={{ expired_page_obj.number }}&branch_page={{ branch_overview_page_obj.number }}">Trước</a>
+                {% else %}
+                <span class="admin-pagination__item admin-pagination__item--nav is-disabled">Trước</span>
+                {% endif %}
+
+                {% for page_number in expiring_soon_page_obj.paginator.page_range %}
+                    {% if page_number >= expiring_soon_page_obj.number|add:'-2' and page_number <= expiring_soon_page_obj.number|add:'2' %}
+                    <a class="admin-pagination__item {% if page_number == expiring_soon_page_obj.number %}is-active{% endif %}" href="?orders_page={{ recent_orders_page_obj.number }}&stock_page={{ low_stock_page_obj.number }}&expiry_page={{ page_number }}&expired_page={{ expired_page_obj.number }}&branch_page={{ branch_overview_page_obj.number }}">{{ page_number }}</a>
+                    {% endif %}
+                {% endfor %}
+
+                {% if expiring_soon_page_obj.has_next %}
+                <a class="admin-pagination__item admin-pagination__item--nav" href="?orders_page={{ recent_orders_page_obj.number }}&stock_page={{ low_stock_page_obj.number }}&expiry_page={{ expiring_soon_page_obj.next_page_number }}&expired_page={{ expired_page_obj.number }}&branch_page={{ branch_overview_page_obj.number }}">Sau</a>
+                {% else %}
+                <span class="admin-pagination__item admin-pagination__item--nav is-disabled">Sau</span>
+                {% endif %}
+            </div>
+        </nav>
+        {% endif %}
+    </div>
+
+    <div class="admin-surface admin-section admin-section--expired" data-pagination-key="dashboard-expired">
+        <div class="admin-section-head">
+            <div>
+                <h3>Đã hết hạn</h3>
+                <p>Các thuốc đã quá hạn cần tách khỏi luồng bán hàng và xử lý ngay.</p>
+            </div>
+            <span class="admin-badge admin-badge-danger">{{ expired_medicine_count }}</span>
+        </div>
+
+        <div class="admin-record-list">
+            {% for medicine in expired_medicines %}
+            <article class="admin-record-item">
+                <div>
+                    <div class="admin-record-item__title">{{ medicine.name }}</div>
+                    <div class="admin-record-item__meta">{{ medicine.pharmacy.name }} • HSD {{ medicine.expiry_date|date:"d/m/Y" }} • Tồn {{ medicine.quantity }}</div>
+                </div>
+                <span class="admin-badge admin-badge-danger">Loại bỏ ngay</span>
+            </article>
+            {% empty %}
+            <div class="admin-empty-state">Hiện chưa có thuốc nào bị quá hạn.</div>
+            {% endfor %}
+        </div>
+
+        {% if expired_page_obj.has_other_pages %}
+        <nav class="admin-pagination" aria-label="Phân trang thuốc quá hạn">
+            <div class="admin-pagination__controls">
+                {% if expired_page_obj.has_previous %}
+                <a class="admin-pagination__item admin-pagination__item--nav" href="?orders_page={{ recent_orders_page_obj.number }}&stock_page={{ low_stock_page_obj.number }}&expiry_page={{ expiring_soon_page_obj.number }}&expired_page={{ expired_page_obj.previous_page_number }}&branch_page={{ branch_overview_page_obj.number }}">Trước</a>
+                {% else %}
+                <span class="admin-pagination__item admin-pagination__item--nav is-disabled">Trước</span>
+                {% endif %}
+
+                {% for page_number in expired_page_obj.paginator.page_range %}
+                    {% if page_number >= expired_page_obj.number|add:'-2' and page_number <= expired_page_obj.number|add:'2' %}
+                    <a class="admin-pagination__item {% if page_number == expired_page_obj.number %}is-active{% endif %}" href="?orders_page={{ recent_orders_page_obj.number }}&stock_page={{ low_stock_page_obj.number }}&expiry_page={{ expiring_soon_page_obj.number }}&expired_page={{ page_number }}&branch_page={{ branch_overview_page_obj.number }}">{{ page_number }}</a>
+                    {% endif %}
+                {% endfor %}
+
+                {% if expired_page_obj.has_next %}
+                <a class="admin-pagination__item admin-pagination__item--nav" href="?orders_page={{ recent_orders_page_obj.number }}&stock_page={{ low_stock_page_obj.number }}&expiry_page={{ expiring_soon_page_obj.number }}&expired_page={{ expired_page_obj.next_page_number }}&branch_page={{ branch_overview_page_obj.number }}">Sau</a>
+                {% else %}
+                <span class="admin-pagination__item admin-pagination__item--nav is-disabled">Sau</span>
+                {% endif %}
+            </div>
+        </nav>
+        {% endif %}
+    </div>
+</section>
+
+<section class="admin-surface admin-section admin-section--stock mb-4" data-pagination-key="dashboard-stock">
+    <div class="admin-section-head">
+        <div>
+            <h3>Cảnh báo tồn kho</h3>
+            <p>Danh sách thuốc sắp hết hàng cần ưu tiên nhập thêm.</p>
+        </div>
+    </div>
+
+    <div class="admin-record-list">
+        {% for medicine in low_stock_medicines %}
+        <article class="admin-record-item">
+            <div>
+                <div class="admin-record-item__title">{{ medicine.name }}</div>
+                <div class="admin-record-item__meta">{{ medicine.pharmacy.name }} • Còn {{ medicine.quantity }} {{ medicine.unit|default:"hộp"|lower }}</div>
+            </div>
+            <span class="admin-badge admin-badge-warning">Sắp hết</span>
+        </article>
+        {% empty %}
+        <div class="admin-empty-state">Hiện chưa có sản phẩm nào rơi vào ngưỡng cảnh báo.</div>
+        {% endfor %}
+    </div>
+
+    {% if low_stock_page_obj.has_other_pages %}
+    <nav class="admin-pagination" aria-label="Phân trang cảnh báo tồn kho">
+        <div class="admin-pagination__controls">
+            {% if low_stock_page_obj.has_previous %}
+            <a class="admin-pagination__item admin-pagination__item--nav" href="?orders_page={{ recent_orders_page_obj.number }}&stock_page={{ low_stock_page_obj.previous_page_number }}&expiry_page={{ expiring_soon_page_obj.number }}&expired_page={{ expired_page_obj.number }}&branch_page={{ branch_overview_page_obj.number }}">Trước</a>
+            {% else %}
+            <span class="admin-pagination__item admin-pagination__item--nav is-disabled">Trước</span>
+            {% endif %}
+
+            {% for page_number in low_stock_page_obj.paginator.page_range %}
+                {% if page_number >= low_stock_page_obj.number|add:'-2' and page_number <= low_stock_page_obj.number|add:'2' %}
+                <a class="admin-pagination__item {% if page_number == low_stock_page_obj.number %}is-active{% endif %}" href="?orders_page={{ recent_orders_page_obj.number }}&stock_page={{ page_number }}&expiry_page={{ expiring_soon_page_obj.number }}&expired_page={{ expired_page_obj.number }}&branch_page={{ branch_overview_page_obj.number }}">{{ page_number }}</a>
+                {% endif %}
+            {% endfor %}
+
+            {% if low_stock_page_obj.has_next %}
+            <a class="admin-pagination__item admin-pagination__item--nav" href="?orders_page={{ recent_orders_page_obj.number }}&stock_page={{ low_stock_page_obj.next_page_number }}&expiry_page={{ expiring_soon_page_obj.number }}&expired_page={{ expired_page_obj.number }}&branch_page={{ branch_overview_page_obj.number }}">Sau</a>
+            {% else %}
+            <span class="admin-pagination__item admin-pagination__item--nav is-disabled">Sau</span>
+            {% endif %}
+        </div>
+    </nav>
+    {% endif %}
+</section>
+
+{% if request.user.is_superuser %}
+<section class="admin-surface admin-section admin-section--branches" data-pagination-key="dashboard-branches">
+    <div class="admin-section-head">
+        <div>
+            <h2>Tổng quan theo chi nhánh</h2>
+        </div>
+    </div>
+
+    <div class="admin-table-wrap">
+        <table class="admin-table admin-table--branches">
+            <thead>
+                <tr>
+                    <th>Chi nhánh</th>
+                    <th>Địa chỉ</th>
+                    <th>Tổng sản phẩm</th>
+                    <th>Khả dụng</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for branch in branch_overview %}
+                <tr>
+                    <td><div class="admin-cell-title">{{ branch.name }}</div></td>
+                    <td><div class="admin-cell-sub">{{ branch.address }}</div></td>
+                    <td><strong>{{ branch.medicine_total }}</strong></td>
+                    <td>
+                        {% if branch.available_total > 0 %}
+                            <span class="admin-badge admin-badge-success">{{ branch.available_total }} loại còn hàng</span>
+                        {% else %}
+                            <span class="admin-badge admin-badge-danger">Tạm hết hàng</span>
+                        {% endif %}
+                    </td>
+                </tr>
+                {% empty %}
+                <tr>
+                    <td colspan="4">
+                        <div class="admin-empty-state">Chưa có dữ liệu chi nhánh để tổng hợp.</div>
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+
+    {% if branch_overview_page_obj.has_other_pages %}
+    <nav class="admin-pagination" aria-label="Phân trang tổng quan chi nhánh">
+        <div class="admin-pagination__controls">
+            {% if branch_overview_page_obj.has_previous %}
+            <a class="admin-pagination__item admin-pagination__item--nav" href="?orders_page={{ recent_orders_page_obj.number }}&stock_page={{ low_stock_page_obj.number }}&branch_page={{ branch_overview_page_obj.previous_page_number }}">Trước</a>
+            {% else %}
+            <span class="admin-pagination__item admin-pagination__item--nav is-disabled">Trước</span>
+            {% endif %}
+
+            {% for page_number in branch_overview_page_obj.paginator.page_range %}
+                {% if page_number >= branch_overview_page_obj.number|add:'-2' and page_number <= branch_overview_page_obj.number|add:'2' %}
+                <a class="admin-pagination__item {% if page_number == branch_overview_page_obj.number %}is-active{% endif %}" href="?orders_page={{ recent_orders_page_obj.number }}&stock_page={{ low_stock_page_obj.number }}&branch_page={{ page_number }}">{{ page_number }}</a>
+                {% endif %}
+            {% endfor %}
+
+            {% if branch_overview_page_obj.has_next %}
+            <a class="admin-pagination__item admin-pagination__item--nav" href="?orders_page={{ recent_orders_page_obj.number }}&stock_page={{ low_stock_page_obj.number }}&branch_page={{ branch_overview_page_obj.next_page_number }}">Sau</a>
+            {% else %}
+            <span class="admin-pagination__item admin-pagination__item--nav is-disabled">Sau</span>
+            {% endif %}
+        </div>
+    </nav>
+    {% endif %}
+</section>
+{% endif %}
+</div>
+{% endblock %}

@@ -1,0 +1,1 @@
+{% if is_username_recovery %}Gửi lại tên đăng nhập{% else %}Mã OTP đặt lại mật khẩu{% endif %} - {{ site_name|default:"GIS Pharma" }}

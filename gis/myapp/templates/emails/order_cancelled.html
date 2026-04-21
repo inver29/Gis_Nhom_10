@@ -1,0 +1,15 @@
+<html>
+<body style="margin:0;padding:24px;background:#fff7f8;font-family:Arial,sans-serif;color:#4b1f29;">
+  <div style="max-width:640px;margin:0 auto;background:#ffffff;border-radius:20px;overflow:hidden;border:1px solid #ffd8de;">
+    <div style="padding:20px 24px;background:linear-gradient(135deg,#e54863 0%,#b61c33 100%);color:#ffffff;">
+      <h1 style="margin:0;font-size:24px;">Đơn hàng #{{ order.id }} đã bị hủy</h1>
+    </div>
+    <div style="padding:24px;">
+      <p style="margin-top:0;">{{ recipient_name }} thân mến,</p>
+      <p>Đơn hàng của bạn hiện đang ở trạng thái <strong>đã hủy</strong>. Nếu đây là nhầm lẫn hoặc bạn cần hỗ trợ thêm, vui lòng liên hệ với chúng tôi.</p>
+      <p><a href="{{ order_history_url }}" style="display:inline-block;padding:12px 18px;border-radius:12px;background:#b61c33;color:#ffffff;text-decoration:none;font-weight:700;">Xem lịch sử đơn hàng</a></p>
+      <p style="margin-bottom:0;color:#7c5160;">Hỗ trợ: {{ support_email }}</p>
+    </div>
+  </div>
+</body>
+</html>

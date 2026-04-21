@@ -1,0 +1,249 @@
+{% extends "admin_panel/base.html" %}
+{% load currency_filters %}
+
+{% block admin_content %}
+<section class="admin-section-head mb-4">
+    <div>
+        <h2 class="admin-section-title">Đơn hàng #{{ order.id }}</h2>
+        <p class="admin-section-muted">Theo dõi toàn bộ thông tin giao nhận, chi nhánh xử lý và cập nhật trạng thái vận hành của đơn.</p>
+    </div>
+    <div class="admin-toolbar">
+        <a href="{% url 'order_invoice_view' order.pk %}" class="btn-admin btn-admin-primary" target="_blank" rel="noopener">
+            <i class="fas fa-file-invoice"></i>
+            <span>Mở hóa đơn</span>
+        </a>
+        {% if can_delete_order %}
+        <a href="{% url 'custom_admin_delete' 'order' order.pk %}" class="btn-admin btn-admin-danger">
+            <i class="fas fa-trash"></i>
+            <span>Xóa đơn hàng</span>
+        </a>
+        {% endif %}
+        <a href="{% url 'custom_admin_list' 'order' %}" class="btn-admin btn-admin-light">
+            <i class="fas fa-arrow-left"></i>
+            <span>Quay lại danh sách</span>
+        </a>
+    </div>
+</section>
+
+<section class="admin-detail-grid">
+    <div>
+        <div class="admin-surface admin-section mb-4">
+            <div class="admin-section-head">
+                <div>
+                    <h3>Thông tin khách hàng và giao hàng</h3>
+                    <p>Dữ liệu nhận hàng được lưu theo đúng đơn để dễ đối soát khi cần.</p>
+                </div>
+            </div>
+
+            <div class="admin-meta-grid">
+                <div class="admin-meta-item">
+                    <div class="admin-meta-item__label">Người nhận</div>
+                    <div class="admin-meta-item__value">{{ order.full_name }}</div>
+                </div>
+                <div class="admin-meta-item">
+                    <div class="admin-meta-item__label">Số điện thoại</div>
+                    <div class="admin-meta-item__value">{{ order.phone }}</div>
+                </div>
+                <div class="admin-meta-item">
+                    <div class="admin-meta-item__label">Tài khoản đặt</div>
+                    <div class="admin-meta-item__value">{% if order.user %}{{ order.user.username }}{% else %}Khách vãng lai{% endif %}</div>
+                </div>
+                <div class="admin-meta-item">
+                    <div class="admin-meta-item__label">Chi nhánh xử lý</div>
+                    <div class="admin-meta-item__value">{{ order.pharmacy.name|default:"Chưa gán" }}</div>
+                </div>
+                <div class="admin-meta-item">
+                    <div class="admin-meta-item__label">Vĩ độ</div>
+                    <div class="admin-meta-item__value">{{ order.delivery_lat|default:"-" }}</div>
+                </div>
+                <div class="admin-meta-item">
+                    <div class="admin-meta-item__label">Kinh độ</div>
+                    <div class="admin-meta-item__value">{{ order.delivery_lng|default:"-" }}</div>
+                </div>
+            </div>
+
+            <div class="admin-meta-item mt-3">
+                <div class="admin-meta-item__label">Địa chỉ giao hàng</div>
+                <div class="admin-meta-item__value">{{ order.address_text }}</div>
+            </div>
+
+            <div class="admin-meta-item mt-3">
+                <div class="admin-meta-item__label">Ghi chú</div>
+                <div class="admin-meta-item__value">{{ order.note|default:"Không có ghi chú" }}</div>
+            </div>
+
+            <div class="admin-meta-item mt-3">
+                <div class="admin-meta-item__label">Nhân viên lập hóa đơn</div>
+                <div class="admin-meta-item__value">{{ order.resolved_invoice_staff_name|default:"Nhân viên quầy thuốc" }}</div>
+            </div>
+        </div>
+
+        <div class="admin-surface admin-section">
+            <div class="admin-section-head">
+                <div>
+                    <h3>Sản phẩm trong đơn</h3>
+                    <p>Đối chiếu từng mặt hàng, số lượng và giá bán tại thời điểm đặt.</p>
+                </div>
+            </div>
+
+            <div class="admin-table-wrap">
+                <table class="admin-table">
+                    <thead>
+                        <tr>
+                            <th>Sản phẩm</th>
+                            <th>Đơn giá</th>
+                            <th>Số lượng</th>
+                            <th>Thành tiền</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for item in order_items %}
+                        <tr>
+                            <td>
+                                <div class="admin-cell-title">{{ item.medicine_name }}</div>
+                                {% if item.lot_allocations.all %}
+                                <div class="admin-cell-sub" style="margin-top:6px; line-height:1.55;">
+                                    {% for allocation in item.lot_allocations.all %}
+                                    <div>
+                                        Lô: {{ allocation.lot_source_label|default:"Lô FEFO" }} · SL: {{ allocation.quantity }}{% if allocation.lot_expiry_date %} · HSD: {{ allocation.lot_expiry_date|date:"d/m/Y" }}{% endif %}
+                                    </div>
+                                    {% endfor %}
+                                </div>
+                                {% endif %}
+                            </td>
+                            <td>{{ item.price|vnd }}</td>
+                            <td>{{ item.quantity }}</td>
+                            <td><strong>{{ item.line_total|vnd }}</strong></td>
+                        </tr>
+                        {% empty %}
+                        <tr>
+                            <td colspan="4">
+                                <div class="admin-empty-state">Đơn hàng chưa có chi tiết sản phẩm.</div>
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <div>
+        <div class="admin-surface admin-section mb-4">
+            <div class="admin-section-head">
+                <div>
+                    <h3>Tóm tắt thanh toán</h3>
+                    <p>Tổng hợp nhanh chi phí hàng hóa, vận chuyển và trạng thái hiện tại.</p>
+                </div>
+            </div>
+
+            <div class="admin-meta-grid">
+                <div class="admin-meta-item">
+                    <div class="admin-meta-item__label">Tạm tính sau khuyến mãi hệ thống</div>
+                    <div class="admin-meta-item__value">{{ order.product_subtotal_before_tier_discount|vnd }}</div>
+                </div>
+                {% if order.has_customer_tier_discount %}
+                <div class="admin-meta-item">
+                    <div class="admin-meta-item__label">Ưu đãi hạng {{ order.customer_tier_name }}</div>
+                    <div class="admin-meta-item__value text-primary">-{{ order.customer_tier_discount_total|vnd }}</div>
+                </div>
+                {% endif %}
+                <div class="admin-meta-item">
+                    <div class="admin-meta-item__label">Phí ship</div>
+                    <div class="admin-meta-item__value">{{ order.shipping_fee|vnd }}</div>
+                </div>
+                <div class="admin-meta-item">
+                    <div class="admin-meta-item__label">Khoảng cách</div>
+                    <div class="admin-meta-item__value">{{ order.distance_km }} km</div>
+                </div>
+                <div class="admin-meta-item">
+                    <div class="admin-meta-item__label">Tổng thanh toán</div>
+                    <div class="admin-meta-item__value">{{ order.final_total_price|vnd }}</div>
+                </div>
+                <div class="admin-meta-item">
+                    <div class="admin-meta-item__label">Phương thức thanh toán</div>
+                    <div class="admin-meta-item__value">{{ order.get_payment_method_display }}</div>
+                </div>
+                <div class="admin-meta-item">
+                    <div class="admin-meta-item__label">Trạng thái thanh toán</div>
+                    <div class="admin-meta-item__value">{{ order.get_payment_status_display }}</div>
+                </div>
+                <div class="admin-meta-item">
+                    <div class="admin-meta-item__label">Mã hóa đơn</div>
+                    <div class="admin-meta-item__value">{{ order.resolved_invoice_code }}</div>
+                </div>
+                <div class="admin-meta-item">
+                    <div class="admin-meta-item__label">Ngày tạo</div>
+                    <div class="admin-meta-item__value">{{ order.created_at|date:"d/m/Y H:i" }}</div>
+                </div>
+                <div class="admin-meta-item">
+                    <div class="admin-meta-item__label">Trạng thái hiện tại</div>
+                    <div class="admin-meta-item__value">
+                        {% if order.status == 'pending' %}
+                            <span class="admin-badge admin-badge-warning">Chờ xử lý</span>
+                        {% elif order.status == 'shipping' %}
+                            <span class="admin-badge admin-badge-info">Đang giao</span>
+                        {% elif order.status == 'completed' %}
+                            <span class="admin-badge admin-badge-success">Hoàn thành</span>
+                        {% else %}
+                            <span class="admin-badge admin-badge-danger">Đã hủy</span>
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        {% if return_request %}
+        <div class="admin-surface admin-section mb-4">
+            <div class="admin-section-head">
+                <div>
+                    <h3>Yêu cầu trả hàng / hoàn tiền</h3>
+                    <p>Đơn này đã có yêu cầu hậu mãi từ khách hàng.</p>
+                </div>
+            </div>
+            <div class="admin-meta-grid">
+                <div class="admin-meta-item">
+                    <div class="admin-meta-item__label">Trạng thái</div>
+                    <div class="admin-meta-item__value">{% if return_request.status == 'processing' %}<span class="admin-badge admin-badge-warning">Đang xử lý</span>{% elif return_request.status == 'approved_refund' %}<span class="admin-badge admin-badge-success">Chấp nhận hoàn tiền</span>{% else %}<span class="admin-badge admin-badge-danger">Từ chối hoàn tiền</span>{% endif %}</div>
+                </div>
+                <div class="admin-meta-item">
+                    <div class="admin-meta-item__label">Liên hệ</div>
+                    <div class="admin-meta-item__value">{{ return_request.contact_phone|default:order.phone }}</div>
+                </div>
+            </div>
+            <a href="{% url 'custom_admin_return_request_detail' return_request.pk %}" class="btn-admin btn-admin-primary mt-3">
+                <i class="fas fa-eye"></i>
+                <span>Mở yêu cầu trả hàng / hoàn tiền</span>
+            </a>
+        </div>
+        {% endif %}
+
+        <div class="admin-surface admin-section">
+            <div class="admin-section-head">
+                <div>
+                    <h3>Cập nhật xử lý đơn</h3>
+                    <p>Thay đổi trạng thái theo đúng tiến độ chuẩn bị và giao hàng.</p>
+                </div>
+            </div>
+
+            <form method="post">
+                {% csrf_token %}
+                {% for field in update_form %}
+                <div class="admin-field">
+                    <label>{{ field.label }}</label>
+                    {{ field }}
+                    {% if field.errors %}
+                    <div class="admin-field-error">{{ field.errors }}</div>
+                    {% endif %}
+                </div>
+                {% endfor %}
+
+                <button type="submit" class="btn-admin btn-admin-primary">
+                    <i class="fas fa-save"></i>
+                    <span>Lưu cập nhật</span>
+                </button>
+            </form>
+        </div>
+    </div>
+</section>
+{% endblock %}

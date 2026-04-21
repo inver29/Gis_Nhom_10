@@ -1,0 +1,13 @@
+Xin chào {{ recipient_name }},
+
+Cảm ơn bạn đã đăng ký tài khoản tại {{ site_name|default:"GIS Pharma" }}.
+
+Vui lòng bấm vào liên kết dưới đây để xác nhận email và kích hoạt tài khoản:
+{{ activation_url }}
+
+Sau khi xác nhận thành công, bạn sẽ được chuyển về trang đăng nhập và có thể đăng nhập bằng tên tài khoản cùng mật khẩu đã tạo.
+
+Nếu bạn không thực hiện đăng ký này, vui lòng bỏ qua email.
+
+Trân trọng,
+{{ site_name|default:"GIS Pharma" }}

@@ -1,0 +1,8 @@
+{{ recipient_name }} thân mến,
+
+Đơn hàng #{{ order.id }} của bạn đã được cập nhật sang trạng thái hủy.
+
+Nếu cần kiểm tra lại thông tin, vui lòng xem tại:
+{{ order_history_url }}
+
+Hỗ trợ: {{ support_email }}

@@ -1,0 +1,18 @@
+{% load currency_filters %}
+{{ recipient_name }} thân mến,
+
+Đơn hàng {{ order.order_code }} của bạn trên {{ site_name }} vừa được cập nhật trạng thái.
+
+Trạng thái trước đó: {{ previous_status_label }}
+Trạng thái hiện tại: {{ current_status_label }}
+Thanh toán: {{ payment_status_label }}
+Chi nhánh xử lý: {{ order.pharmacy.name|default:"Chưa gán chi nhánh" }}
+Tổng thanh toán: {{ order.final_total_price|vnd }}
+
+Xem chi tiết đơn hàng:
+{{ order_detail_url }}
+
+Xem lịch sử đơn hàng:
+{{ order_history_url }}
+
+Nếu cần hỗ trợ, vui lòng liên hệ {{ support_email }}.

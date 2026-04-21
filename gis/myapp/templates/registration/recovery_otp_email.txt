@@ -1,0 +1,26 @@
+Xin chào {{ user.get_username }},
+
+{% if is_username_recovery %}
+Bạn vừa yêu cầu lấy lại tên đăng nhập trên {{ site_name|default:"GIS Pharma" }}.
+{% else %}
+Bạn vừa yêu cầu đặt lại mật khẩu trên {{ site_name|default:"GIS Pharma" }}.
+{% endif %}
+
+Mã OTP của bạn là: {{ otp_code }}
+
+Mã này có hiệu lực trong {{ otp_valid_minutes }} phút.
+
+{% if is_username_recovery %}
+Sau khi quay lại web, hãy nhập mã OTP để xem lại tên đăng nhập của bạn.
+{% else %}
+Sau khi quay lại web, hãy nhập mã OTP rồi tạo mật khẩu mới ngay trên trang xác thực.
+{% endif %}
+
+Trang xác thực:
+{{ verify_url }}
+
+{% if is_username_recovery %}
+Tên đăng nhập hiện tại của bạn là: {{ username_snapshot }}
+{% endif %}
+
+Nếu bạn không thực hiện yêu cầu này, hãy bỏ qua email.

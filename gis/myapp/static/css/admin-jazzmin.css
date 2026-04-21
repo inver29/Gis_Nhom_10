@@ -1,0 +1,20 @@
+html,
+body,
+body * {
+    font-family: "Segoe UI", "Noto Sans", Arial, sans-serif;
+    text-rendering: optimizeLegibility;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+}
+
+.brand-text,
+.content-header h1,
+.main-sidebar,
+.main-header,
+.content-wrapper,
+.card,
+.btn,
+.form-control,
+.select2-container--default .select2-selection--single {
+    font-family: "Segoe UI", "Noto Sans", Arial, sans-serif !important;
+}

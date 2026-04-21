@@ -1,0 +1,1 @@
+{{ site_name }} | Yêu cầu trả hàng / hoàn tiền của {{ order.order_code }} đã chuyển sang "{{ current_status_label }}"

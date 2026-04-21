@@ -1,0 +1,34 @@
+{% extends "base.html" %}
+{% block title %}Không tìm thấy trang{% endblock %}
+{% block header_search %}{% endblock %}
+{% block body_class %}site-page error-page page--hide-search{% endblock %}
+{% block content_wrapper %}
+<div class="site-page-section error-page-section">
+    <div class="container">
+        <div class="error-hero">
+            <div class="error-hero__copy">
+                <span class="error-hero__eyebrow"><i class="fas fa-map-signs"></i> Lỗi điều hướng</span>
+                <h1>Không tìm thấy trang cần mở</h1>
+                <p>Đường dẫn vừa nhập không tồn tại trong hệ thống GIS Pharma. Có thể URL bị gõ sai hoặc đường dẫn sản phẩm không hợp lệ.</p>
+                <div class="error-hero__path">{{ requested_path }}</div>
+                <div class="error-hero__actions">
+                    <a href="{% url 'home' %}" class="pharma-btn"><i class="fas fa-home"></i><span>Về trang chủ</span></a>
+                    <a href="{% url 'product_list' %}" class="pharma-outline-btn"><i class="fas fa-capsules"></i><span>Xem sản phẩm</span></a>
+                    <a href="{% url 'map_view' %}" class="pharma-outline-btn"><i class="fas fa-map-marked-alt"></i><span>Mở bản đồ</span></a>
+                </div>
+            </div>
+            <div class="error-hero__visual">
+                <div class="error-hero__badge">404</div>
+                <div class="error-hero__card">
+                    <div class="error-hero__mini-map"></div>
+                    <div class="error-hero__pin"><i class="fas fa-map-marker-alt"></i></div>
+                    <div class="error-hero__panel">
+                        <strong>Không có điểm đến hợp lệ</strong>
+                        <span>Hãy quay lại danh mục thuốc, bản đồ chi nhánh hoặc trang chủ để tiếp tục.</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

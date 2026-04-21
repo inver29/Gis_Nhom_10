@@ -1,0 +1,72 @@
+{# Shared rich-editor wrapper. Caller must pass `field` as a bound form field. #}
+{# Renders toolbar + contenteditable + hidden textarea so admin-rich-editor.js #}
+{# can take over once it runs. #}
+<div class="admin-rich-editor" data-rich-editor-root>
+    <div class="admin-rich-editor__toolbar">
+        <div class="admin-rich-editor__group">
+            <select data-editor-format aria-label="Kiểu đoạn văn">
+                <option value="p">Bình thường</option>
+                <option value="h2">Tiêu đề 2</option>
+                <option value="h3">Tiêu đề 3</option>
+                <option value="blockquote">Trích dẫn</option>
+            </select>
+            <select data-editor-font-size aria-label="Cỡ chữ">
+                <option value="3">Cỡ chữ</option>
+                <option value="1">Nhỏ</option>
+                <option value="3">Vừa</option>
+                <option value="5">Lớn</option>
+                <option value="7">Rất lớn</option>
+            </select>
+        </div>
+        <div class="admin-rich-editor__group">
+            <button type="button" data-editor-command="bold" title="Đậm"><i class="fas fa-bold"></i></button>
+            <button type="button" data-editor-command="italic" title="Nghiêng"><i class="fas fa-italic"></i></button>
+            <button type="button" data-editor-command="underline" title="Gạch chân"><i class="fas fa-underline"></i></button>
+            <button type="button" data-editor-command="strikeThrough" title="Gạch ngang"><i class="fas fa-strikethrough"></i></button>
+        </div>
+        <div class="admin-rich-editor__group">
+            <button type="button" data-editor-command="insertUnorderedList" title="Danh sách chấm"><i class="fas fa-list-ul"></i></button>
+            <button type="button" data-editor-command="insertOrderedList" title="Danh sách số"><i class="fas fa-list-ol"></i></button>
+            <button type="button" data-editor-command="outdent" title="Giảm lề"><i class="fas fa-outdent"></i></button>
+            <button type="button" data-editor-command="indent" title="Tăng lề"><i class="fas fa-indent"></i></button>
+        </div>
+        <div class="admin-rich-editor__group">
+            <button type="button" data-editor-command="justifyLeft" title="Canh trái"><i class="fas fa-align-left"></i></button>
+            <button type="button" data-editor-command="justifyCenter" title="Canh giữa"><i class="fas fa-align-center"></i></button>
+            <button type="button" data-editor-command="justifyRight" title="Canh phải"><i class="fas fa-align-right"></i></button>
+            <button type="button" data-editor-command="justifyFull" title="Canh đều"><i class="fas fa-align-justify"></i></button>
+        </div>
+        <div class="admin-rich-editor__group">
+            <input type="color" value="#163057" data-editor-color title="Màu chữ">
+            <input type="color" value="#fff59d" data-editor-bg-color title="Màu nền">
+            <button type="button" data-editor-link title="Chèn liên kết"><i class="fas fa-link"></i></button>
+            <button type="button" data-editor-unlink title="Gỡ liên kết"><i class="fas fa-unlink"></i></button>
+        </div>
+        <div class="admin-rich-editor__group">
+            <button type="button" data-editor-table title="Chèn bảng"><i class="fas fa-table"></i></button>
+            <button type="button" data-editor-image title="Chèn ảnh"><i class="fas fa-image"></i></button>
+            <button type="button" data-editor-remove-format title="Xoá định dạng"><i class="fas fa-eraser"></i></button>
+            <button type="button" data-editor-command="undo" title="Hoàn tác"><i class="fas fa-undo"></i></button>
+            <button type="button" data-editor-command="redo" title="Làm lại"><i class="fas fa-redo"></i></button>
+        </div>
+        <div class="admin-rich-editor__group admin-rich-editor__group--image-tools is-disabled" data-editor-image-tools>
+            <span class="admin-rich-editor__toolbar-note"><i class="fas fa-expand-arrows-alt"></i> Ảnh</span>
+            <button type="button" data-editor-image-align="left" title="Canh trái"><i class="fas fa-align-left"></i></button>
+            <button type="button" data-editor-image-align="center" title="Canh giữa"><i class="fas fa-align-center"></i></button>
+            <button type="button" data-editor-image-align="right" title="Canh phải"><i class="fas fa-align-right"></i></button>
+            <input type="range" min="20" max="100" step="5" value="100" data-editor-image-width disabled>
+            <span class="admin-rich-editor__toolbar-note" data-editor-image-width-label>100%</span>
+            <button type="button" data-editor-image-reset title="Trả về mặc định"><i class="fas fa-compress-arrows-alt"></i></button>
+        </div>
+        <div class="admin-rich-editor__group">
+            <button type="button" class="admin-rich-editor__source-toggle" data-editor-source-toggle>Mã HTML</button>
+        </div>
+    </div>
+    <div class="admin-rich-editor__body">
+        <div class="admin-rich-editor__editable" data-editor-editable contenteditable="true"></div>
+        <textarea class="admin-rich-editor__source" data-editor-source spellcheck="false"></textarea>
+    </div>
+    <div class="admin-rich-editor__foot">Trình soạn thảo WYSIWYG. Nội dung nhập vào sẽ được lưu dưới dạng HTML. Bấm vào ảnh trong nội dung để chỉnh kích thước và canh lề.</div>
+    <input type="file" class="admin-rich-editor__hidden" data-editor-image-input accept="image/*">
+    {{ field }}
+</div>

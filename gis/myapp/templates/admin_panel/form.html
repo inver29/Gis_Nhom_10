@@ -1,0 +1,2039 @@
+{% extends "admin_panel/base.html" %}
+{% load static %}
+{% load currency_filters %}
+
+{% block extra_head %}
+{% if model_key == 'pharmacy' %}
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.css">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.js"></script>
+{% endif %}
+<style>
+    .admin-media-preview--live,
+    .admin-gallery-preview,
+    .admin-location-map-shell {
+        margin-bottom: 14px;
+        padding: 14px;
+        border-radius: 18px;
+        background: #fff;
+        border: 1px solid rgba(17, 70, 184, 0.08);
+    }
+
+    .admin-media-preview--live img {
+        width: 100%;
+        max-width: 320px;
+        height: 210px;
+        object-fit: cover;
+        border-radius: 16px;
+        border: 1px solid rgba(17, 70, 184, 0.08);
+    }
+
+    .admin-gallery-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fill, minmax(110px, 1fr));
+        gap: 12px;
+        margin-top: 12px;
+    }
+
+    .admin-gallery-thumb {
+        overflow: hidden;
+        border-radius: 16px;
+        border: 1px solid rgba(17, 70, 184, 0.08);
+        background: #f8fbff;
+        box-shadow: inset 0 1px 2px rgba(15, 23, 42, 0.03);
+    }
+
+    .admin-gallery-thumb img {
+        display: block;
+        width: 100%;
+        height: 110px;
+        object-fit: cover;
+    }
+
+    .admin-gallery-thumb__caption {
+        display: block;
+        padding: 8px 10px;
+        font-size: 0.8rem;
+        color: #5d7090;
+        line-height: 1.35;
+        word-break: break-word;
+    }
+
+    .admin-location-map {
+        width: 100%;
+        height: 520px;
+        border-radius: 18px;
+        overflow: hidden;
+        border: 1px solid rgba(17, 70, 184, 0.1);
+    }
+
+    .admin-lot-summary {
+        margin-top: 22px;
+        padding: 18px;
+        border-radius: 18px;
+        background: #fff;
+        border: 1px solid rgba(17, 70, 184, 0.08);
+    }
+
+    .admin-lot-table {
+        width: 100%;
+        border-collapse: collapse;
+        margin-top: 12px;
+    }
+
+    .admin-lot-table th,
+    .admin-lot-table td {
+        padding: 10px 12px;
+        border-bottom: 1px solid rgba(17, 70, 184, 0.08);
+        vertical-align: top;
+        font-size: 0.94rem;
+    }
+
+    .admin-lot-table th {
+        color: #35527f;
+        font-weight: 700;
+        background: #f7faff;
+    }
+
+    .admin-lot-table tr:last-child td {
+        border-bottom: 0;
+    }
+
+    .admin-lot-badge {
+        display: inline-flex;
+        align-items: center;
+        padding: 4px 10px;
+        border-radius: 999px;
+        font-size: 0.82rem;
+        font-weight: 700;
+        white-space: nowrap;
+    }
+
+    .admin-lot-badge--success { background: rgba(17, 138, 82, 0.12); color: #14824f; }
+    .admin-lot-badge--warning { background: rgba(235, 149, 44, 0.14); color: #b96b10; }
+    .admin-lot-badge--danger { background: rgba(214, 59, 59, 0.12); color: #c23030; }
+    .admin-lot-badge--muted { background: rgba(102, 119, 153, 0.12); color: #5f6f8c; }
+
+    .admin-map-status {
+        margin-top: 12px;
+        padding: 10px 12px;
+        border-radius: 14px;
+        background: #eef4ff;
+        color: #33507c;
+        font-size: 0.92rem;
+        line-height: 1.45;
+    }
+
+    .admin-map-status.is-error {
+        background: #fff1f1;
+        color: #b03030;
+    }
+
+    .admin-map-status.is-success {
+        background: #eefbf2;
+        color: #1f7a46;
+    }
+
+    .admin-map-search {
+        display: grid;
+        gap: 8px;
+        margin-bottom: 12px;
+    }
+
+    .admin-map-search label {
+        margin: 0;
+        color: #163057;
+        font-weight: 800;
+    }
+
+    .admin-map-search__row {
+        display: grid;
+        grid-template-columns: minmax(0, 1fr) auto;
+        gap: 10px;
+    }
+
+    .admin-map-search__row input {
+        min-height: 48px;
+        border-radius: 14px;
+        border: 1px solid rgba(17, 70, 184, 0.12);
+        padding: 11px 14px;
+        color: #163057;
+        font-weight: 700;
+    }
+
+    .admin-map-search-result {
+        display: grid;
+        gap: 12px;
+        padding: 14px;
+        border-radius: 18px;
+        border: 1px solid rgba(245, 158, 11, 0.24);
+        background: linear-gradient(180deg, #fffaf0 0%, #fff 100%);
+        margin-bottom: 12px;
+    }
+
+    .admin-map-search-result.d-none {
+        display: none !important;
+    }
+
+    .admin-map-search-result__label {
+        display: block;
+        font-size: 0.78rem;
+        font-weight: 800;
+        letter-spacing: 0.04em;
+        text-transform: uppercase;
+        color: #9a6700;
+    }
+
+    .admin-map-search-result__address {
+        font-weight: 800;
+        color: #163057;
+        line-height: 1.6;
+    }
+
+    .admin-map-search-result__meta {
+        font-size: 0.88rem;
+        color: #7a6a4b;
+        line-height: 1.55;
+    }
+
+    .admin-map-search-result__actions {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 10px;
+    }
+
+    .admin-map-search-preview-pin {
+        width: 18px;
+        height: 18px;
+        border-radius: 50%;
+        background: #f59e0b;
+        border: 3px solid #fff;
+        box-shadow: 0 0 0 4px rgba(245, 158, 11, 0.22);
+    }
+
+    .admin-promo-suggestions {
+        margin-top: 22px;
+        display: grid;
+        gap: 18px;
+    }
+
+    .admin-promo-suggestion-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+        gap: 14px;
+    }
+
+    .admin-promo-suggestion-card {
+        padding: 16px;
+        border-radius: 18px;
+        background: #fff;
+        border: 1px solid rgba(17, 70, 184, 0.08);
+    }
+
+    .admin-promo-suggestion-card strong {
+        display: block;
+        color: #163057;
+        line-height: 1.45;
+        margin-bottom: 6px;
+    }
+
+    .admin-promo-suggestion-card small {
+        display: block;
+        color: #627394;
+        line-height: 1.55;
+    }
+
+    .admin-promo-suggestion-pill {
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        padding: 5px 10px;
+        border-radius: 999px;
+        font-size: 0.78rem;
+        font-weight: 800;
+        margin-bottom: 10px;
+    }
+
+    .admin-promo-suggestion-pill--warning { background: rgba(245, 158, 11, 0.14); color: #a86100; }
+    .admin-promo-suggestion-pill--info { background: rgba(17, 70, 184, 0.1); color: #1146b8; }
+    .admin-promo-suggestion-pill--success { background: rgba(17, 138, 82, 0.12); color: #14824f; }
+
+    .btn-admin.btn-admin-soft {
+        min-height: 40px;
+        padding: 0 14px;
+        background: #eef4ff;
+        color: var(--admin-blue);
+    }
+
+    .admin-rich-editor {
+        border: 1px solid rgba(17, 70, 184, 0.14);
+        border-radius: 20px;
+        overflow: hidden;
+        background: #fff;
+        box-shadow: 0 16px 40px rgba(17, 70, 184, 0.08);
+    }
+
+    .admin-rich-editor__toolbar {
+        display: flex;
+        flex-wrap: wrap;
+        align-items: center;
+        gap: 8px;
+        padding: 12px;
+        background: linear-gradient(180deg, #f8fbff 0%, #eef4ff 100%);
+        border-bottom: 1px solid rgba(17, 70, 184, 0.08);
+        overflow-x: auto;
+        scrollbar-width: thin;
+        scrollbar-color: rgba(17, 70, 184, 0.28) rgba(17, 70, 184, 0.08);
+    }
+
+    .admin-rich-editor__toolbar::-webkit-scrollbar {
+        height: 8px;
+    }
+
+    .admin-rich-editor__toolbar::-webkit-scrollbar-thumb {
+        border-radius: 999px;
+        background: rgba(17, 70, 184, 0.28);
+    }
+
+    .admin-rich-editor__toolbar::-webkit-scrollbar-track {
+        border-radius: 999px;
+        background: rgba(17, 70, 184, 0.08);
+    }
+
+    .admin-rich-editor__group {
+        display: inline-flex;
+        flex-wrap: wrap;
+        gap: 6px;
+        align-items: center;
+        padding-right: 8px;
+        margin-right: 2px;
+        border-right: 1px solid rgba(17, 70, 184, 0.08);
+    }
+
+    .admin-rich-editor__group:last-child {
+        padding-right: 0;
+        margin-right: 0;
+        border-right: 0;
+    }
+
+    .admin-rich-editor__toolbar button,
+    .admin-rich-editor__toolbar select,
+    .admin-rich-editor__toolbar input[type="color"] {
+        min-height: 38px;
+        border: 1px solid rgba(17, 70, 184, 0.12);
+        background: #fff;
+        color: #163057;
+        border-radius: 12px;
+        padding: 0 12px;
+        font-weight: 700;
+        font-size: 0.9rem;
+        box-shadow: 0 4px 12px rgba(17, 70, 184, 0.05);
+    }
+
+    .admin-rich-editor__toolbar button:hover,
+    .admin-rich-editor__toolbar select:hover,
+    .admin-rich-editor__toolbar input[type="color"]:hover {
+        border-color: rgba(17, 70, 184, 0.26);
+        background: #f8fbff;
+    }
+
+    .admin-rich-editor__toolbar button:focus,
+    .admin-rich-editor__toolbar select:focus,
+    .admin-rich-editor__toolbar input[type="color"]:focus {
+        outline: none;
+        border-color: rgba(17, 70, 184, 0.35);
+        box-shadow: 0 0 0 0.18rem rgba(17, 70, 184, 0.12);
+    }
+
+    .admin-rich-editor__toolbar button.is-active {
+        background: #dfeaff;
+        color: #1146b8;
+        border-color: rgba(17, 70, 184, 0.24);
+    }
+
+    .admin-rich-editor__source-toggle {
+        min-width: 104px;
+    }
+
+    .admin-rich-editor__body {
+        background: #fff;
+        overflow: auto;
+    }
+
+    .admin-rich-editor__editable,
+    .admin-rich-editor__source {
+        min-height: 440px;
+        padding: 16px 18px;
+        color: #17345d;
+        line-height: 1.75;
+        background: #fff;
+        overflow: auto;
+    }
+
+    .admin-rich-editor__editable:focus,
+    .admin-rich-editor__source:focus {
+        outline: none;
+    }
+
+    .admin-rich-editor__editable p:last-child {
+        margin-bottom: 0;
+    }
+
+    .admin-rich-editor__source {
+        width: 100%;
+        border: 0;
+        resize: vertical;
+        font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+        font-size: 0.92rem;
+        display: none;
+    }
+
+    .admin-rich-editor.is-source-mode .admin-rich-editor__editable {
+        display: none;
+    }
+
+    .admin-rich-editor.is-source-mode .admin-rich-editor__source {
+        display: block;
+    }
+
+    .admin-rich-editor__foot {
+        padding: 10px 14px;
+        font-size: 0.85rem;
+        color: #5d7090;
+        border-top: 1px solid rgba(17, 70, 184, 0.08);
+        background: #fbfdff;
+    }
+
+    .admin-rich-editor > textarea[data-rich-editor="1"],
+    .admin-rich-editor__hidden {
+        display: none !important;
+    }
+
+    .admin-rich-editor__toolbar input[type="color"] {
+        width: 42px;
+        padding: 4px;
+    }
+
+    .admin-rich-editor__toolbar input[type="range"] {
+        width: 128px;
+        accent-color: #1146b8;
+        box-shadow: none;
+        padding: 0;
+    }
+
+    .admin-rich-editor__toolbar-note {
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+        color: #4d668e;
+        font-size: 0.82rem;
+        font-weight: 800;
+        white-space: nowrap;
+    }
+
+    .admin-rich-editor__group--image-tools {
+        gap: 8px;
+    }
+
+    .admin-rich-editor__group--image-tools.is-disabled {
+        opacity: 0.48;
+    }
+
+    .admin-rich-editor__group--image-tools.is-disabled button,
+    .admin-rich-editor__group--image-tools.is-disabled input {
+        pointer-events: none;
+    }
+
+    .admin-rich-editor__editable img {
+        display: block;
+        max-width: 100%;
+        height: auto;
+        margin: 0 0 14px;
+        border-radius: 16px;
+        box-shadow: 0 12px 26px rgba(17, 70, 184, 0.12);
+    }
+
+    .admin-rich-editor__editable img.is-selected {
+        outline: 3px solid rgba(17, 70, 184, 0.3);
+        outline-offset: 4px;
+        box-shadow: 0 0 0 6px rgba(17, 70, 184, 0.08), 0 18px 40px rgba(17, 70, 184, 0.16);
+    }
+
+    .admin-gallery-thumb--manage {
+        position: relative;
+        display: grid;
+        gap: 8px;
+        padding-bottom: 12px;
+    }
+
+    .admin-gallery-thumb__remove {
+        position: absolute;
+        top: 8px;
+        right: 8px;
+        width: 34px;
+        height: 34px;
+        border: 0;
+        border-radius: 999px;
+        background: rgba(12, 23, 43, 0.72);
+        color: #fff;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        box-shadow: 0 10px 20px rgba(15, 23, 42, 0.2);
+        cursor: pointer;
+        transition: transform 0.18s ease, background 0.18s ease;
+        z-index: 2;
+    }
+
+    .admin-gallery-thumb__remove:hover {
+        transform: scale(1.05);
+        background: #cf2e2e;
+    }
+
+    .admin-gallery-thumb__remove:focus {
+        outline: none;
+        box-shadow: 0 0 0 0.18rem rgba(207, 46, 46, 0.2);
+    }
+
+    .admin-gallery-thumb__status {
+        display: none;
+        margin: 0 10px;
+        padding: 6px 10px;
+        border-radius: 999px;
+        font-size: 0.78rem;
+        font-weight: 800;
+        color: #c23030;
+        background: rgba(207, 46, 46, 0.1);
+        justify-self: start;
+    }
+
+    .admin-gallery-thumb.is-removed {
+        opacity: 0.5;
+        border-style: dashed;
+    }
+
+    .admin-gallery-thumb.is-removed .admin-gallery-thumb__status {
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+    }
+
+    .admin-rich-editor-shell {
+        display: grid;
+        gap: 8px;
+    }
+
+    .admin-rich-editor-shell textarea.form-control[data-rich-editor="1"] {
+        min-height: 520px;
+        resize: vertical;
+        border-radius: 18px;
+        line-height: 1.7;
+        padding: 16px 18px;
+    }
+
+    .admin-rich-editor-shell .ck-editor__editable_inline {
+        min-height: 520px;
+        max-height: 900px;
+        line-height: 1.7;
+        padding: 16px 18px;
+    }
+
+    .admin-rich-editor-shell .ck.ck-toolbar {
+        border-top-left-radius: 18px;
+        border-top-right-radius: 18px;
+        border-color: rgba(17, 70, 184, 0.12);
+    }
+
+    .admin-rich-editor-shell .ck.ck-editor__main>.ck-editor__editable,
+    .admin-rich-editor-shell .ck.ck-editor__main>.ck-editor__editable:not(.ck-focused) {
+        border-bottom-left-radius: 18px;
+        border-bottom-right-radius: 18px;
+        border-color: rgba(17, 70, 184, 0.12);
+    }
+
+    .admin-rich-editor-shell .ck.ck-editor {
+        width: 100%;
+    }
+
+    .admin-rich-editor-shell .ck-powered-by {
+        display: none;
+    }
+
+    .admin-rich-editor-shell .cke_chrome {
+        border-radius: 18px !important;
+        border: 1px solid rgba(17, 70, 184, 0.12) !important;
+        overflow: hidden;
+        box-shadow: 0 10px 24px rgba(17, 70, 184, 0.06);
+    }
+
+    .admin-rich-editor-shell .cke_top {
+        background: linear-gradient(180deg, #f8fbff 0%, #eef5ff 100%) !important;
+        border-bottom: 1px solid rgba(17, 70, 184, 0.08) !important;
+    }
+
+    .admin-rich-editor-shell .cke_bottom {
+        background: #fbfdff !important;
+        border-top: 1px solid rgba(17, 70, 184, 0.08) !important;
+    }
+
+    .admin-rich-editor-shell .cke_contents {
+        min-height: 520px !important;
+    }
+
+    .admin-rich-editor-shell .cke_contents iframe,
+    .admin-rich-editor-shell .cke_contents textarea {
+        min-height: 520px !important;
+    }
+
+    .admin-inline-help strong {
+        color: #163057;
+    }
+</style>
+{% endblock %}
+
+{% block admin_content %}
+<section class="admin-surface admin-section">
+    <div class="admin-section-head">
+        <div>
+            <h2>{% if is_create %}Thêm {{ title }}{% else %}Cập nhật {{ title }}{% endif %}</h2>
+            <p>
+                {% if model_key == 'pharmacy' %}
+                Điền đầy đủ thông tin chi nhánh, tọa độ và ảnh để phần bản đồ hiển thị chính xác hơn.
+                {% elif model_key == 'medicine' %}
+                Cập nhật thông tin bán hàng, mô tả ngắn cho trang danh sách, mô tả chi tiết cho trang sản phẩm và thư viện ảnh. Các trường dùng chung như tên, giá bán, ảnh và mô tả sẽ tự đồng bộ cho cùng mặt hàng ở các chi nhánh hoặc bản ghi cùng loại; tồn kho, hạn dùng và lô vẫn được giữ riêng.
+                {% elif model_key == 'user' %}
+                Quản lý tài khoản theo đúng vai trò và mức truy cập của từng người dùng.
+                {% else %}
+                Hoàn tất biểu mẫu rồi lưu để cập nhật dữ liệu.
+                {% endif %}
+            </p>
+        </div>
+    </div>
+
+    <form method="post" enctype="multipart/form-data" id="admin-main-form" novalidate>
+        {% csrf_token %}
+        {% for hidden in form.hidden_fields %}
+            {{ hidden }}
+        {% endfor %}
+
+        {% if form.non_field_errors %}
+        <div class="alert alert-danger">{{ form.non_field_errors }}</div>
+        {% endif %}
+
+        <div class="admin-form-grid">
+            {% for section in form_sections %}
+            <section class="admin-form-section">
+                <div class="admin-form-section__head">
+                    <span class="admin-form-section__icon"><i class="{{ section.icon }}"></i></span>
+                    <h3>{{ section.title }}</h3>
+                </div>
+
+                <div class="row">
+                    {% for item in section.normal_fields %}
+                    <div class="{% if item.full_width %}col-12{% else %}col-md-6{% endif %}">
+                        <div class="admin-field" data-admin-field-name="{{ item.field.name }}">
+                            <label for="{{ item.field.id_for_label }}">{{ item.field.label }}</label>
+
+                            {% if object and item.field.name == 'image' and object.image %}
+                            <div class="admin-media-preview">
+                                <span class="admin-media-preview__label">Ảnh hiện tại</span>
+                                <img src="{{ object.image.url }}" alt="Ảnh hiện tại">
+                            </div>
+                            {% endif %}
+                            {% if object and item.field.name == 'cover_image' and object.cover_image %}
+                            <div class="admin-media-preview">
+                                <span class="admin-media-preview__label">Anh hien tai</span>
+                                <img src="{{ object.cover_image.url }}" alt="Anh hien tai">
+                            </div>
+                            {% endif %}
+
+                            {% if item.field.name == 'image' or item.field.name == 'cover_image' %}
+                            <div class="admin-media-preview admin-media-preview--live d-none" id="{{ item.field.id_for_label }}-live-preview">
+                                <span class="admin-media-preview__label">Ảnh vừa chọn</span>
+                                <img src="" alt="Xem trước ảnh vừa chọn">
+                            </div>
+                            {% endif %}
+
+                            {% if item.field.name == 'gallery_images' and object and object.gallery_only_image_list %}
+                            <div class="admin-gallery-preview" id="existing-gallery-block">
+                                <span class="admin-media-preview__label">Thư viện ảnh hiện tại</span>
+                                <div class="admin-gallery-grid">
+                                    {% for gallery_url in object.gallery_only_image_list %}
+                                    <div class="admin-gallery-thumb admin-gallery-thumb--manage" data-gallery-item>
+                                        <input type="hidden" name="gallery_keep_{{ forloop.counter0 }}" value="1" data-gallery-keep-input>
+                                        <button type="button" class="admin-gallery-thumb__remove" data-gallery-remove-button aria-label="Gỡ ảnh {{ forloop.counter }}">
+                                            <i class="fas fa-times"></i>
+                                        </button>
+                                        <img src="{{ gallery_url }}" alt="Ảnh thư viện {{ forloop.counter }}">
+                                        <span class="admin-gallery-thumb__caption">Ảnh {{ forloop.counter }}</span>
+                                        <span class="admin-gallery-thumb__status"><i class="fas fa-times-circle"></i> Ảnh sẽ được gỡ khi lưu</span>
+                                    </div>
+                                    {% endfor %}
+                                </div>
+                            </div>
+                            {% endif %}
+
+                            {% if item.field.name == 'gallery_images' %}
+                            <div class="admin-gallery-preview d-none" id="{{ item.field.id_for_label }}-live-preview">
+                                <span class="admin-media-preview__label">Các ảnh vừa chọn</span>
+                                <div class="admin-gallery-grid" data-gallery-grid></div>
+                            </div>
+                            {% endif %}
+
+                            {% if item.is_rich_text %}
+                            <div class="admin-rich-editor" data-rich-editor-root>
+                                <div class="admin-rich-editor__toolbar">
+                                    <div class="admin-rich-editor__group">
+                                        <select data-editor-format>
+                                            <option value="p">Bình thường</option>
+                                            <option value="h2">Tiêu đề 2</option>
+                                            <option value="h3">Tiêu đề 3</option>
+                                            <option value="blockquote">Trích dẫn</option>
+                                        </select>
+                                        <select data-editor-font-size>
+                                            <option value="3">Cỡ chữ</option>
+                                            <option value="1">Nhỏ</option>
+                                            <option value="3">Vừa</option>
+                                            <option value="5">Lớn</option>
+                                            <option value="7">Rất lớn</option>
+                                        </select>
+                                    </div>
+                                    <div class="admin-rich-editor__group">
+                                        <button type="button" data-editor-command="bold"><i class="fas fa-bold"></i></button>
+                                        <button type="button" data-editor-command="italic"><i class="fas fa-italic"></i></button>
+                                        <button type="button" data-editor-command="underline"><i class="fas fa-underline"></i></button>
+                                        <button type="button" data-editor-command="strikeThrough"><i class="fas fa-strikethrough"></i></button>
+                                    </div>
+                                    <div class="admin-rich-editor__group">
+                                        <button type="button" data-editor-command="insertUnorderedList"><i class="fas fa-list-ul"></i></button>
+                                        <button type="button" data-editor-command="insertOrderedList"><i class="fas fa-list-ol"></i></button>
+                                        <button type="button" data-editor-command="outdent"><i class="fas fa-outdent"></i></button>
+                                        <button type="button" data-editor-command="indent"><i class="fas fa-indent"></i></button>
+                                    </div>
+                                    <div class="admin-rich-editor__group">
+                                        <button type="button" data-editor-command="justifyLeft"><i class="fas fa-align-left"></i></button>
+                                        <button type="button" data-editor-command="justifyCenter"><i class="fas fa-align-center"></i></button>
+                                        <button type="button" data-editor-command="justifyRight"><i class="fas fa-align-right"></i></button>
+                                        <button type="button" data-editor-command="justifyFull"><i class="fas fa-align-justify"></i></button>
+                                    </div>
+                                    <div class="admin-rich-editor__group">
+                                        <input type="color" value="#163057" data-editor-color title="Màu chữ">
+                                        <input type="color" value="#fff59d" data-editor-bg-color title="Màu nền">
+                                        <button type="button" data-editor-link><i class="fas fa-link"></i></button>
+                                        <button type="button" data-editor-unlink><i class="fas fa-unlink"></i></button>
+                                    </div>
+                                    <div class="admin-rich-editor__group">
+                                        <button type="button" data-editor-table><i class="fas fa-table"></i></button>
+                                        <button type="button" data-editor-image><i class="fas fa-image"></i></button>
+                                        <button type="button" data-editor-remove-format><i class="fas fa-eraser"></i></button>
+                                        <button type="button" data-editor-command="undo"><i class="fas fa-undo"></i></button>
+                                        <button type="button" data-editor-command="redo"><i class="fas fa-redo"></i></button>
+                                    </div>
+                                    <div class="admin-rich-editor__group admin-rich-editor__group--image-tools is-disabled" data-editor-image-tools>
+                                        <span class="admin-rich-editor__toolbar-note"><i class="fas fa-expand-arrows-alt"></i> Ảnh</span>
+                                        <button type="button" data-editor-image-align="left" title="Canh trái"><i class="fas fa-align-left"></i></button>
+                                        <button type="button" data-editor-image-align="center" title="Canh giữa"><i class="fas fa-align-center"></i></button>
+                                        <button type="button" data-editor-image-align="right" title="Canh phải"><i class="fas fa-align-right"></i></button>
+                                        <input type="range" min="20" max="100" step="5" value="100" data-editor-image-width disabled>
+                                        <span class="admin-rich-editor__toolbar-note" data-editor-image-width-label>100%</span>
+                                        <button type="button" data-editor-image-reset title="Trả về mặc định"><i class="fas fa-compress-arrows-alt"></i></button>
+                                    </div>
+                                    <div class="admin-rich-editor__group">
+                                        <button type="button" class="admin-rich-editor__source-toggle" data-editor-source-toggle>Mã HTML</button>
+                                    </div>
+                                </div>
+                                <div class="admin-rich-editor__body">
+                                    <div class="admin-rich-editor__editable" data-editor-editable contenteditable="true"></div>
+                                    <textarea class="admin-rich-editor__source" data-editor-source spellcheck="false"></textarea>
+                                </div>
+                                <div class="admin-rich-editor__foot">Trình soạn thảo nội dung rich text / WYSIWYG. Nội dung nhập vào sẽ được lưu dưới dạng HTML trong hệ thống. Bấm vào ảnh trong nội dung để chỉnh kích thước và canh lề.</div>
+                                <input type="file" class="admin-rich-editor__hidden" data-editor-image-input accept="image/*">
+                                {{ item.field }}
+                            </div>
+                            {% else %}
+                            {{ item.field }}
+                            {% endif %}
+
+                            {% if item.field.name == 'gallery_images' %}
+                            <span class="admin-inline-help">Bạn có thể thêm nhiều ảnh mới cùng lúc. Với ảnh cũ, chỉ cần bấm dấu × ở góc phải để gỡ ảnh sai rồi tải ảnh mới lên lại.</span>
+
+                            {% if object and object.gallery_only_image_list and 'delete_gallery' in form.fields %}
+                            <div class="mt-3">
+                                <button type="button" class="btn-admin btn-admin-soft" onclick="markCurrentGalleryForRemoval()">
+                                    <i class="fas fa-images"></i>
+                                    <span>Xóa toàn bộ thư viện ảnh hiện tại</span>
+                                </button>
+                                <div class="admin-inline-help d-none" id="gallery-delete-note">Thư viện ảnh hiện tại sẽ bị xóa khi bấm Lưu thay đổi.</div>
+                            </div>
+                            {% endif %}
+                            {% elif item.field.help_text %}
+                            <span class="admin-inline-help">{{ item.field.help_text }}</span>
+                            {% endif %}
+
+                            {% if item.field.name == 'image' and object and object.image and 'delete_image' in form.fields %}
+                            <div class="mt-3">
+                                <button type="button" class="btn-admin btn-admin-danger" onclick="confirmDeleteCurrentImage()">
+                                    <i class="fas fa-trash"></i>
+                                    <span>Xóa ảnh hiện tại</span>
+                                </button>
+                            </div>
+                            {% endif %}
+
+                            {% if item.field.name == 'role' %}
+                            <div class="admin-form-note-list">
+                                <div class="admin-form-note">
+                                    <strong>Khách hàng</strong>
+                                    Chỉ dùng website để mua thuốc, quản lý giỏ hàng, địa chỉ và đơn hàng cá nhân.
+                                </div>
+                                <div class="admin-form-note">
+                                    <strong>Nhân viên quản trị</strong>
+                                    Chỉ được quản lý sản phẩm và đơn hàng của đúng một chi nhánh mà quản trị viên hệ thống đã gán.
+                                </div>
+                                <div class="admin-form-note">
+                                    <strong>Quản trị viên</strong>
+                                    Có toàn quyền trên hệ thống, được tạo tài khoản nhân viên và gán chi nhánh phụ trách.
+                                </div>
+                            </div>
+                            {% endif %}
+
+                            {% if item.field.name == 'managed_pharmacy' %}
+                            <span class="admin-inline-help">Chỉ áp dụng cho tài khoản nhân viên. Mỗi nhân viên chỉ được quản lý một chi nhánh duy nhất.</span>
+                            {% endif %}
+
+                            {% if item.field.errors %}
+                            <div class="admin-field-error">{{ item.field.errors }}</div>
+                            {% endif %}
+                        </div>
+                    </div>
+                    {% endfor %}
+
+                    {% if model_key == 'pharmacy' and section.title == 'Thời gian hoạt động và bản đồ' %}
+                    <div class="col-12">
+                        <div class="admin-field" data-admin-field-name="{{ item.field.name }}">
+                            <label for="admin-pharmacy-map">Bản đồ vị trí chi nhánh</label>
+                            <div class="admin-inline-help">Nhập địa chỉ, nhập tay tọa độ hoặc chấm trực tiếp lên bản đồ. Ba phần sẽ tự đồng bộ với nhau.</div>
+                            <div class="admin-location-map-shell">
+                                <div class="admin-map-search">
+                                    <label for="admin-pharmacy-map-search">Tìm địa chỉ để ghim lên bản đồ</label>
+                                    <div class="admin-map-search__row">
+                                        <input type="text" id="admin-pharmacy-map-search" placeholder="Ví dụ: 355/1 ABC, phường..., quận..., TP.HCM">
+                                        <button type="button" class="btn-admin btn-admin-primary" id="admin-pharmacy-map-search-submit">
+                                            <i class="fas fa-search"></i>
+                                            <span>Tìm</span>
+                                        </button>
+                                    </div>
+                                </div>
+                                <div class="admin-map-search-result d-none" id="admin-pharmacy-map-search-result">
+                                    <div>
+                                        <span class="admin-map-search-result__label">Kết quả tìm kiếm</span>
+                                        <div class="admin-map-search-result__address" id="admin-pharmacy-map-search-result-address">Chưa có kết quả nào.</div>
+                                        <div class="admin-map-search-result__meta" id="admin-pharmacy-map-search-result-meta"></div>
+                                    </div>
+                                    <div class="admin-map-search-result__actions">
+                                        <button type="button" class="btn-admin btn-admin-primary" id="admin-pharmacy-map-search-use">
+                                            <i class="fas fa-map-pin"></i>
+                                            <span>Dùng vị trí này</span>
+                                        </button>
+                                        <button type="button" class="btn-admin btn-admin-light" id="admin-pharmacy-map-search-clear">
+                                            <i class="fas fa-times"></i>
+                                            <span>Xóa kết quả</span>
+                                        </button>
+                                    </div>
+                                </div>
+                                <div id="admin-pharmacy-map" class="admin-location-map"></div>
+                                <div class="admin-map-status" id="admin-pharmacy-map-status">Bản đồ sẽ tự cập nhật khi có địa chỉ hoặc tọa độ hợp lệ.</div>
+                            </div>
+                        </div>
+                    </div>
+                    {% endif %}
+                </div>
+
+                {% if section.checkbox_fields %}
+                <div class="admin-checkbox-stack mt-2">
+                    {% for item in section.checkbox_fields %}
+                    <div>
+                        <div class="admin-checkbox-card">
+                            <label class="admin-toggle" for="{{ item.field.id_for_label }}">
+                                <input
+                                    type="checkbox"
+                                    name="{{ item.field.html_name }}"
+                                    id="{{ item.field.id_for_label }}"
+                                    class="admin-toggle__input"
+                                    {% if item.field.value %}checked{% endif %}
+                                >
+                                <span class="admin-toggle__visual" aria-hidden="true">
+                                    <span class="admin-toggle__thumb"></span>
+                                </span>
+                                <span class="admin-toggle__content">
+                                    <span class="admin-toggle__text">{{ item.field.label }}</span>
+                                    <span class="admin-toggle__hint">
+                                        {% if item.field.name == 'prescription_required' %}
+                                        Bật nếu sản phẩm chỉ được bán khi có đơn hợp lệ từ bác sĩ.
+                                        {% elif item.field.name == 'is_active' %}
+                                        Bật để cho phép tài khoản đăng nhập và sử dụng hệ thống bình thường.
+                                        {% else %}
+                                        Chọn nếu muốn áp dụng tùy chọn này cho bản ghi hiện tại.
+                                        {% endif %}
+                                    </span>
+                                </span>
+                            </label>
+                        </div>
+                        {% if item.field.errors %}
+                        <div class="admin-field-error">{{ item.field.errors }}</div>
+                        {% endif %}
+                    </div>
+                    {% endfor %}
+                </div>
+                {% endif %}
+            </section>
+            {% endfor %}
+        </div>
+
+        {% if model_key == 'medicine' and inventory_lots %}
+        <section class="admin-lot-summary">
+            <div class="admin-form-section__head">
+                <span class="admin-form-section__icon"><i class="fas fa-boxes-stacked"></i></span>
+                <h3>Lô tồn kho đang quản lý theo FEFO</h3>
+            </div>
+            <div class="admin-inline-help">Tồn kho và HSD tổng hợp của thuốc được tính tự động từ các lô bên dưới. Khi bán hàng, hệ thống sẽ ưu tiên xuất lô có hạn sử dụng gần nhất trước.</div>
+            <div class="table-responsive">
+                <table class="admin-lot-table">
+                    <thead>
+                        <tr>
+                            <th>Nguồn lô</th>
+                            <th>HSD</th>
+                            <th>Đã nhập</th>
+                            <th>Còn lại</th>
+                            <th>Giá nhập</th>
+                            <th>Trạng thái</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for lot in inventory_lots %}
+                        <tr>
+                            <td>
+                                <strong>{{ lot.source_label|default:"Lô tồn kho" }}</strong>
+                                <div class="cell-sub">{{ lot.get_source_type_display }}</div>
+                            </td>
+                            <td>{% if lot.expiry_date %}{{ lot.expiry_date|date:"d/m/Y" }}{% else %}Chưa có{% endif %}</td>
+                            <td>{{ lot.received_quantity }}</td>
+                            <td>{{ lot.remaining_quantity }}</td>
+                            <td>{{ lot.import_price|vnd }}</td>
+                            <td>
+                                {% if lot.remaining_quantity <= 0 %}
+                                    <span class="admin-lot-badge admin-lot-badge--muted">Đã xuất hết</span>
+                                {% elif lot.is_expired %}
+                                    <span class="admin-lot-badge admin-lot-badge--danger">Đã hết hạn</span>
+                                {% elif lot.expiry_date and lot.expiry_days_remaining <= 183 %}
+                                    <span class="admin-lot-badge admin-lot-badge--warning">Sắp hết hạn</span>
+                                {% else %}
+                                    <span class="admin-lot-badge admin-lot-badge--success">Đang bán được</span>
+                                {% endif %}
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </section>
+        {% elif model_key == 'medicine' and object %}
+        <section class="admin-lot-summary">
+            <div class="admin-form-section__head">
+                <span class="admin-form-section__icon"><i class="fas fa-boxes-stacked"></i></span>
+                <h3>Lô tồn kho đang quản lý theo FEFO</h3>
+            </div>
+            <div class="admin-inline-help">Sản phẩm này hiện chưa có lô tồn kho. Hãy dùng chức năng nhập hàng để tạo lô mới và cập nhật tồn kho/HSD tự động.</div>
+        </section>
+        {% endif %}
+
+        {% if model_key == 'promotion' and promotion_suggestion_groups %}
+        <section class="admin-lot-summary admin-promo-suggestions">
+            <div>
+                <div class="admin-form-section__head">
+                    <span class="admin-form-section__icon"><i class="fas fa-lightbulb"></i></span>
+                    <h3>Gợi ý chọn sản phẩm để khuyến mãi</h3>
+                </div>
+                <div class="admin-inline-help">Mỗi mặt hàng chỉ hiện một dòng đại diện. Hệ thống ưu tiên gợi ý các mặt hàng còn tồn lớn và có HSD gần để bạn chọn nhanh hơn.</div>
+            </div>
+
+            {% if promotion_suggestion_groups.suggested %}
+            <div>
+                <h4 class="mb-3">Ưu tiên giảm giá ngay (HSD ≤ 6 tháng)</h4>
+                <div class="admin-promo-suggestion-grid">
+                    {% for item in promotion_suggestion_groups.suggested %}
+                    <article class="admin-promo-suggestion-card">
+                        <span class="admin-promo-suggestion-pill admin-promo-suggestion-pill--{{ item.tone }}">{{ item.kind_label }}</span>
+                        <strong>{{ item.medicine.name }}</strong>
+                        <small>{{ item.unit|default:item.medicine.unit|default:"Hộp" }} · Toàn hệ thống</small>
+                        <small>HSD gần nhất: {{ item.expiry_label }}</small>
+                        <small>Tồn có thể áp dụng: {{ item.warning_stock|default:item.total_stock }}</small>
+                    </article>
+                    {% endfor %}
+                </div>
+            </div>
+            {% endif %}
+
+            {% if promotion_suggestion_groups.regular %}
+            <div>
+                <h4 class="mb-3">Sản phẩm thường có thể dùng cho dịp lễ / campaign</h4>
+                <div class="admin-promo-suggestion-grid">
+                    {% for item in promotion_suggestion_groups.regular %}
+                    <article class="admin-promo-suggestion-card">
+                        <span class="admin-promo-suggestion-pill admin-promo-suggestion-pill--{{ item.tone }}">{{ item.kind_label }}</span>
+                        <strong>{{ item.medicine.name }}</strong>
+                        <small>{{ item.unit|default:item.medicine.unit|default:"Hộp" }} · Toàn hệ thống</small>
+                        <small>HSD gần nhất: {{ item.expiry_label }}</small>
+                        <small>Tồn có thể áp dụng: {{ item.warning_stock|default:item.total_stock }}</small>
+                    </article>
+                    {% endfor %}
+                </div>
+            </div>
+            {% endif %}
+
+            {% if promotion_suggestion_groups.active %}
+            <div>
+                <h4 class="mb-3">Đang có khuyến mãi active</h4>
+                <div class="admin-promo-suggestion-grid">
+                    {% for item in promotion_suggestion_groups.active %}
+                    <article class="admin-promo-suggestion-card">
+                        <span class="admin-promo-suggestion-pill admin-promo-suggestion-pill--{{ item.tone }}">{{ item.kind_label }}</span>
+                        <strong>{{ item.medicine.name }}</strong>
+                        <small>{{ item.unit|default:item.medicine.unit|default:"Hộp" }} · Toàn hệ thống</small>
+                        <small>HSD gần nhất: {{ item.expiry_label }}</small>
+                        <small>Sản phẩm này đang có khuyến mãi hoạt động và sẽ ưu tiên xuất hiện trong khu giảm giá.</small>
+                    </article>
+                    {% endfor %}
+                </div>
+            </div>
+            {% endif %}
+        </section>
+        {% endif %}
+
+        <div class="admin-sticky-actions">
+            <button type="submit" class="btn-admin btn-admin-primary">
+                <i class="fas fa-save"></i>
+                <span>Lưu thay đổi</span>
+            </button>
+            <a href="{% url 'custom_admin_list' model_key %}" class="btn-admin btn-admin-light">
+                <i class="fas fa-times"></i>
+                <span>Hủy</span>
+            </a>
+        </div>
+    </form>
+</section>
+
+<input type="hidden" id="delete-image-action-input" form="admin-main-form" name="delete_image_action" value="0">
+{% endblock %}
+
+{% block extra_scripts %}
+<script>
+function confirmDeleteCurrentImage() {
+    const ok = confirm("Bạn có chắc muốn xóa ảnh hiện tại không?");
+    if (!ok) return;
+
+    const deleteInput = document.getElementById("id_delete_image");
+    const actionInput = document.getElementById("delete-image-action-input");
+    if (deleteInput) {
+        deleteInput.value = "on";
+    }
+    if (actionInput) {
+        actionInput.value = "1";
+    }
+    document.getElementById("admin-main-form").submit();
+}
+
+function markCurrentGalleryForRemoval() {
+    const deleteInput = document.getElementById("id_delete_gallery");
+    const existingBlock = document.getElementById("existing-gallery-block");
+    const note = document.getElementById("gallery-delete-note");
+
+    if (deleteInput) {
+        deleteInput.value = "on";
+    }
+    if (existingBlock) {
+        existingBlock.classList.add("d-none");
+    }
+    if (note) {
+        note.classList.remove("d-none");
+    }
+}
+
+function bindSingleImagePreview(inputId) {
+    const input = document.getElementById(inputId);
+    const previewBox = document.getElementById(inputId + '-live-preview');
+    if (!input || !previewBox) {
+        return;
+    }
+
+    const image = previewBox.querySelector('img');
+    input.addEventListener('change', function () {
+        const file = input.files && input.files[0];
+        if (!file) {
+            previewBox.classList.add('d-none');
+            image.removeAttribute('src');
+            return;
+        }
+
+        image.src = URL.createObjectURL(file);
+        previewBox.classList.remove('d-none');
+    });
+}
+
+function bindGalleryPreview(inputId) {
+    const input = document.getElementById(inputId);
+    const previewBox = document.getElementById(inputId + '-live-preview');
+    if (!input || !previewBox) {
+        return;
+    }
+
+    const grid = previewBox.querySelector('[data-gallery-grid]');
+    input.addEventListener('change', function () {
+        const files = Array.from(input.files || []);
+        grid.innerHTML = '';
+
+        if (!files.length) {
+            previewBox.classList.add('d-none');
+            return;
+        }
+
+        const deleteInput = document.getElementById('id_delete_gallery');
+        const note = document.getElementById('gallery-delete-note');
+        if (deleteInput) {
+            deleteInput.value = '';
+        }
+        if (note) {
+            note.classList.add('d-none');
+        }
+
+        files.forEach(function (file, index) {
+            const wrapper = document.createElement('div');
+            wrapper.className = 'admin-gallery-thumb';
+
+            const image = document.createElement('img');
+            image.src = URL.createObjectURL(file);
+            image.alt = file.name || ('Ảnh ' + (index + 1));
+
+            const caption = document.createElement('span');
+            caption.className = 'admin-gallery-thumb__caption';
+            caption.textContent = file.name || ('Ảnh ' + (index + 1));
+
+            wrapper.appendChild(image);
+            wrapper.appendChild(caption);
+            grid.appendChild(wrapper);
+        });
+
+        previewBox.classList.remove('d-none');
+    });
+}
+
+function initPharmacyLocationSync() {
+    const mapElement = document.getElementById('admin-pharmacy-map');
+    if (!mapElement || typeof L === 'undefined') {
+        return;
+    }
+
+    const addressInput = document.getElementById('id_address');
+    const latInput = document.getElementById('id_lat');
+    const lngInput = document.getElementById('id_lng');
+    const statusBox = document.getElementById('admin-pharmacy-map-status');
+    const searchInput = document.getElementById('admin-pharmacy-map-search');
+    const searchSubmit = document.getElementById('admin-pharmacy-map-search-submit');
+    const searchResultBox = document.getElementById('admin-pharmacy-map-search-result');
+    const searchResultAddress = document.getElementById('admin-pharmacy-map-search-result-address');
+    const searchResultMeta = document.getElementById('admin-pharmacy-map-search-result-meta');
+    const searchUseButton = document.getElementById('admin-pharmacy-map-search-use');
+    const searchClearButton = document.getElementById('admin-pharmacy-map-search-clear');
+
+    if (!addressInput || !latInput || !lngInput) {
+        return;
+    }
+
+    const defaultLat = 10.776889;
+    const defaultLng = 106.700806;
+    const map = L.map(mapElement, { scrollWheelZoom: true }).setView([defaultLat, defaultLng], 13);
+    L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png', {
+        attribution: '&copy; OpenStreetMap contributors &copy; CARTO',
+        subdomains: 'abcd',
+        maxZoom: 20
+    }).addTo(map);
+
+    let marker = null;
+    let reverseRequestId = 0;
+    let forwardRequestId = 0;
+    let searchPreview = null;
+    let searchPreviewMarker = null;
+    const searchPreviewIcon = L.divIcon({
+        className: 'admin-map-search-preview-icon',
+        html: '<span class="admin-map-search-preview-pin"></span>',
+        iconSize: [18, 18],
+        iconAnchor: [9, 9]
+    });
+
+    function setStatus(message, tone) {
+        if (!statusBox) {
+            return;
+        }
+        statusBox.textContent = message || '';
+        statusBox.classList.remove('is-error', 'is-success');
+        if (tone === 'error') {
+            statusBox.classList.add('is-error');
+        } else if (tone === 'success') {
+            statusBox.classList.add('is-success');
+        }
+    }
+
+    function parseCoordinate(value) {
+        const normalized = String(value || '').trim().replace(',', '.');
+        if (!normalized) {
+            return null;
+        }
+        const number = Number(normalized);
+        return Number.isFinite(number) ? number : null;
+    }
+
+    function updateCoordinateInputs(lat, lng) {
+        latInput.value = Number(lat).toFixed(6);
+        lngInput.value = Number(lng).toFixed(6);
+    }
+
+    function ensureMarker(lat, lng) {
+        if (!marker) {
+            marker = L.marker([lat, lng], { draggable: true }).addTo(map);
+            marker.on('dragend', function () {
+                const point = marker.getLatLng();
+                applyCoordinates(point.lat, point.lng, {
+                    lookupAddress: true,
+                    recenter: false,
+                    statusMessage: 'Đã cập nhật vị trí từ điểm kéo trên bản đồ.'
+                });
+            });
+        } else {
+            marker.setLatLng([lat, lng]);
+        }
+        return marker;
+    }
+
+    function clearSearchPreview(options) {
+        options = options || {};
+        searchPreview = null;
+        if (searchPreviewMarker && map.hasLayer(searchPreviewMarker)) {
+            map.removeLayer(searchPreviewMarker);
+        }
+        searchPreviewMarker = null;
+        if (searchResultBox) {
+            searchResultBox.classList.add('d-none');
+        }
+        if (searchResultAddress) {
+            searchResultAddress.textContent = 'Chưa có kết quả nào.';
+        }
+        if (searchResultMeta) {
+            searchResultMeta.textContent = '';
+        }
+        if (!options.keepStatus) {
+            setStatus('Ô tìm kiếm chỉ dùng để xem trước vị trí trên bản đồ. Khi cần lưu cho chi nhánh, hãy bấm "Dùng vị trí này".');
+        }
+    }
+
+    function setSearchPreview(result) {
+        const lat = Number(result.lat);
+        const lng = Number(result.lng);
+        if (!Number.isFinite(lat) || !Number.isFinite(lng)) {
+            throw new Error('Tọa độ kết quả tìm kiếm không hợp lệ.');
+        }
+
+        searchPreview = {
+            lat: lat,
+            lng: lng,
+            addressText: result.display_name || '',
+            sourceLabel: result.type_label || 'Địa chỉ tìm kiếm'
+        };
+
+        if (!searchPreviewMarker) {
+            searchPreviewMarker = L.marker([lat, lng], { icon: searchPreviewIcon }).addTo(map);
+        } else {
+            searchPreviewMarker.setLatLng([lat, lng]);
+            if (!map.hasLayer(searchPreviewMarker)) {
+                map.addLayer(searchPreviewMarker);
+            }
+        }
+
+        searchPreviewMarker.bindPopup(searchPreview.addressText || 'Kết quả tìm kiếm', { autoPan: false });
+
+        if (searchResultBox) {
+            searchResultBox.classList.remove('d-none');
+        }
+        if (searchResultAddress) {
+            searchResultAddress.textContent = searchPreview.addressText || 'Đã tìm thấy một vị trí trên bản đồ.';
+        }
+        if (searchResultMeta) {
+            searchResultMeta.textContent = `${searchPreview.sourceLabel} • Chưa áp dụng vào địa chỉ chi nhánh cho tới khi bạn bấm "Dùng vị trí này".`;
+        }
+
+        map.stop();
+        map.setView([lat, lng], 16);
+        searchPreviewMarker.openPopup();
+    }
+
+    function applySearchPreview() {
+        if (!searchPreview) {
+            setStatus('Chưa có kết quả tìm kiếm nào để sử dụng.', 'error');
+            return;
+        }
+
+        applyCoordinates(searchPreview.lat, searchPreview.lng, {
+            recenter: true,
+            zoom: 16,
+            lookupAddress: false,
+            addressText: searchPreview.addressText || 'Địa chỉ vừa tìm',
+            statusMessage: 'Đã áp dụng kết quả tìm kiếm cho vị trí chi nhánh.',
+            statusTone: 'success'
+        });
+        clearSearchPreview({ keepStatus: true });
+    }
+
+    async function reverseLookup(lat, lng) {
+        const requestId = ++reverseRequestId;
+        setStatus('Đang cập nhật địa chỉ từ tọa độ...');
+
+        try {
+            const response = await fetch(`/api/reverse-address/?lat=${encodeURIComponent(lat)}&lng=${encodeURIComponent(lng)}`);
+            const data = await response.json();
+            if (requestId !== reverseRequestId) {
+                return;
+            }
+            if (!response.ok) {
+                throw new Error(data.error || 'Không thể lấy địa chỉ từ tọa độ.');
+            }
+
+            const addressText = (data.address || '').trim();
+            if (addressText) {
+                addressInput.value = addressText;
+                addressInput.dataset.syncedAddress = addressText;
+            }
+            setStatus('Đã đồng bộ địa chỉ từ tọa độ.', 'success');
+        } catch (error) {
+            setStatus(error.message || 'Không thể cập nhật địa chỉ từ tọa độ.', 'error');
+        }
+    }
+
+    async function forwardLookup(addressText, options) {
+        const keyword = String(addressText || '').trim();
+        if (!keyword) {
+            return;
+        }
+
+        options = options || {};
+        const requestId = ++forwardRequestId;
+        setStatus('Đang tìm vị trí theo địa chỉ...');
+
+        try {
+            const response = await fetch(`/api/search-address/?q=${encodeURIComponent(keyword)}`);
+            const data = await response.json();
+            if (requestId !== forwardRequestId) {
+                return;
+            }
+            if (!response.ok) {
+                throw new Error(data.error || 'Không thể tìm vị trí từ địa chỉ.');
+            }
+            if (!data.results || !data.results.length) {
+                throw new Error('Không tìm thấy vị trí phù hợp cho địa chỉ này.');
+            }
+
+            const first = data.results[0];
+            if (options.applyImmediately === true) {
+                applyCoordinates(first.lat, first.lng, {
+                    recenter: true,
+                    zoom: 16,
+                    lookupAddress: false,
+                    addressText: first.display_name || keyword,
+                    statusMessage: options.statusMessage || 'Đã đồng bộ tọa độ từ địa chỉ.',
+                    statusTone: options.statusTone || 'success'
+                });
+                return;
+            }
+
+            setSearchPreview(first);
+            setStatus('Đã tìm thấy vị trí. Kiểm tra kết quả rồi bấm "Dùng vị trí này" nếu muốn áp dụng.', 'success');
+        } catch (error) {
+            setStatus(error.message || 'Không thể tìm vị trí theo địa chỉ.', 'error');
+        }
+    }
+
+    function applyCoordinates(lat, lng, options) {
+        const numericLat = Number(lat);
+        const numericLng = Number(lng);
+        if (!Number.isFinite(numericLat) || !Number.isFinite(numericLng)) {
+            setStatus('Tọa độ không hợp lệ.', 'error');
+            return;
+        }
+
+        options = options || {};
+        clearSearchPreview({ keepStatus: true });
+        updateCoordinateInputs(numericLat, numericLng);
+        ensureMarker(numericLat, numericLng);
+
+        if (options.addressText) {
+            addressInput.value = options.addressText;
+            addressInput.dataset.syncedAddress = options.addressText;
+        }
+
+        if (options.recenter !== false) {
+            map.stop();
+            map.setView([numericLat, numericLng], options.zoom || 16);
+        }
+
+        if (options.lookupAddress) {
+            reverseLookup(numericLat, numericLng);
+        } else if (options.statusMessage) {
+            setStatus(options.statusMessage, options.statusTone || 'success');
+        }
+    }
+
+    function syncFromCoordinateInputs() {
+        const lat = parseCoordinate(latInput.value);
+        const lng = parseCoordinate(lngInput.value);
+        if (lat === null || lng === null) {
+            return;
+        }
+        applyCoordinates(lat, lng, {
+            lookupAddress: true,
+            recenter: true,
+            zoom: 16,
+            statusMessage: 'Đang cập nhật từ tọa độ...'
+        });
+    }
+
+    map.on('click', function (event) {
+        applyCoordinates(event.latlng.lat, event.latlng.lng, {
+            lookupAddress: true,
+            recenter: false,
+            statusMessage: 'Đã cập nhật vị trí từ điểm bạn chọn trên bản đồ.'
+        });
+    });
+
+    latInput.addEventListener('change', syncFromCoordinateInputs);
+    lngInput.addEventListener('change', syncFromCoordinateInputs);
+    latInput.addEventListener('blur', syncFromCoordinateInputs);
+    lngInput.addEventListener('blur', syncFromCoordinateInputs);
+    if (searchSubmit) {
+        searchSubmit.addEventListener('click', function () {
+            forwardLookup(searchInput ? searchInput.value : '');
+        });
+    }
+    if (searchInput) {
+        searchInput.addEventListener('keydown', function (event) {
+            if (event.key === 'Enter') {
+                event.preventDefault();
+                forwardLookup(searchInput.value);
+            }
+        });
+    }
+    if (searchUseButton) {
+        searchUseButton.addEventListener('click', applySearchPreview);
+    }
+    if (searchClearButton) {
+        searchClearButton.addEventListener('click', function () {
+            clearSearchPreview();
+        });
+    }
+
+    const initialLat = parseCoordinate(latInput.value);
+    const initialLng = parseCoordinate(lngInput.value);
+    const initialAddress = String(addressInput.value || '').trim();
+
+    if (initialLat !== null && initialLng !== null) {
+        applyCoordinates(initialLat, initialLng, {
+            lookupAddress: !initialAddress,
+            recenter: true,
+            zoom: 16,
+            addressText: initialAddress || null,
+            statusMessage: initialAddress ? 'Đã hiển thị vị trí hiện tại của chi nhánh.' : 'Đang tìm địa chỉ từ tọa độ hiện tại.',
+            statusTone: initialAddress ? 'success' : null
+        });
+    } else if (initialAddress) {
+        forwardLookup(initialAddress, {
+            applyImmediately: true,
+            statusMessage: 'Đã hiển thị vị trí theo địa chỉ hiện tại của chi nhánh.',
+            statusTone: 'success'
+        });
+    } else {
+        clearSearchPreview({ keepStatus: true });
+        setStatus('Nhập địa chỉ, nhập tọa độ hoặc chấm trực tiếp lên bản đồ để xác định vị trí chi nhánh.');
+    }
+
+    window.setTimeout(function () {
+        map.invalidateSize();
+    }, 200);
+}
+
+function syncManagedPharmacyVisibility() {
+    var roleField = document.getElementById('id_role');
+    var managedField = document.querySelector('[data-admin-field-name="managed_pharmacy"]');
+    if (!roleField || !managedField) {
+        return;
+    }
+
+    var shouldShow = roleField.value === 'staff';
+    managedField.style.display = shouldShow ? '' : 'none';
+    var select = managedField.querySelector('select');
+    if (select && !shouldShow) {
+        select.value = '';
+    }
+}
+
+function getEditorCsrfToken() {
+    if (window.siteUtils && typeof window.siteUtils.getCookie === 'function') {
+        return window.siteUtils.getCookie('csrftoken') || '';
+    }
+    var match = document.cookie.match(/(?:^|; )csrftoken=([^;]+)/);
+    return match ? decodeURIComponent(match[1]) : '';
+}
+
+function syncAllRichEditorInputs() {
+    document.querySelectorAll('[data-rich-editor-root]').forEach(function (root) {
+        if (root._richEditor && typeof root._richEditor.syncToTextarea === 'function') {
+            root._richEditor.syncToTextarea();
+        }
+    });
+}
+
+function insertHtmlAtCursor(editable, html) {
+    editable.focus();
+    if (document.queryCommandSupported && document.queryCommandSupported('insertHTML')) {
+        document.execCommand('insertHTML', false, html);
+        return;
+    }
+    var selection = window.getSelection();
+    if (!selection || !selection.rangeCount) {
+        editable.insertAdjacentHTML('beforeend', html);
+        return;
+    }
+    var range = selection.getRangeAt(0);
+    range.deleteContents();
+    var fragment = range.createContextualFragment(html);
+    range.insertNode(fragment);
+}
+
+function buildAdminRichEditor(root) {
+    if (!root || root._richEditor) {
+        return;
+    }
+
+    var textarea = root.querySelector('textarea[data-rich-editor="1"]');
+    var editor = root.querySelector('[data-editor-editable]');
+    var source = root.querySelector('[data-editor-source]');
+    var sourceToggle = root.querySelector('[data-editor-source-toggle]');
+    var formatSelect = root.querySelector('[data-editor-format]');
+    var fontSizeSelect = root.querySelector('[data-editor-font-size]');
+    var colorInput = root.querySelector('[data-editor-color]');
+    var bgColorInput = root.querySelector('[data-editor-bg-color]');
+    var imageInput = root.querySelector('[data-editor-image-input]');
+    var imageTools = root.querySelector('[data-editor-image-tools]');
+    var imageWidthInput = root.querySelector('[data-editor-image-width]');
+    var imageWidthLabel = root.querySelector('[data-editor-image-width-label]');
+    var imageAlignButtons = Array.prototype.slice.call(root.querySelectorAll('[data-editor-image-align]'));
+    var imageResetButton = root.querySelector('[data-editor-image-reset]');
+
+    if (!textarea || !editor || !source) {
+        return;
+    }
+
+    var state = { sourceMode: false, selectedImage: null };
+    textarea.classList.add('admin-rich-editor__hidden');
+    textarea.style.display = 'none';
+    editor.innerHTML = (textarea.value || '').trim() || '<p></p>';
+    source.value = textarea.value || '';
+
+    function syncToTextarea() {
+        if (state.sourceMode) {
+            textarea.value = source.value.trim();
+        } else {
+            textarea.value = editor.innerHTML.trim();
+            source.value = textarea.value;
+        }
+        if (!textarea.value) {
+            textarea.value = '';
+        }
+    }
+
+    function syncFromSource() {
+        editor.innerHTML = source.value.trim() || '<p></p>';
+        textarea.value = source.value.trim();
+    }
+
+    function clampImageWidth(value) {
+        var parsed = parseInt(value || '100', 10);
+        if (Number.isNaN(parsed)) {
+            parsed = 100;
+        }
+        return Math.min(100, Math.max(20, parsed));
+    }
+
+    function setImageToolsDisabled(disabled) {
+        if (imageTools) {
+            imageTools.classList.toggle('is-disabled', !!disabled);
+        }
+        if (imageWidthInput) {
+            imageWidthInput.disabled = !!disabled;
+        }
+        if (imageResetButton) {
+            imageResetButton.disabled = !!disabled;
+        }
+        imageAlignButtons.forEach(function (button) {
+            button.disabled = !!disabled;
+        });
+    }
+
+    function normalizeEditorImage(image) {
+        if (!image) {
+            return;
+        }
+        image.style.maxWidth = '100%';
+        image.style.height = 'auto';
+        if (!image.style.display) {
+            image.style.display = 'block';
+        }
+        if (!image.style.marginBottom) {
+            image.style.marginBottom = '14px';
+        }
+    }
+
+    function getSelectedImageWidth(image) {
+        if (!image) {
+            return 100;
+        }
+
+        var widthStyle = (image.style.width || '').trim();
+        if (widthStyle.indexOf('%') > -1) {
+            return clampImageWidth(widthStyle.replace('%', ''));
+        }
+
+        var widthAttribute = (image.getAttribute('width') || '').trim();
+        if (/^\d+$/.test(widthAttribute)) {
+            return clampImageWidth(Math.round((parseInt(widthAttribute, 10) / Math.max(editor.clientWidth || 1, 1)) * 100));
+        }
+
+        var imageRect = image.getBoundingClientRect();
+        var editorRect = editor.getBoundingClientRect();
+        if (imageRect.width && editorRect.width) {
+            return clampImageWidth(Math.round((imageRect.width / editorRect.width) * 100));
+        }
+
+        return 100;
+    }
+
+    function getSelectedImageAlign(image) {
+        if (!image) {
+            return 'left';
+        }
+
+        var marginLeft = (image.style.marginLeft || '').trim();
+        var marginRight = (image.style.marginRight || '').trim();
+
+        if (marginLeft === 'auto' && marginRight === 'auto') {
+            return 'center';
+        }
+        if (marginLeft === 'auto') {
+            return 'right';
+        }
+        return 'left';
+    }
+
+    function clearEditorImageSelection() {
+        if (state.selectedImage) {
+            state.selectedImage.classList.remove('is-selected');
+        }
+        state.selectedImage = null;
+    }
+
+    function updateImageControls() {
+        var selectedImage = state.selectedImage;
+        if (selectedImage && !editor.contains(selectedImage)) {
+            clearEditorImageSelection();
+            selectedImage = null;
+        }
+
+        var disabled = state.sourceMode || !selectedImage;
+        setImageToolsDisabled(disabled);
+
+        imageAlignButtons.forEach(function (button) {
+            button.classList.remove('is-active');
+        });
+
+        if (imageWidthInput) {
+            imageWidthInput.value = disabled ? '100' : String(getSelectedImageWidth(selectedImage));
+        }
+        if (imageWidthLabel) {
+            imageWidthLabel.textContent = (imageWidthInput ? imageWidthInput.value : '100') + '%';
+        }
+
+        if (disabled) {
+            return;
+        }
+
+        normalizeEditorImage(selectedImage);
+        var selectedAlign = getSelectedImageAlign(selectedImage);
+        imageAlignButtons.forEach(function (button) {
+            button.classList.toggle('is-active', button.getAttribute('data-editor-image-align') === selectedAlign);
+        });
+    }
+
+    function selectEditorImage(image) {
+        if (!image || state.sourceMode) {
+            clearEditorImageSelection();
+            updateImageControls();
+            return;
+        }
+
+        if (state.selectedImage && state.selectedImage !== image) {
+            state.selectedImage.classList.remove('is-selected');
+        }
+
+        state.selectedImage = image;
+        normalizeEditorImage(image);
+        image.classList.add('is-selected');
+        updateImageControls();
+    }
+
+    function applySelectedImageWidth(value) {
+        if (!state.selectedImage || state.sourceMode) {
+            return;
+        }
+
+        var resolvedWidth = clampImageWidth(value);
+        normalizeEditorImage(state.selectedImage);
+        state.selectedImage.style.width = resolvedWidth + '%';
+        state.selectedImage.removeAttribute('width');
+        syncToTextarea();
+        updateImageControls();
+    }
+
+    function applySelectedImageAlignment(alignment) {
+        if (!state.selectedImage || state.sourceMode) {
+            return;
+        }
+
+        normalizeEditorImage(state.selectedImage);
+        if (alignment === 'center') {
+            state.selectedImage.style.marginLeft = 'auto';
+            state.selectedImage.style.marginRight = 'auto';
+        } else if (alignment === 'right') {
+            state.selectedImage.style.marginLeft = 'auto';
+            state.selectedImage.style.marginRight = '0';
+        } else {
+            state.selectedImage.style.marginLeft = '0';
+            state.selectedImage.style.marginRight = 'auto';
+        }
+        syncToTextarea();
+        updateImageControls();
+    }
+
+    function refreshActiveStates() {
+        root.querySelectorAll('[data-editor-command]').forEach(function (button) {
+            var command = button.getAttribute('data-editor-command');
+            if (!command || state.sourceMode) {
+                button.classList.remove('is-active');
+                return;
+            }
+            try {
+                var active = document.queryCommandState(command);
+                button.classList.toggle('is-active', !!active);
+            } catch (error) {
+                button.classList.remove('is-active');
+            }
+        });
+        updateImageControls();
+    }
+
+    function execEditorCommand(command, value) {
+        if (state.sourceMode) {
+            source.focus();
+            return;
+        }
+        editor.focus();
+        document.execCommand(command, false, value || null);
+        syncToTextarea();
+        refreshActiveStates();
+    }
+
+    root.querySelectorAll('[data-editor-command]').forEach(function (button) {
+        button.addEventListener('click', function () {
+            execEditorCommand(button.getAttribute('data-editor-command'));
+        });
+    });
+
+    if (formatSelect) {
+        formatSelect.addEventListener('change', function () {
+            execEditorCommand('formatBlock', formatSelect.value || 'p');
+        });
+    }
+
+    if (fontSizeSelect) {
+        fontSizeSelect.addEventListener('change', function () {
+            execEditorCommand('fontSize', fontSizeSelect.value || '3');
+        });
+    }
+
+    if (colorInput) {
+        colorInput.addEventListener('input', function () {
+            execEditorCommand('foreColor', colorInput.value);
+        });
+    }
+
+    if (bgColorInput) {
+        bgColorInput.addEventListener('input', function () {
+            execEditorCommand('hiliteColor', bgColorInput.value);
+        });
+    }
+
+    if (imageWidthInput) {
+        imageWidthInput.addEventListener('input', function () {
+            applySelectedImageWidth(imageWidthInput.value);
+        });
+    }
+
+    imageAlignButtons.forEach(function (button) {
+        button.addEventListener('click', function () {
+            applySelectedImageAlignment(button.getAttribute('data-editor-image-align') || 'left');
+        });
+    });
+
+    if (imageResetButton) {
+        imageResetButton.addEventListener('click', function () {
+            applySelectedImageWidth(100);
+            applySelectedImageAlignment('center');
+        });
+    }
+
+    var linkButton = root.querySelector('[data-editor-link]');
+    if (linkButton) {
+        linkButton.addEventListener('click', function () {
+            if (state.sourceMode) {
+                return;
+            }
+            var link = window.prompt('Nhập liên kết muốn chèn:', 'https://');
+            if (link) {
+                execEditorCommand('createLink', link);
+            }
+        });
+    }
+
+    var unlinkButton = root.querySelector('[data-editor-unlink]');
+    if (unlinkButton) {
+        unlinkButton.addEventListener('click', function () {
+            execEditorCommand('unlink');
+        });
+    }
+
+    var removeFormatButton = root.querySelector('[data-editor-remove-format]');
+    if (removeFormatButton) {
+        removeFormatButton.addEventListener('click', function () {
+            execEditorCommand('removeFormat');
+        });
+    }
+
+    var tableButton = root.querySelector('[data-editor-table]');
+    if (tableButton) {
+        tableButton.addEventListener('click', function () {
+            var rows = parseInt(window.prompt('Số hàng muốn chèn:', '2') || '0', 10);
+            var cols = parseInt(window.prompt('Số cột muốn chèn:', '2') || '0', 10);
+            if (!rows || !cols || rows < 1 || cols < 1) {
+                return;
+            }
+            var tableHtml = '<table style="width:100%;border-collapse:collapse" border="1">';
+            for (var rowIndex = 0; rowIndex < rows; rowIndex += 1) {
+                tableHtml += '<tr>';
+                for (var colIndex = 0; colIndex < cols; colIndex += 1) {
+                    tableHtml += '<td style="padding:8px">&nbsp;</td>';
+                }
+                tableHtml += '</tr>';
+            }
+            tableHtml += '</table><p></p>';
+            if (state.sourceMode) {
+                source.value += tableHtml;
+                syncFromSource();
+                syncToTextarea();
+                return;
+            }
+            insertHtmlAtCursor(editor, tableHtml);
+            syncToTextarea();
+        });
+    }
+
+    var imageButton = root.querySelector('[data-editor-image]');
+    if (imageButton && imageInput) {
+        imageButton.addEventListener('click', function () {
+            imageInput.click();
+        });
+        imageInput.addEventListener('change', function () {
+            var file = imageInput.files && imageInput.files[0];
+            if (!file) {
+                return;
+            }
+            var data = new FormData();
+            data.append('upload', file);
+            fetch('{% url "editor_upload_api" %}', {
+                method: 'POST',
+                headers: {
+                    'X-CSRFToken': getEditorCsrfToken()
+                },
+                body: data
+            }).then(function (response) {
+                return response.json().then(function (payload) {
+                    if (!response.ok || !payload.url) {
+                        throw new Error(payload.error || 'Không thể tải ảnh lên.');
+                    }
+                    return payload.url;
+                });
+            }).then(function (url) {
+                var uploadMarker = 'editor-upload-' + Date.now() + '-' + Math.floor(Math.random() * 100000);
+                var imageHtml = '<p><img src="' + url + '" alt="Hình minh họa" data-editor-upload-marker="' + uploadMarker + '" style="display:block;max-width:100%;width:100%;height:auto;margin:0 auto 14px;"></p>';
+                if (state.sourceMode) {
+                    source.value += imageHtml.replace(/\sdata-editor-upload-marker="[^"]*"/, '');
+                    syncFromSource();
+                    syncToTextarea();
+                } else {
+                    insertHtmlAtCursor(editor, imageHtml);
+                    syncToTextarea();
+                    window.requestAnimationFrame(function () {
+                        var insertedImage = editor.querySelector('img[data-editor-upload-marker="' + uploadMarker + '"]');
+                        if (insertedImage) {
+                            insertedImage.removeAttribute('data-editor-upload-marker');
+                            selectEditorImage(insertedImage);
+                        }
+                    });
+                }
+            }).catch(function (error) {
+                window.alert(error.message || 'Không thể tải ảnh lên.');
+            }).finally(function () {
+                imageInput.value = '';
+            });
+        });
+    }
+
+    if (sourceToggle) {
+        sourceToggle.addEventListener('click', function () {
+            state.sourceMode = !state.sourceMode;
+            if (state.sourceMode) {
+                clearEditorImageSelection();
+                syncToTextarea();
+                source.value = textarea.value;
+                root.classList.add('is-source-mode');
+                sourceToggle.textContent = 'Soạn thảo';
+            } else {
+                syncFromSource();
+                root.classList.remove('is-source-mode');
+                sourceToggle.textContent = 'Mã HTML';
+            }
+            syncToTextarea();
+            refreshActiveStates();
+        });
+    }
+
+    editor.addEventListener('click', function (event) {
+        var targetImage = event.target.closest('img');
+        if (targetImage && editor.contains(targetImage)) {
+            selectEditorImage(targetImage);
+            return;
+        }
+        clearEditorImageSelection();
+        updateImageControls();
+    });
+
+    editor.addEventListener('keydown', function (event) {
+        if (event.key === 'Escape') {
+            clearEditorImageSelection();
+            updateImageControls();
+        }
+    });
+
+    ['input', 'blur', 'keyup', 'paste', 'mouseup'].forEach(function (eventName) {
+        editor.addEventListener(eventName, function () {
+            syncToTextarea();
+            refreshActiveStates();
+        });
+    });
+    source.addEventListener('input', function () {
+        syncToTextarea();
+    });
+
+    root._richEditor = {
+        syncToTextarea: syncToTextarea
+    };
+    syncToTextarea();
+    refreshActiveStates();
+}
+
+function ensureRichEditors() {
+    document.querySelectorAll('[data-rich-editor-root]').forEach(function (root) {
+        buildAdminRichEditor(root);
+    });
+}
+
+function initGalleryRemovalButtons() {
+    document.querySelectorAll('[data-gallery-remove-button]').forEach(function (button) {
+        if (button.dataset.bound === '1') {
+            return;
+        }
+        button.dataset.bound = '1';
+        button.addEventListener('click', function () {
+            var card = button.closest('[data-gallery-item]');
+            var keepInput = card ? card.querySelector('[data-gallery-keep-input]') : null;
+            if (!card || !keepInput) {
+                return;
+            }
+            keepInput.value = '0';
+            card.classList.add('is-removed');
+        });
+    });
+}
+
+document.addEventListener('DOMContentLoaded', function () {
+    try {
+        bindSingleImagePreview('id_image');
+    } catch (error) {
+        console.error('Single image preview init error:', error);
+    }
+    try {
+        bindSingleImagePreview('id_cover_image');
+    } catch (error) {
+        console.error('Cover image preview init error:', error);
+    }
+    try {
+        bindGalleryPreview('id_gallery_images');
+    } catch (error) {
+        console.error('Gallery preview init error:', error);
+    }
+    try {
+        initGalleryRemovalButtons();
+    } catch (error) {
+        console.error('Gallery removal button init error:', error);
+    }
+    try {
+        initPharmacyLocationSync();
+    } catch (error) {
+        console.error('Pharmacy map init error:', error);
+    }
+    try {
+        syncManagedPharmacyVisibility();
+    } catch (error) {
+        console.error('Managed pharmacy visibility init error:', error);
+    }
+
+    var roleField = document.getElementById('id_role');
+    if (roleField) {
+        roleField.addEventListener('change', syncManagedPharmacyVisibility);
+    }
+
+    {% if has_rich_editors %}
+    ensureRichEditors();
+    window.setTimeout(ensureRichEditors, 400);
+    window.setTimeout(ensureRichEditors, 1200);
+
+    var adminMainForm = document.getElementById('admin-main-form');
+    if (adminMainForm) {
+        adminMainForm.addEventListener('submit', syncAllRichEditorInputs);
+    }
+    {% endif %}
+});
+</script>
+{% endblock %}

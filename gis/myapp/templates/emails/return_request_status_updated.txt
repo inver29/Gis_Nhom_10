@@ -1,0 +1,15 @@
+{{ recipient_name }} thân mến,
+
+Yêu cầu trả hàng / hoàn tiền cho đơn {{ order.order_code }} của bạn vừa được cập nhật trên {{ site_name }}.
+
+Trạng thái trước đó: {{ previous_status_label }}
+Trạng thái hiện tại: {{ current_status_label }}
+Trạng thái đơn hàng liên quan: {{ order_status_label }}
+
+{% if return_request.admin_note %}Ghi chú từ bộ phận xử lý:
+{{ return_request.admin_note }}
+
+{% endif %}Xem chi tiết yêu cầu và đơn hàng:
+{{ order_detail_url }}
+
+Nếu cần hỗ trợ thêm, vui lòng liên hệ {{ support_email }}.

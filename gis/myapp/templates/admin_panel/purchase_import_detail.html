@@ -1,0 +1,125 @@
+{% extends "admin_panel/base.html" %}
+{% load currency_filters %}
+
+{% block admin_content %}
+<section class="admin-section-head mb-4">
+    <div>
+        <h2 class="admin-section-title">{{ purchase_batch.resolved_invoice_code }}</h2>
+        <p class="admin-section-muted">Biên nhận nhập hàng từ Excel, dùng để đối soát người phụ trách, số lượng nhập và tồn kho sau khi cập nhật.</p>
+    </div>
+    <div class="admin-toolbar">
+        <a href="{% url 'custom_admin_list' 'purchase_import' %}" class="btn-admin btn-admin-light">
+            <i class="fas fa-arrow-left"></i>
+            <span>Quay lại danh sách</span>
+        </a>
+        <a href="{% url 'custom_admin_purchase_import_receipt' purchase_batch.pk %}" class="btn-admin btn-admin-primary">
+            <i class="fas fa-file-export"></i>
+            <span>Xuất phiếu nhập</span>
+        </a>
+    </div>
+</section>
+
+<section class="admin-surface admin-section mb-4">
+    <div class="admin-section-head">
+        <div>
+            <h3>Thông tin phiếu nhập</h3>
+            <p>Tóm tắt các thông tin cốt lõi của lần nhập hàng này.</p>
+        </div>
+        {% if purchase_batch.source_file %}
+        <a href="{{ purchase_batch.source_file.url }}" class="admin-import-file-chip" target="_blank" rel="noopener">
+            <i class="fas fa-file-excel"></i>
+            <span>Tải lại file Excel gốc</span>
+        </a>
+        {% endif %}
+    </div>
+
+    <div class="admin-import-summary">
+        <div class="admin-import-summary__item">
+            <small>Chi nhánh nhập hàng</small>
+            <strong>{{ purchase_batch.pharmacy.name }}</strong>
+        </div>
+        <div class="admin-import-summary__item">
+            <small>Người phụ trách</small>
+            <strong>{{ purchase_batch.resolved_imported_by_name }}</strong>
+        </div>
+        <div class="admin-import-summary__item">
+            <small>Tổng số dòng hợp lệ</small>
+            <strong>{{ purchase_batch.total_lines }}</strong>
+        </div>
+        <div class="admin-import-summary__item">
+            <small>Tổng số lượng nhập</small>
+            <strong>{{ purchase_batch.total_quantity }}</strong>
+        </div>
+    </div>
+
+    <div class="admin-meta-grid mt-4">
+        <div class="admin-meta-item">
+            <div class="admin-meta-item__label">Mã phiếu nhập</div>
+            <div class="admin-meta-item__value">{{ purchase_batch.resolved_invoice_code }}</div>
+        </div>
+        <div class="admin-meta-item">
+            <div class="admin-meta-item__label">Thời gian nhập</div>
+            <div class="admin-meta-item__value">{{ purchase_batch.created_at|date:"d/m/Y H:i" }}</div>
+        </div>
+        <div class="admin-meta-item">
+            <div class="admin-meta-item__label">Tệp nguồn</div>
+            <div class="admin-meta-item__value">{% if purchase_batch.source_file %}{{ purchase_batch.source_file.name|cut:"imports/excel/" }}{% else %}-{% endif %}</div>
+        </div>
+        <div class="admin-meta-item">
+            <div class="admin-meta-item__label">Ghi chú</div>
+            <div class="admin-meta-item__value">{{ purchase_batch.note|default:"Không có ghi chú" }}</div>
+        </div>
+    </div>
+</section>
+
+<section class="admin-surface admin-section">
+    <div class="admin-section-head">
+        <div>
+            <h3>Chi tiết từng dòng nhập</h3>
+            <p>Đối chiếu nhanh số lượng tồn trước và sau khi nhập cho từng thuốc.</p>
+        </div>
+    </div>
+
+    <div class="admin-table-wrap">
+        <table class="admin-table">
+            <thead>
+                <tr>
+                    <th>Thuốc</th>
+                    <th>Hãng / đơn vị</th>
+                    <th>Tồn trước</th>
+                    <th>Nhập thêm</th>
+                    <th>Tồn sau</th>
+                    <th>Giá nhập</th>
+                    <th>HSD</th>
+                    <th>Ghi chú</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for item in purchase_items %}
+                <tr>
+                    <td>
+                        <div class="admin-cell-title">{{ item.medicine_name }}</div>
+                        {% if item.medicine %}
+                        <div class="admin-cell-sub">Mã thuốc #{{ item.medicine_id }} • {{ item.medicine.pharmacy.name }}</div>
+                        {% endif %}
+                    </td>
+                    <td>{{ item.manufacturer|default:"-" }}{% if item.unit %}<div class="admin-cell-sub">{{ item.unit }}</div>{% endif %}</td>
+                    <td>{{ item.previous_quantity }}</td>
+                    <td><strong>+{{ item.imported_quantity }}</strong></td>
+                    <td>{{ item.new_quantity }}</td>
+                    <td>{% if item.import_price %}{{ item.import_price|vnd }}{% else %}-{% endif %}</td>
+                    <td>{% if item.expiry_date %}{{ item.expiry_date|date:"d/m/Y" }}{% else %}-{% endif %}</td>
+                    <td>{{ item.note|default:"-" }}</td>
+                </tr>
+                {% empty %}
+                <tr>
+                    <td colspan="8">
+                        <div class="admin-empty-state">Phiếu nhập này chưa có dòng dữ liệu nào.</div>
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</section>
+{% endblock %}

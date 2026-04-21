@@ -1,0 +1,551 @@
+{% extends "base.html" %}
+{% load static content_filters %}
+{% block title %}{{ about_content.page_title }}{% endblock %}
+{% block body_class %}site-page about-page{% endblock %}
+
+{% block extra_css %}
+<style>
+    .about-page{
+        --about-ink:#14315f;
+        --about-blue:#1f63dd;
+        --about-blue-dark:#1146b8;
+        --about-soft:#eef4ff;
+        --about-line:rgba(17,70,184,.10);
+        --about-shadow:0 18px 42px rgba(17,70,184,.08);
+    }
+    .about-page .about-shell{display:grid;gap:24px;padding:30px 0 60px}
+    .about-page .about-surface{
+        border-radius:28px;
+        background:#fff;
+        border:1px solid var(--about-line);
+        box-shadow:var(--about-shadow);
+    }
+    .about-page .about-rich{color:#5d6e8a;line-height:1.76}
+    .about-page .about-rich p:first-child{margin-top:0}
+    .about-page .about-rich p:last-child{margin-bottom:0}
+
+    .about-page .about-hero{
+        display:grid;
+        grid-template-columns:minmax(0,1.08fr) minmax(320px,.92fr);
+        gap:24px;
+        padding:28px;
+        background:
+            radial-gradient(circle at top right, rgba(255,255,255,.18), transparent 36%),
+            linear-gradient(135deg,#1146b8 0%,#1f63dd 58%,#67a6ff 100%);
+        color:#fff;
+        overflow:hidden;
+    }
+    .about-page .about-eyebrow{
+        display:inline-flex;
+        align-items:center;
+        gap:8px;
+        padding:8px 14px;
+        border-radius:999px;
+        background:rgba(255,255,255,.14);
+        color:#fff;
+        font-size:.82rem;
+        font-weight:800;
+        letter-spacing:.04em;
+        text-transform:uppercase;
+    }
+    .about-page .about-hero h1{
+        margin:16px 0 14px;
+        font-size:clamp(2rem,3.5vw,3.1rem);
+        line-height:1.08;
+        font-weight:900;
+        color:#fff;
+    }
+    .about-page .about-hero .about-rich{color:rgba(255,255,255,.88)}
+    .about-page .about-hero__chips{display:flex;flex-wrap:wrap;gap:10px;margin:18px 0 22px}
+    .about-page .about-hero__chips span{
+        display:inline-flex;
+        align-items:center;
+        gap:8px;
+        padding:9px 14px;
+        border-radius:999px;
+        background:rgba(255,255,255,.12);
+        border:1px solid rgba(255,255,255,.16);
+        color:#fff;
+        font-weight:700;
+    }
+    .about-page .about-hero__actions{display:flex;flex-wrap:wrap;gap:10px}
+    .about-page .about-hero__actions .pharma-outline-btn{
+        background:rgba(255,255,255,.1);
+        border-color:rgba(255,255,255,.24);
+        color:#fff;
+    }
+    .about-page .about-visual{
+        border-radius:24px;
+        background:rgba(255,255,255,.10);
+        border:1px solid rgba(255,255,255,.16);
+        overflow:hidden;
+        backdrop-filter:blur(10px);
+    }
+    .about-page .about-visual__slider{padding:14px 14px 0}
+    .about-page .about-visual__frame{
+        overflow:hidden;
+        border-radius:18px;
+        background:#eaf2ff;
+        min-height:260px;
+    }
+    .about-page .about-visual__frame img{display:block;width:100%;height:280px;object-fit:cover}
+    .about-page .about-visual__placeholder{
+        display:flex;
+        align-items:center;
+        justify-content:center;
+        height:280px;
+        color:var(--about-blue);
+        font-size:2.2rem;
+        background:#eef4ff;
+    }
+    .about-page .about-visual__body{padding:18px 18px 20px}
+    .about-page .about-visual__body strong{
+        display:block;
+        margin-bottom:10px;
+        color:#fff;
+        font-size:1.05rem;
+        font-weight:900;
+    }
+    .about-page .about-visual__body .about-rich{color:rgba(255,255,255,.84)}
+
+    .about-page .about-stats{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:16px}
+    .about-page .about-stat{
+        padding:22px;
+        border-radius:24px;
+        background:#fff;
+        border:1px solid var(--about-line);
+        box-shadow:var(--about-shadow);
+    }
+    .about-page .about-stat__icon{
+        width:48px;
+        height:48px;
+        display:inline-flex;
+        align-items:center;
+        justify-content:center;
+        border-radius:16px;
+        background:var(--about-soft);
+        color:var(--about-blue);
+        margin-bottom:14px;
+        font-size:1.05rem;
+    }
+    .about-page .about-stat strong{
+        display:block;
+        color:var(--about-ink);
+        font-size:1.8rem;
+        line-height:1;
+        font-weight:900;
+    }
+    .about-page .about-stat span{
+        display:block;
+        margin-top:10px;
+        color:#5f7290;
+        line-height:1.6;
+    }
+
+    .about-page .about-section{padding:26px}
+    .about-page .about-section__head{
+        display:grid;
+        gap:10px;
+        max-width:760px;
+        margin-bottom:18px;
+    }
+    .about-page .about-section__head .about-eyebrow{
+        width:max-content;
+        background:var(--about-soft);
+        color:var(--about-blue-dark);
+    }
+    .about-page .about-section__head h2{
+        margin:0;
+        color:var(--about-ink);
+        font-size:clamp(1.55rem,2.4vw,2.25rem);
+        line-height:1.15;
+        font-weight:900;
+    }
+    .about-page .about-grid-3{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:16px}
+    .about-page .about-grid-4{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:16px}
+    .about-page .about-inline-tags{display:flex;flex-wrap:wrap;gap:10px;margin-top:18px}
+    .about-page .about-inline-tags span{
+        display:inline-flex;
+        align-items:center;
+        gap:8px;
+        padding:8px 12px;
+        border-radius:999px;
+        background:#eef4ff;
+        color:var(--about-blue-dark);
+        font-weight:700;
+        border:1px solid rgba(17,70,184,.10);
+    }
+    .about-page .about-card,
+    .about-page .about-step,
+    .about-page .about-branch{
+        border-radius:22px;
+        background:linear-gradient(180deg,#fff 0%,#f8fbff 100%);
+        border:1px solid var(--about-line);
+    }
+    .about-page .about-card{padding:22px;display:grid;gap:12px}
+    .about-page .about-card__icon,
+    .about-page .about-step__num{
+        width:46px;
+        height:46px;
+        display:inline-flex;
+        align-items:center;
+        justify-content:center;
+        border-radius:16px;
+        background:var(--about-soft);
+        color:var(--about-blue);
+        font-weight:900;
+    }
+    .about-page .about-card h3,
+    .about-page .about-step h3,
+    .about-page .about-branch__body h3{
+        margin:0;
+        color:var(--about-ink);
+        font-size:1.12rem;
+        font-weight:900;
+    }
+    .about-page .about-step{padding:22px;display:grid;gap:12px}
+    .about-page .about-step__num{
+        border-radius:50%;
+        background:linear-gradient(145deg,#ffe08a,#ffb135);
+        color:#724500;
+    }
+
+    .about-page .about-branches{display:grid;grid-template-columns:repeat(auto-fit,minmax(250px,1fr));gap:16px}
+    .about-page .about-branch{overflow:hidden}
+    .about-page .about-branch__media{
+        position:relative;
+        height:180px;
+        background:#eef4ff;
+    }
+    .about-page .about-branch__media img{display:block;width:100%;height:100%;object-fit:cover}
+    .about-page .about-branch__placeholder{
+        width:100%;
+        height:100%;
+        display:flex;
+        align-items:center;
+        justify-content:center;
+        color:var(--about-blue);
+        font-size:2rem;
+    }
+    .about-page .about-branch__badge{
+        position:absolute;
+        top:14px;
+        left:14px;
+        display:inline-flex;
+        align-items:center;
+        gap:8px;
+        padding:8px 12px;
+        border-radius:999px;
+        background:rgba(17,70,184,.9);
+        color:#fff;
+        font-size:.78rem;
+        font-weight:800;
+    }
+    .about-page .about-branch__body{padding:18px;display:grid;gap:10px}
+    .about-page .about-branch__body p{margin:0;color:#5f7290;line-height:1.65}
+    .about-page .about-branch__meta{display:grid;gap:8px;color:#5f7290}
+    .about-page .about-branch__meta span{display:inline-flex;align-items:center;gap:8px}
+    .about-page .about-custom-block__actions{display:flex;flex-wrap:wrap;gap:10px;margin-top:16px}
+
+    .about-page .about-cta{
+        display:grid;
+        grid-template-columns:minmax(0,1fr) auto;
+        gap:20px;
+        align-items:center;
+        padding:28px;
+        background:
+            radial-gradient(circle at top right, rgba(255,255,255,.18), transparent 30%),
+            linear-gradient(135deg,#113b97 0%,#1f63dd 68%,#5d9dff 100%);
+        color:#fff;
+    }
+    .about-page .about-cta h2{
+        margin:0 0 12px;
+        color:#fff;
+        font-size:clamp(1.55rem,2.2vw,2rem);
+        font-weight:900;
+    }
+    .about-page .about-cta .about-rich{color:rgba(255,255,255,.88)}
+    .about-page .about-cta__actions{display:flex;flex-wrap:wrap;gap:10px}
+    .about-page .about-cta__actions .pharma-outline-btn{
+        background:rgba(255,255,255,.1);
+        border-color:rgba(255,255,255,.24);
+        color:#fff;
+    }
+
+    @media (max-width:991px){
+        .about-page .about-hero,
+        .about-page .about-cta{grid-template-columns:1fr}
+        .about-page .about-stats{grid-template-columns:repeat(2,minmax(0,1fr))}
+        .about-page .about-grid-3{grid-template-columns:1fr}
+        .about-page .about-grid-4{grid-template-columns:repeat(2,minmax(0,1fr))}
+    }
+    @media (max-width:575px){
+        .about-page .about-shell{gap:20px;padding:22px 0 42px}
+        .about-page .about-hero,
+        .about-page .about-section,
+        .about-page .about-cta{padding:20px}
+        .about-page .about-stats,
+        .about-page .about-grid-4{grid-template-columns:1fr}
+        .about-page .about-hero__actions .pharma-btn,
+        .about-page .about-hero__actions .pharma-outline-btn,
+        .about-page .about-cta__actions .pharma-btn,
+        .about-page .about-cta__actions .pharma-outline-btn{width:100%;justify-content:center}
+    }
+</style>
+{% endblock %}
+
+{% block content_wrapper %}
+<div class="site-page-section">
+    <div class="container">
+        <div class="about-shell">
+
+            <section class="about-hero about-surface" data-reveal="up">
+                <div>
+                    <span class="about-eyebrow"><i class="fas fa-clinic-medical"></i> {{ about_content.hero_kicker }}</span>
+                    <h1>{{ about_content.hero_title }}</h1>
+                    <div class="about-rich">{{ about_content.hero_intro|richtext }}</div>
+
+                    <div class="about-hero__chips">
+                        {% if about_content.hero_chip_1 %}<span><i class="fas fa-check-circle"></i> {{ about_content.hero_chip_1 }}</span>{% endif %}
+                        {% if about_content.hero_chip_2 %}<span><i class="fas fa-check-circle"></i> {{ about_content.hero_chip_2 }}</span>{% endif %}
+                        {% if about_content.hero_chip_3 %}<span><i class="fas fa-check-circle"></i> {{ about_content.hero_chip_3 }}</span>{% endif %}
+                    </div>
+
+                    <div class="about-hero__actions">
+                        <a href="{% url 'product_list' %}" class="pharma-btn">
+                            <i class="fas fa-capsules"></i>
+                            <span>{{ about_content.hero_primary_label }}</span>
+                        </a>
+                        <a href="{% url 'map_view' %}" class="pharma-outline-btn">
+                            <i class="fas fa-map-marked-alt"></i>
+                            <span>{{ about_content.hero_secondary_label }}</span>
+                        </a>
+                    </div>
+                </div>
+
+                <div class="about-visual">
+                    <div class="about-visual__slider">
+                        <div class="about-visual__frame">
+                            {% if about_slides %}
+                            <div class="splide site-splide" data-site-splide data-per-page="1" data-gap="0" data-autoplay="true" data-pagination="true" data-arrows="false">
+                                <div class="splide__track">
+                                    <ul class="splide__list">
+                                        {% for slide in about_slides %}
+                                        <li class="splide__slide">
+                                            {% if slide.link_url %}<a href="{{ slide.link_url }}">{% endif %}
+                                            {% if slide.image %}
+                                            <img src="{{ slide.image.url }}" alt="{{ slide.alt_text|default:'Slide giới thiệu' }}">
+                                            {% elif slide.legacy_static_path %}
+                                            <img src="{% static slide.legacy_static_path %}" alt="{{ slide.alt_text|default:'Slide giới thiệu' }}">
+                                            {% endif %}
+                                            {% if slide.link_url %}</a>{% endif %}
+                                        </li>
+                                        {% endfor %}
+                                    </ul>
+                                </div>
+                            </div>
+                            {% else %}
+                            <div class="about-visual__placeholder"><i class="fas fa-images"></i></div>
+                            {% endif %}
+                        </div>
+                    </div>
+                    <div class="about-visual__body">
+                        <strong>{{ about_content.visual_title }}</strong>
+                        <div class="about-rich">{{ about_content.visual_description|richtext }}</div>
+                    </div>
+                </div>
+            </section>
+
+            {% for section in about_sections %}
+                {% if section.kind == "builtin" %}
+                    {% if section.key == "stats" %}
+                    <section class="about-stats" data-reveal="up">
+                        <article class="about-stat">
+                            <span class="about-stat__icon"><i class="fas fa-store"></i></span>
+                            <strong>{{ pharmacy_total }}</strong>
+                            <span>{{ about_content.stat_pharmacy_label }}</span>
+                        </article>
+                        <article class="about-stat">
+                            <span class="about-stat__icon"><i class="fas fa-capsules"></i></span>
+                            <strong>{{ medicine_total }}</strong>
+                            <span>{{ about_content.stat_medicine_label }}</span>
+                        </article>
+                        <article class="about-stat">
+                            <span class="about-stat__icon"><i class="fas fa-shopping-bag"></i></span>
+                            <strong>{{ order_total }}</strong>
+                            <span>{{ about_content.stat_order_label }}</span>
+                        </article>
+                        <article class="about-stat">
+                            <span class="about-stat__icon"><i class="fas fa-star"></i></span>
+                            <strong>{{ review_total }}</strong>
+                            <span>{{ about_content.stat_review_label }}</span>
+                        </article>
+                    </section>
+                    {% elif section.key == "story" %}
+                    <section class="about-section about-surface" data-reveal="up">
+                        <div class="about-section__head">
+                            <span class="about-eyebrow"><i class="fas fa-book-open"></i> {{ about_content.story_tag }}</span>
+                            <h2>{{ about_content.story_title }}</h2>
+                            <div class="about-rich">{{ about_content.story_body|richtext }}</div>
+                        </div>
+                        <div class="about-grid-3">
+                            {% for item in about_story_items %}
+                            <article class="about-card">
+                                <span class="about-card__icon"><i class="{{ item.icon }}"></i></span>
+                                <h3>{{ item.title }}</h3>
+                                <div class="about-rich">{{ item.body|richtext }}</div>
+                            </article>
+                            {% endfor %}
+                        </div>
+                    </section>
+                    {% elif section.key == "value" %}
+                    <section class="about-section about-surface" data-reveal="up">
+                        <div class="about-section__head">
+                            <span class="about-eyebrow"><i class="fas fa-gem"></i> {{ about_content.value_tag }}</span>
+                            <h2>{{ about_content.value_title }}</h2>
+                            <div class="about-rich">{{ about_content.value_body|richtext }}</div>
+                        </div>
+                        <div class="about-grid-3 about-value-grid">
+                            {% for card in about_value_cards %}
+                            <article class="about-card">
+                                <span class="about-card__icon"><i class="{{ card.icon }}"></i></span>
+                                <h3>{{ card.title }}</h3>
+                                <div class="about-rich">{{ card.body|richtext }}</div>
+                            </article>
+                            {% endfor %}
+                        </div>
+                        {% if featured_categories %}
+                        <div class="about-inline-tags">
+                            {% for category in featured_categories %}
+                            <span><i class="fas fa-check-circle"></i> {{ category }}</span>
+                            {% endfor %}
+                        </div>
+                        {% endif %}
+                    </section>
+                    {% elif section.key == "journey" %}
+                    <section class="about-section about-surface" data-reveal="up">
+                        <div class="about-section__head">
+                            <span class="about-eyebrow"><i class="fas fa-stream"></i> {{ about_content.journey_tag }}</span>
+                            <h2>{{ about_content.journey_title }}</h2>
+                            <div class="about-rich">{{ about_content.journey_body|richtext }}</div>
+                        </div>
+                        <div class="about-grid-4">
+                            {% for step in about_journey_steps %}
+                            <article class="about-step">
+                                <span class="about-step__num">{{ step.number }}</span>
+                                <h3>{{ step.title }}</h3>
+                                <div class="about-rich">{{ step.body|richtext }}</div>
+                            </article>
+                            {% endfor %}
+                        </div>
+                    </section>
+                    {% elif section.key == "branch_role" %}
+                    <section class="about-section about-surface" data-reveal="up">
+                        <div class="about-section__head">
+                            <span class="about-eyebrow"><i class="fas fa-store-alt"></i> {{ about_content.branch_role_tag }}</span>
+                            <h2>{{ about_content.branch_role_title }}</h2>
+                            <div class="about-rich">{{ about_content.branch_role_body|richtext }}</div>
+                        </div>
+                        <div class="about-grid-3">
+                            {% for item in about_branch_role_items %}
+                            <article class="about-card">
+                                <span class="about-card__icon"><i class="{{ item.icon }}"></i></span>
+                                <h3>{{ item.title }}</h3>
+                                <div class="about-rich">{{ item.body|richtext }}</div>
+                            </article>
+                            {% endfor %}
+                        </div>
+                    </section>
+                    {% elif section.key == "branch_showcase" %}
+                    <section class="about-section about-surface" data-reveal="up">
+                        <div class="about-section__head">
+                            <span class="about-eyebrow"><i class="fas fa-map-marked-alt"></i> {{ about_content.branch_showcase_tag }}</span>
+                            <h2>{{ about_content.branch_showcase_title }}</h2>
+                            <div class="about-rich">{{ about_content.branch_showcase_body|richtext }}</div>
+                        </div>
+                        <div class="about-branches about-branch-grid">
+                            {% for item in about_branch_items %}
+                            <article class="about-branch">
+                                <div class="about-branch__media">
+                                    <span class="about-branch__badge"><i class="fas fa-map-pin"></i> {{ item.badge|default:about_content.branch_showcase_badge }}</span>
+                                    {% if item.image_url %}
+                                    <img src="{{ item.image_url }}" alt="{{ item.title }}">
+                                    {% else %}
+                                    <div class="about-branch__placeholder"><i class="{{ item.icon_class|default:'fas fa-clinic-medical' }}"></i></div>
+                                    {% endif %}
+                                </div>
+                                <div class="about-branch__body">
+                                    <h3>{{ item.title }}</h3>
+                                    {% if item.summary %}<p>{{ item.summary|linebreaksbr }}</p>{% endif %}
+                                    {% if item.address %}<p>{{ item.address }}</p>{% endif %}
+                                    <div class="about-branch__meta">
+                                        <span><i class="fas fa-clock text-primary"></i> {{ item.hours|default:"Đang cập nhật" }}</span>
+                                        <span><i class="fas fa-map text-primary"></i> {{ item.map_note|default:about_content.branch_showcase_map_note }}</span>
+                                    </div>
+                                    {% if item.link_url %}
+                                    <a href="{{ item.link_url }}" class="pharma-outline-btn">
+                                        <i class="fas fa-arrow-right"></i>
+                                        <span>{{ item.link_label|default:"Xem chi nhánh" }}</span>
+                                    </a>
+                                    {% endif %}
+                                </div>
+                            </article>
+                            {% empty %}
+                            <article class="about-branch">
+                                <div class="about-branch__media">
+                                    <span class="about-branch__badge"><i class="fas fa-clock"></i> {{ about_content.branch_empty_tag }}</span>
+                                    <div class="about-branch__placeholder"><i class="fas fa-store"></i></div>
+                                </div>
+                                <div class="about-branch__body">
+                                    <h3>{{ about_content.branch_empty_title }}</h3>
+                                    <div class="about-rich">{{ about_content.branch_empty_body|richtext }}</div>
+                                </div>
+                            </article>
+                            {% endfor %}
+                        </div>
+                    </section>
+                    {% elif section.key == "cta" %}
+                    <section class="about-cta about-surface" data-reveal="up">
+                        <div>
+                            <h2>{{ about_content.cta_title }}</h2>
+                            <div class="about-rich">{{ about_content.cta_body|richtext }}</div>
+                        </div>
+                        <div class="about-cta__actions">
+                            <a href="{% url 'product_list' %}" class="pharma-btn">
+                                <i class="fas fa-capsules"></i>
+                                <span>{{ about_content.cta_primary_label }}</span>
+                            </a>
+                            <a href="{% url 'map_view' %}" class="pharma-outline-btn">
+                                <i class="fas fa-map-marked-alt"></i>
+                                <span>{{ about_content.cta_secondary_label }}</span>
+                            </a>
+                        </div>
+                    </section>
+                    {% endif %}
+                {% elif section.kind == "custom" %}
+                    {% with block=section.block %}
+                    <section class="about-section about-surface" data-reveal="up">
+                        <div class="about-section__head">
+                            {% if block.kicker %}
+                            <span class="about-eyebrow"><i class="{{ block.icon_class|default:'fas fa-layer-group' }}"></i> {{ block.kicker }}</span>
+                            {% endif %}
+                            <h2>{{ block.title }}</h2>
+                            {% if block.body %}<div class="about-rich">{{ block.body|richtext }}</div>{% endif %}
+                            {% if block.link_url and block.link_label %}
+                            <div class="about-custom-block__actions">
+                                <a href="{{ block.link_url }}" class="pharma-outline-btn">
+                                    <i class="fas fa-arrow-right"></i>
+                                    <span>{{ block.link_label }}</span>
+                                </a>
+                            </div>
+                            {% endif %}
+                        </div>
+                    </section>
+                    {% endwith %}
+                {% endif %}
+            {% endfor %}
+
+        </div>
+    </div>
+</div>
+{% endblock %}

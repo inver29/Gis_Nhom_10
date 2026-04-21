@@ -1,0 +1,14 @@
+{{ recipient_name }} thân mến,
+
+{{ site_name }} đã ghi nhận đơn hàng #{{ order.id }} của bạn.
+
+Người nhận: {{ order.full_name }}
+Số điện thoại: {{ order.phone }}
+Địa chỉ giao hàng: {{ order.address_text }}
+Chi nhánh xử lý: {{ order.pharmacy.name|default:"Chưa gán chi nhánh" }}
+Tổng thanh toán: {{ order.final_total_price|floatformat:0 }} VND
+
+Bạn có thể xem lịch sử đơn hàng tại:
+{{ order_history_url }}
+
+Nếu cần hỗ trợ, vui lòng liên hệ {{ support_email }}.

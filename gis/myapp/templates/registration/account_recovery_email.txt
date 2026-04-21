@@ -1,0 +1,14 @@
+Xin chào {{ user.get_username }},
+
+{% if is_username_recovery %}
+Bạn đã yêu cầu tìm lại tên đăng nhập cho tài khoản tại {{ site_name|default:"GIS Pharma" }}.
+{% else %}
+Bạn đã yêu cầu khôi phục thông tin đăng nhập cho tài khoản tại {{ site_name|default:"GIS Pharma" }}.
+{% endif %}
+
+Tên đăng nhập của bạn: {{ user.get_username }}
+
+Vui lòng mở liên kết dưới đây để tạo mật khẩu mới:
+{{ protocol }}://{{ domain }}{% url 'password_reset_confirm' uidb64=uid token=token %}
+
+Nếu bạn không thực hiện yêu cầu này, hãy bỏ qua email.

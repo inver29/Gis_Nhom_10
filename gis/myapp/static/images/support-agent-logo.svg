@@ -1,0 +1,13 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="160" height="160" viewBox="0 0 160 160" fill="none">
+  <defs>
+    <linearGradient id="g" x1="18" y1="16" x2="136" y2="146" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#1F64E0"/>
+      <stop offset="1" stop-color="#15A751"/>
+    </linearGradient>
+  </defs>
+  <circle cx="80" cy="80" r="72" fill="url(#g)"/>
+  <circle cx="80" cy="80" r="68" stroke="white" stroke-opacity="0.24" stroke-width="8"/>
+  <path d="M54 68c0-8.837 7.163-16 16-16h20c8.837 0 16 7.163 16 16v18c0 8.837-7.163 16-16 16H79l-10 10a4 4 0 0 1-6.828-2.828V102.5C57.4 99.4 54 93.955 54 88V68Z" fill="white" fill-opacity="0.96"/>
+  <path d="M71 73h18M71 81h26M71 89h14" stroke="#1F64E0" stroke-width="5" stroke-linecap="round"/>
+  <text x="80" y="34" text-anchor="middle" font-family="Arial, sans-serif" font-weight="700" font-size="16" fill="white">GIS Pharma</text>
+</svg>
