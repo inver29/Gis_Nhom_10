@@ -233,9 +233,9 @@ ADMIN_PERMISSION_DEFINITIONS = [
     {"key": "home_page", "label": "Trang chủ", "description": "Quản lý slider và các khối nội dung trang chủ", "actions": ("view", "update")},
     {"key": "about_page", "label": "Trang giới thiệu", "description": "Quản lý nội dung hiển thị ở trang Giới thiệu", "actions": ("view", "update")},
     {"key": "news", "label": "Tin tức", "description": "Quản lý bài viết tin tức hiển thị ngoài website", "actions": ("view", "create", "update", "delete")},
-    {"key": "order", "label": "Đơn hàng", "description": "Xem và cập nhật trạng thái đơn", "actions": ("view", "update")},
-    {"key": "return_request", "label": "Trả hàng / hoàn tiền", "description": "Xem và xử lý yêu cầu hoàn tiền", "actions": ("view", "update")},
-    {"key": "medicine", "label": "Sản phẩm", "description": "Xem, thêm và sửa sản phẩm", "actions": ("view", "create", "update")},
+    {"key": "order", "label": "Đơn hàng", "description": "Xem, cập nhật trạng thái và xóa đơn hàng", "actions": ("view", "update", "delete")},
+    {"key": "return_request", "label": "Trả hàng / hoàn tiền", "description": "Xem, xử lý và xóa yêu cầu hoàn tiền", "actions": ("view", "update", "delete")},
+    {"key": "medicine", "label": "Sản phẩm", "description": "Xem, thêm, sửa và xóa sản phẩm", "actions": ("view", "create", "update", "delete")},
     {"key": "purchase_import", "label": "Nhập kho", "description": "Xem và tạo phiếu nhập", "actions": ("view", "create", "delete")},
     {"key": "stock_export", "label": "Xuất kho", "description": "Xem và tạo phiếu xuất", "actions": ("view", "create", "delete")},
     {"key": "inventory_lot", "label": "Lô tồn kho", "description": "Theo dõi tồn theo lô FEFO", "actions": ("view",)},
@@ -2601,6 +2601,20 @@ def user_has_admin_permission(user, module_key, action="view"):
     return bool(module_permissions.get(action, False))
 
 
+def can_create_admin_model(user, model_key):
+    return user_has_admin_permission(user, model_key, "create")
+
+
+def can_update_admin_model(user, model_key):
+    return user_has_admin_permission(user, model_key, "update")
+
+
+def disable_form_fields(form):
+    for field in form.fields.values():
+        field.disabled = True
+    return form
+
+
 def filter_queryset_by_admin_scope(queryset, user, model_key):
     managed_pharmacy = get_admin_scope_pharmacy(user)
     if not managed_pharmacy:
@@ -2856,6 +2870,7 @@ def build_inventory_alert_center(queryset, request=None):
     today = timezone.localdate()
     warning_deadline = today + timedelta(days=183)
     alert_queryset = queryset.filter(remaining_quantity__gt=0).select_related("medicine", "pharmacy")
+    can_create_stock_export = bool(request is not None and can_create_admin_model(request.user, "stock_export"))
 
     def build_item_payload(lot, *, group_key):
         export_scope = StockExportBatch.EXPORT_SCOPE_EXPIRED if group_key == "expired" else StockExportBatch.EXPORT_SCOPE_RECONCILE
@@ -2868,7 +2883,7 @@ def build_inventory_alert_center(queryset, request=None):
             "cta_url": (
                 f"{reverse('custom_admin_create', kwargs={'model_key': 'stock_export'})}"
                 f"?pharmacy={lot.pharmacy_id}&export_scope={export_scope}"
-            ) if lot.pharmacy_id else reverse("custom_admin_list", kwargs={"model_key": "stock_export"}),
+            ) if lot.pharmacy_id and can_create_stock_export else "",
         }
 
     section_configs = [
@@ -7554,9 +7569,9 @@ def build_list_data(model_key, request):
         rows = []
         for obj in queryset:
             status_badge = render_badge('Có hàng', 'success') if obj.available_total > 0 else render_badge('Không có hàng', 'danger')
-            actions = [
-                {'url': reverse('custom_admin_update', kwargs={'model_key': 'pharmacy', 'pk': obj.pk}), 'label': 'Cập nhật', 'icon': 'fas fa-pen', 'class': 'btn-primary'},
-            ]
+            actions = []
+            if can_update_admin_model(request.user, model_key):
+                actions.append({'url': reverse('custom_admin_update', kwargs={'model_key': 'pharmacy', 'pk': obj.pk}), 'label': 'Cập nhật', 'icon': 'fas fa-pen', 'class': 'btn-primary'})
             if can_delete_object(request.user, model_key, obj):
                 actions.append({'url': reverse('custom_admin_delete', kwargs={'model_key': 'pharmacy', 'pk': obj.pk}), 'label': 'Xóa', 'icon': 'fas fa-trash', 'class': 'btn-danger'})
             rows.append({
@@ -7615,9 +7630,9 @@ def build_list_data(model_key, request):
 
         rows = []
         for obj in queryset:
-            actions = [
-                {'url': reverse('custom_admin_update', kwargs={'model_key': 'medicine', 'pk': obj.pk}), 'label': 'Cập nhật', 'icon': 'fas fa-pen', 'class': 'btn-primary'},
-            ]
+            actions = []
+            if can_update_admin_model(request.user, model_key):
+                actions.append({'url': reverse('custom_admin_update', kwargs={'model_key': 'medicine', 'pk': obj.pk}), 'label': 'Cập nhật', 'icon': 'fas fa-pen', 'class': 'btn-primary'})
             if can_delete_object(request.user, model_key, obj):
                 actions.append({'url': reverse('custom_admin_delete', kwargs={'model_key': 'medicine', 'pk': obj.pk}), 'label': 'Xóa', 'icon': 'fas fa-trash', 'class': 'btn-danger'})
             rows.append({
@@ -7927,9 +7942,12 @@ def build_list_data(model_key, request):
                     format_html('<strong>{}%</strong><div class="cell-sub">{} → {}</div>', obj.discount_percent, format_vnd(obj.medicine.price), format_vnd(get_discounted_price(obj.medicine.price, obj.discount_percent))),
                     status_badge,
                 ],
-                'actions': [
-                    {'url': reverse('custom_admin_update', kwargs={'model_key': 'promotion', 'pk': obj.pk}), 'label': 'Cập nhật', 'icon': 'fas fa-pen', 'class': 'btn-primary'},
-                ] + ([
+                'actions': ([{
+                    'url': reverse('custom_admin_update', kwargs={'model_key': 'promotion', 'pk': obj.pk}),
+                    'label': 'Cập nhật',
+                    'icon': 'fas fa-pen',
+                    'class': 'btn-primary',
+                }] if can_update_admin_model(request.user, model_key) else []) + ([
                     {'url': reverse('custom_admin_delete', kwargs={'model_key': 'promotion', 'pk': obj.pk}), 'label': 'Xóa', 'icon': 'fas fa-trash', 'class': 'btn-danger'},
                 ] if can_delete_object(request.user, 'promotion', obj) else []),
             })
@@ -7982,12 +8000,12 @@ def build_list_data(model_key, request):
                 lot_badge = render_badge('HSD ≤ 6 tháng', 'warning')
             else:
                 lot_badge = render_badge('Đang bán được', 'success')
-            action_list = [
-                {'url': reverse('custom_admin_update', kwargs={'model_key': 'medicine', 'pk': obj.medicine_id}), 'label': 'Mở thuốc', 'icon': 'fas fa-pills', 'class': 'btn-info'},
-            ]
+            action_list = []
+            if can_update_admin_model(request.user, 'medicine'):
+                action_list.append({'url': reverse('custom_admin_update', kwargs={'model_key': 'medicine', 'pk': obj.medicine_id}), 'label': 'Mở thuốc', 'icon': 'fas fa-pills', 'class': 'btn-info'})
             if obj.purchase_batch_id:
                 action_list.append({'url': reverse('custom_admin_purchase_import_detail', kwargs={'pk': obj.purchase_batch_id}), 'label': 'Phiếu nhập', 'icon': 'fas fa-file-alt', 'class': 'btn-primary'})
-            if obj.pharmacy_id and obj.remaining_quantity > 0 and obj.expiry_date:
+            if obj.pharmacy_id and obj.remaining_quantity > 0 and obj.expiry_date and can_create_admin_model(request.user, 'stock_export'):
                 export_scope = StockExportBatch.EXPORT_SCOPE_EXPIRED if obj.expiry_date < today else StockExportBatch.EXPORT_SCOPE_RECONCILE
                 action_list.append({
                     'url': f"{reverse('custom_admin_create', kwargs={'model_key': 'stock_export'})}?pharmacy={obj.pharmacy_id}&export_scope={export_scope}",
@@ -8054,12 +8072,12 @@ def build_list_data(model_key, request):
                         'icon': 'fas fa-external-link-alt',
                         'class': 'btn-info',
                     }] if obj.is_published else [])
-                    + [{
+                    + ([{
                         'url': reverse('custom_admin_update', kwargs={'model_key': 'news', 'pk': obj.pk}),
                         'label': 'Cập nhật',
                         'icon': 'fas fa-pen',
                         'class': 'btn-primary',
-                    }]
+                    }] if can_update_admin_model(request.user, 'news') else [])
                     + ([{
                         'url': reverse('custom_admin_delete', kwargs={'model_key': 'news', 'pk': obj.pk}),
                         'label': 'Xóa',
@@ -8107,7 +8125,7 @@ def build_list_data(model_key, request):
         profile = profile_map.get(obj.pk)
         managed_branch_label = profile.managed_pharmacy.name if profile and profile.managed_pharmacy else 'Chưa gán chi nhánh'
         actions = []
-        if not obj.is_superuser or request.user.is_superuser:
+        if can_update_admin_model(request.user, model_key) and (not obj.is_superuser or request.user.is_superuser):
             actions.append({'url': reverse('custom_admin_update', kwargs={'model_key': 'user', 'pk': obj.pk}), 'label': 'Cập nhật', 'icon': 'fas fa-pen', 'class': 'btn-primary'})
         if can_delete_object(request.user, model_key, obj):
             actions.append({'url': reverse('custom_admin_delete', kwargs={'model_key': 'user', 'pk': obj.pk}), 'label': 'Xóa', 'icon': 'fas fa-trash', 'class': 'btn-danger'})
@@ -8225,7 +8243,7 @@ def custom_admin_list(request, model_key):
 
     create_allowed = (
         model_key in {'pharmacy', 'medicine', 'user', 'purchase_import', 'stock_export', 'promotion', 'news'}
-        and user_has_admin_permission(request.user, model_key, 'create')
+        and can_create_admin_model(request.user, model_key)
     )
     create_label = {
         'pharmacy': 'Thêm chi nhánh',
@@ -8258,7 +8276,11 @@ def custom_admin_list(request, model_key):
                     {
                         'article': obj,
                         'preview_url': reverse('news_detail', kwargs={'slug': obj.slug}) if obj.is_published else '',
-                        'edit_url': reverse('custom_admin_update', kwargs={'model_key': 'news', 'pk': obj.pk}),
+                        'edit_url': (
+                            reverse('custom_admin_update', kwargs={'model_key': 'news', 'pk': obj.pk})
+                            if can_update_admin_model(request.user, 'news')
+                            else ''
+                        ),
                         'delete_url': (
                             reverse('custom_admin_delete', kwargs={'model_key': 'news', 'pk': obj.pk})
                             if can_delete_object(request.user, 'news', obj)
@@ -8650,6 +8672,8 @@ def custom_admin_create(request, model_key):
     denied_response = require_admin_model_access(request, model_key)
     if denied_response:
         return denied_response
+    if not can_create_admin_model(request.user, model_key):
+        raise PermissionDenied('Tài khoản hiện tại không có quyền tạo dữ liệu ở chức năng quản trị này.')
 
     if model_key == 'purchase_import':
         if request.method == 'POST':
@@ -8785,6 +8809,8 @@ def custom_admin_update(request, model_key, pk):
     denied_response = require_admin_model_access(request, model_key)
     if denied_response:
         return denied_response
+    if not can_update_admin_model(request.user, model_key):
+        raise PermissionDenied('Tài khoản hiện tại không có quyền cập nhật dữ liệu ở chức năng quản trị này.')
 
     if model_key == 'order':
         return redirect('custom_admin_order_detail', pk=pk)
@@ -8864,8 +8890,11 @@ def custom_admin_order_detail(request, pk):
     auto_complete_order_if_due(order)
     order.refresh_from_db()
     ensure_object_is_within_admin_scope(request.user, 'order', order)
+    can_update_order = can_update_admin_model(request.user, 'order')
 
     if request.method == 'POST':
+        if not can_update_order:
+            raise PermissionDenied('Tài khoản hiện tại không có quyền cập nhật đơn hàng.')
         previous_status = order.status
         form = OrderStatusUpdateForm(request.POST, instance=order, admin_user=request.user)
         if form.is_valid():
@@ -8894,6 +8923,8 @@ def custom_admin_order_detail(request, pk):
                 form.add_error(None, str(exc))
     else:
         form = OrderStatusUpdateForm(instance=order, admin_user=request.user)
+        if not can_update_order:
+            disable_form_fields(form)
 
     order.user_return_request = getattr(order, 'return_request', None)
     order_items = list(order.items.select_related('medicine').prefetch_related('lot_allocations__lot').all())
@@ -8905,6 +8936,7 @@ def custom_admin_order_detail(request, pk):
         'order_items': order_items,
         'return_request': getattr(order, 'return_request', None),
         'can_delete_order': can_delete_object(request.user, 'order', order),
+        'can_update_order': can_update_order,
     }
     return render(request, 'admin_panel/orders/order_detail.html', context)
 
@@ -8963,8 +8995,11 @@ def custom_admin_return_request_detail(request, pk):
         pk=pk,
     )
     ensure_object_is_within_admin_scope(request.user, 'return_request', return_request)
+    can_update_return_request = can_update_admin_model(request.user, 'return_request')
 
     if request.method == 'POST':
+        if not can_update_return_request:
+            raise PermissionDenied('Tài khoản hiện tại không có quyền cập nhật yêu cầu trả hàng / hoàn tiền.')
         previous_status = return_request.status
         form = ReturnRefundRequestAdminUpdateForm(request.POST, instance=return_request)
         if form.is_valid():
@@ -8991,6 +9026,8 @@ def custom_admin_return_request_detail(request, pk):
                 form.add_error(None, str(exc))
     else:
         form = ReturnRefundRequestAdminUpdateForm(instance=return_request)
+        if not can_update_return_request:
+            disable_form_fields(form)
 
     context = {
         'page_title': f'Yêu cầu trả hàng / hoàn tiền #{return_request.pk}',
@@ -8999,6 +9036,7 @@ def custom_admin_return_request_detail(request, pk):
         'update_form': form,
         'evidence_images': return_request.evidences.all(),
         'can_delete_return_request': can_delete_object(request.user, 'return_request', return_request),
+        'can_update_return_request': can_update_return_request,
     }
     return render(request, 'admin_panel/returns/return_request_detail.html', context)
 

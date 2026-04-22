@@ -238,10 +238,10 @@
                 </div>
                 {% endfor %}
 
-                <button type="submit" class="btn-admin btn-admin-primary">
+                {% if can_update_order %}<button type="submit" class="btn-admin btn-admin-primary">
                     <i class="fas fa-save"></i>
                     <span>Lưu cập nhật</span>
-                </button>
+                </button>{% else %}<span class="admin-badge admin-badge-warning">Tai khoan hien tai chi co quyen xem don hang.</span>{% endif %}
             </form>
         </div>
     </div>
