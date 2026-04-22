@@ -120,14 +120,13 @@ from .models import (
     fold_text_for_match,
     sync_medicine_catalog_metadata,
 )
-from .tool import (
-    DeliveryRoutingService,
+from .tools.calculations import (
     calculate_air_distance_km,
     estimate_road_distance_km,
     normalize_departure_time_str,
-    reverse_geocode_coordinates,
-    search_address_candidates,
 )
+from .tools.geocode import reverse_geocode_coordinates, search_address_candidates
+from .tools.routing import DeliveryRoutingService
 from .tokens import email_activation_token
 
 try:

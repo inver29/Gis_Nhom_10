@@ -10,7 +10,8 @@ from django.utils import timezone
 
 from .forms import AccountProfileForm, AboutPageContentForm, CheckoutForm, MedicineAdminForm, PharmacyAdminForm, ProfilePasswordChangeForm, ReturnRefundRequestForm
 from .models import AccountOtpChallenge, AboutPageContent, Cart, CartItem, Medicine, MedicineLot, MedicineReview, NewsArticle, Order, OrderItem, Pharmacy, ReturnRefundRequest, UserProfile, fold_text_for_match
-from .tool import DeliveryRoutingService
+from .tools.calculations import estimate_road_distance_km
+from .tools.routing import DeliveryRoutingService
 from .views import get_or_create_medicine_for_import
 
 
@@ -23,6 +24,12 @@ class DeliveryRoutingServiceTest(TestCase):
         self.assertTrue(len(result['routes']) > 0)
         self.assertIn('distance_km', result['routes'][0])
         self.assertIn('shipping_fee_value', result['routes'][0])
+
+    def test_estimate_road_distance_uses_factor_for_each_delivery_mode(self):
+        self.assertAlmostEqual(estimate_road_distance_km(10, 'motorbike'), 12.0)
+        self.assertAlmostEqual(estimate_road_distance_km(10, 'car'), 13.0)
+        self.assertAlmostEqual(estimate_road_distance_km(10, 'walking'), 10.5)
+        self.assertAlmostEqual(estimate_road_distance_km(10, 'unknown-mode'), 12.0)
 
 
 class PharmacyAvailabilityTest(TestCase):
