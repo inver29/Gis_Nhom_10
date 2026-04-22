@@ -1,0 +1,370 @@
+{% extends "base.html" %}
+{% load static %}
+{% load currency_filters %}
+{% block title %}Thanh toán và vận chuyển{% endblock %}
+{% block body_class %}site-page checkout-page{% endblock %}
+
+{% block extra_css %}
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.css">
+<link rel="stylesheet" href="{% static 'css/shop/checkout.css' %}">
+{% endblock %}
+
+{% block content_wrapper %}
+<script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.js"></script>
+
+<div class="checkout-shell">
+    <div class="container">
+        <section class="section-shell mb-4">
+            <div class="section-heading">
+                <div>
+                    <div class="section-heading__eyebrow"><i class="fas fa-shipping-fast"></i> Thanh toán đơn hàng</div>
+                    <h1>Chọn địa chỉ nhận hàng và xác nhận chi nhánh giao</h1>
+                </div>
+            </div>
+        </section>
+
+        <div class="checkout-layout">
+            <div class="checkout-summary-card">
+                <div class="checkout-card-head">
+                    <div>
+                        <h2><i class="fas fa-user-circle"></i> Thông tin giao hàng và thanh toán</h2>
+                        <p>Kiểm tra địa chỉ, chi nhánh xử lý và phương thức thanh toán trước khi xác nhận đơn.</p>
+                    </div>
+                    {% if saved_address %}
+                    <button type="button" class="pharma-outline-btn" style="max-width:180px;" onclick="useSavedAddress()"><i class="fas fa-map-pin"></i><span>Địa chỉ đã lưu</span></button>
+                    {% endif %}
+                </div>
+                <div class="checkout-card-body">
+                    <form method="POST" id="checkout-form" class="checkout-stack">
+                        {% csrf_token %}
+
+                        <section class="checkout-section">
+                            <div class="checkout-section__title">
+                                <div>
+                                    <h3>Thông tin người nhận</h3>
+                                    <p>Thông tin này được dùng để giao hàng và liên hệ khi đơn được xử lý.</p>
+                                </div>
+                            </div>
+                            {% if saved_address %}
+                            <div class="checkout-location-card mb-3">
+                                <strong>Địa chỉ mặc định hiện có</strong>
+                                <div>{{ saved_address.address_text }}</div>
+                            </div>
+                            {% endif %}
+                            <div class="form-group"><label class="font-weight-bold">Họ tên</label>{{ form.full_name }}</div>
+                            <div class="form-group"><label class="font-weight-bold">Số điện thoại</label>{{ form.phone }}</div>
+                            <div class="form-group"><label class="font-weight-bold">Địa chỉ cụ thể</label>{{ form.address_text }}</div>
+                            <div class="form-group mb-0"><label class="font-weight-bold">Ghi chú</label>{{ form.note }}</div>
+                            <input type="hidden" name="delivery_lat" id="delivery-latitude">
+                            <input type="hidden" name="delivery_lng" id="delivery-longitude">
+                            <input type="hidden" name="pharmacy_id" id="selected-pharmacy-id" value="{{ preselected_pharmacy_id }}">
+                            <input type="hidden" name="departure_time" id="checkout-departure-time-hidden" value="{{ departure_time_value }}">
+                        </section>
+
+                        <section class="checkout-section">
+                            <div class="checkout-section__title">
+                                <div>
+                                    <h3>Tóm tắt thanh toán</h3>
+                                    <p>Tổng tiền sẽ tự cập nhật ngay khi hệ thống tìm được chi nhánh phù hợp và tính phí giao hàng.</p>
+                                </div>
+                            </div>
+                            <div class="checkout-summary-grid">
+                                <div class="checkout-summary-box">
+                                    <small>Tạm tính sau ưu đãi hệ thống</small>
+                                    <strong id="product-subtotal-text">{{ cart_pricing.system_subtotal|vnd }}</strong>
+                                </div>
+                                {% if loyalty_context.show_program_hint %}
+                                <div class="checkout-summary-box">
+                                    <small>Ưu đãi hạng khách hàng</small>
+                                    <strong class="text-primary" id="customer-tier-discount-text">{% if loyalty_context.discount_percent > 0 %}-{{ cart_pricing.loyalty_discount_total|vnd }}{% else %}0 đ{% endif %}</strong>
+                                </div>
+                                {% endif %}
+                                <div class="checkout-summary-box checkout-summary-box--accent">
+                                    <small>Phí ship</small>
+                                    <strong class="text-danger" id="shipping-fee-text">Chưa tính</strong>
+                                </div>
+                                <div class="checkout-summary-box checkout-summary-box--total">
+                                    <small>Tổng thanh toán</small>
+                                    <strong id="grand-total-text">{{ cart_pricing.final_product_total|vnd }}</strong>
+                                </div>
+                            </div>
+                            {% if loyalty_context.discount_percent > 0 %}
+                            <div class="checkout-loyalty-banner mt-3">
+                                <div class="checkout-loyalty-banner__icon">
+                                    {% if loyalty_context.code == 'diamond' %}
+                                        <i class="fas fa-gem"></i>
+                                    {% elif loyalty_context.code == 'gold' %}
+                                        <i class="fas fa-crown"></i>
+                                    {% elif loyalty_context.code == 'silver' %}
+                                        <i class="fas fa-medal"></i>
+                                    {% else %}
+                                        <i class="fas fa-award"></i>
+                                    {% endif %}
+                                </div>
+                                <div class="checkout-loyalty-banner__content">
+                                    <div class="checkout-loyalty-banner__eyebrow"><i class="fas fa-tags"></i> Ưu đãi hạng khách hàng</div>
+                                    <strong>Hạng {{ loyalty_context.label }} · giảm {{ loyalty_context.discount_percent }}% trên tạm tính đơn hàng</strong>
+                                    <p>Ưu đãi được áp một lần trên phần tiền hàng hiện tại, sau khi hệ thống đã trừ khuyến mãi của từng sản phẩm.</p>
+                                </div>
+                                <div class="checkout-loyalty-banner__meta">
+                                    <small>Tiết kiệm tại đơn này</small>
+                                    <strong>{% if cart_pricing.loyalty_discount_total > 0 %}-{{ cart_pricing.loyalty_discount_total|vnd }}{% else %}0 đ{% endif %}</strong>
+                                    <span>Giảm trực tiếp ở bước thanh toán</span>
+                                </div>
+                            </div>
+                            {% elif loyalty_context.show_program_hint and loyalty_context.next_tier %}
+                            <div class="checkout-loyalty-banner checkout-loyalty-banner--inactive mt-3">
+                                <div class="checkout-loyalty-banner__icon">
+                                    <i class="fas fa-star"></i>
+                                </div>
+                                <div class="checkout-loyalty-banner__content">
+                                    <div class="checkout-loyalty-banner__eyebrow"><i class="fas fa-layer-group"></i> Chưa có ưu đãi hạng khách hàng</div>
+                                    <strong>Mua thêm {{ loyalty_context.amount_to_next_tier|vnd }} để đạt hạng {{ loyalty_context.next_tier.label }}</strong>
+                                    <p>Khi đạt hạng {{ loyalty_context.next_tier.label }}, bạn sẽ được giảm {{ loyalty_context.next_tier.discount_percent }}% trên phần tiền hàng của đơn.</p>
+                                </div>
+                                <div class="checkout-loyalty-banner__meta">
+                                    <small>Mốc kế tiếp</small>
+                                    <strong>{{ loyalty_context.next_tier.discount_percent }}%</strong>
+                                    <span>Ưu đãi trên đơn hàng</span>
+                                </div>
+                            </div>
+                            {% endif %}
+                        </section>
+
+                        <section class="checkout-section">
+                            <div class="checkout-payment-panel">
+                                <div class="checkout-payment-panel__lead">
+                                    <h3>Phương thức thanh toán</h3>
+                                    <span><i class="fas fa-shield-alt"></i> Mã thanh toán cập nhật theo tổng tiền hiện tại</span>
+                                </div>
+                                <div class="checkout-payment-grid">
+                                    <label class="checkout-payment-option" data-payment-option>
+                                        <input type="radio" name="payment_method" value="cod" {% if form.payment_method.value == 'cod' or not form.payment_method.value %}checked{% endif %}>
+                                        <div class="checkout-payment-option__icon"><i class="fas fa-money-bill-wave"></i></div>
+                                        <div>
+                                            <strong>COD</strong>
+                                        
+                                        </div>
+                                    </label>
+                                    <label class="checkout-payment-option" data-payment-option>
+                                        <input type="radio" name="payment_method" value="momo" {% if form.payment_method.value == 'momo' %}checked{% endif %}>
+                                        <div class="checkout-payment-option__icon"><i class="fas fa-wallet"></i></div>
+                                        <div>
+                                            <strong>Ví MoMo</strong>
+                                            
+                                        </div>
+                                    </label>
+                                    <label class="checkout-payment-option" data-payment-option>
+                                        <input type="radio" name="payment_method" value="bank" {% if form.payment_method.value == 'bank' %}checked{% endif %}>
+                                        <div class="checkout-payment-option__icon"><i class="fas fa-university"></i></div>
+                                        <div>
+                                            <strong>Chuyển khoản ngân hàng</strong>
+                                            
+                                        </div>
+                                    </label>
+                                </div>
+                                <div id="payment-preview-panel" class="checkout-payment-preview"></div>
+                            </div>
+                        </section>
+
+                        <button type="submit" class="pharma-btn" id="submit-order-button" disabled><i class="fas fa-check-circle"></i><span>Xác nhận đặt hàng</span></button>
+                    </form>
+                </div>
+            </div>
+
+            <div class="checkout-map-card">
+                <div class="checkout-card-head">
+                    <div>
+                        <h2><i class="fas fa-map-marked-alt"></i> Bản đồ</h2>
+                        
+                    </div>
+                    <button type="button" class="pharma-outline-btn" style="max-width:170px;" onclick="findMyLocation()"><i class="fas fa-crosshairs"></i><span>Vị trí của tôi</span></button>
+                </div>
+                <div class="checkout-map-tools">
+                    <div class="checkout-map-summary">
+                        <div class="checkout-map-summary__card">
+                            <span>Vị trí giao hàng đang chọn</span>
+                            <strong id="checkout-selected-address-text">Chưa chọn vị trí giao hàng. Hãy chấm lên bản đồ hoặc dùng ô tìm kiếm bên dưới.</strong>
+                        </div>
+                        <div class="checkout-map-summary__card">
+                            <span>Địa chỉ mặc định trong tài khoản</span>
+                            <strong>{% if saved_address %}{{ saved_address.address_text }}{% else %}Bạn chưa lưu địa chỉ mặc định trong hồ sơ.{% endif %}</strong>
+                            <div class="checkout-map-summary__actions">
+                                {% if saved_address %}
+                                <button type="button" class="pharma-outline-btn" onclick="useSavedAddress()"><i class="fas fa-map-pin"></i><span>Dùng địa chỉ đã lưu</span></button>
+                                {% endif %}
+                                <a class="pharma-outline-btn" href="{% url 'account' %}"><i class="fas fa-user-edit"></i><span>Chỉnh trong hồ sơ</span></a>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="checkout-map-search">
+                        <label for="checkout-map-search-input">Tìm địa chỉ giao hàng trên bản đồ</label>
+                        <div class="checkout-map-search__row">
+                            <input type="text" id="checkout-map-search-input" placeholder="Ví dụ: 355/1 ABC, phố..., phường..., quận..., TP.HCM">
+                            <button type="button" class="pharma-btn" id="checkout-map-search-submit"><i class="fas fa-search"></i><span>Tìm</span></button>
+                        </div>
+                        <div id="checkout-map-search-status" class="checkout-map-search__status">Ô này chỉ dùng để tìm trước vị trí trên bản đồ, chưa đổi địa chỉ giao hàng cho tới khi bạn bấm "Dùng vị trí này".</div>
+                        <div id="checkout-map-search-result" class="checkout-map-search-result is-hidden">
+                            <div>
+                                <span class="checkout-map-search-result__label">Kết quả tìm kiếm</span>
+                                <div id="checkout-map-search-result-address" class="checkout-map-search-result__address">Chưa có kết quả nào.</div>
+                                <div id="checkout-map-search-result-meta" class="checkout-map-search-result__meta"></div>
+                            </div>
+                            <div class="checkout-map-search-result__actions">
+                                <button type="button" class="pharma-btn" id="checkout-map-search-use"><i class="fas fa-map-pin"></i><span>Dùng vị trí này</span></button>
+                                <button type="button" class="pharma-outline-btn" id="checkout-map-search-clear"><i class="fas fa-times"></i><span>Xóa kết quả</span></button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="checkout-map-frame">
+                    <div id="checkout-map"></div>
+                    <div id="checkout-loading-overlay" class="checkout-loading-overlay"><div class="spinner-border text-primary"></div><div>Đang tính chi nhánh phù hợp...</div></div>
+                    <div id="selected-route-info" class="checkout-route-info"></div>
+                    <button type="button" id="route-info-collapsed-button" class="checkout-route-collapse-btn"><i class="fas fa-eye"></i><span>Xem thông tin</span></button>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+{{ pharmacies|json_script:"pharmacies-data" }}
+{{ saved_address|json_script:"checkout-saved-address" }}
+{{ preselected_delivery|json_script:"checkout-preselected-delivery" }}
+
+<script>
+const checkoutMap = L.map("checkout-map", { scrollWheelZoom: true }).setView([10.7721, 106.6983], 13);
+attachLeafletBaseLayer(checkoutMap);
+
+const pharmacyList = JSON.parse(document.getElementById("pharmacies-data").textContent || "[]");
+const savedAddress = JSON.parse(document.getElementById("checkout-saved-address").textContent || "null");
+const preselectedDelivery = JSON.parse(document.getElementById("checkout-preselected-delivery").textContent || "null");
+const cartSubtotalValue = Number("{{ cart_pricing.system_subtotal|stringformat:'d' }}");
+const customerTierDiscountValue = Number("{{ cart_pricing.loyalty_discount_total|stringformat:'d' }}");
+const customerTierDiscountElement = document.getElementById("customer-tier-discount-text");
+const cartTotalValue = Number("{{ cart_pricing.final_product_total|stringformat:'d' }}");
+
+const fullNameInput = document.querySelector('[name="full_name"]');
+const phoneInput = document.querySelector('[name="phone"]');
+const addressInput = document.querySelector('[name="address_text"]');
+const noteInput = document.querySelector('[name="note"]');
+const deliveryLatInput = document.getElementById("delivery-latitude");
+const deliveryLngInput = document.getElementById("delivery-longitude");
+const selectedPharmacyInput = document.getElementById("selected-pharmacy-id");
+const departureTimeHiddenInput = document.getElementById("checkout-departure-time-hidden");
+const submitOrderButton = document.getElementById("submit-order-button");
+const routeInfoBox = document.getElementById("selected-route-info");
+const routeInfoCollapsedButton = document.getElementById("route-info-collapsed-button");
+const paymentMethodInputs = Array.from(document.querySelectorAll('input[name="payment_method"]'));
+const paymentPreviewPanel = document.getElementById("payment-preview-panel");
+const checkoutSelectedAddressText = document.getElementById("checkout-selected-address-text");
+const checkoutMapSearchInput = document.getElementById("checkout-map-search-input");
+const checkoutMapSearchSubmit = document.getElementById("checkout-map-search-submit");
+const checkoutMapSearchStatus = document.getElementById("checkout-map-search-status");
+const checkoutMapSearchResult = document.getElementById("checkout-map-search-result");
+const checkoutMapSearchResultAddress = document.getElementById("checkout-map-search-result-address");
+const checkoutMapSearchResultMeta = document.getElementById("checkout-map-search-result-meta");
+const checkoutMapSearchUseButton = document.getElementById("checkout-map-search-use");
+const checkoutMapSearchClearButton = document.getElementById("checkout-map-search-clear");
+
+let deliveryMarker = null, deliveryRouteLayer = null, addressLookupRequestId = 0, bestPharmacyRequestId = 0, checkoutSearchPreviewMarker = null, checkoutSearchPreview = null;
+let checkoutGrandTotalValue = cartTotalValue;
+let routeInfoVisible = true;
+const pharmacyIcon = new L.Icon({ iconUrl:"https://cdn-icons-png.flaticon.com/512/169/169869.png", iconSize:[30,30], popupAnchor:[0,-15] });
+const checkoutSearchPreviewIcon = L.divIcon({ className:"checkout-map-search-preview-icon", html:'<span class="checkout-map-search-preview-pin"></span>', iconSize:[18,18], iconAnchor:[9,9] });
+const pharmacyMarkers = {};
+
+function escapeCheckoutHtml(value){
+    return String(value || "")
+        .replace(/&/g, "&amp;")
+        .replace(/</g, "&lt;")
+        .replace(/>/g, "&gt;")
+        .replace(/\"/g, "&quot;")
+        .replace(/'/g, "&#39;");
+}
+
+function buildCheckoutPopupGallery(pharmacy){
+    const images = Array.isArray(pharmacy.gallery_images) && pharmacy.gallery_images.length ? pharmacy.gallery_images : [pharmacy.image];
+    if(images.length <= 1){
+        return `<div class="checkout-popup__gallery"><img src="${escapeCheckoutHtml(images[0] || pharmacy.image)}" alt="${escapeCheckoutHtml(pharmacy.name)}" onerror="this.onerror=null;this.src='/db-media/pharmacies/pm.jpg';"></div>`;
+    }
+    const slides = images.map(function(imageUrl){
+        return `<li class="splide__slide"><div class="checkout-popup__slide"><img src="${escapeCheckoutHtml(imageUrl)}" alt="${escapeCheckoutHtml(pharmacy.name)}" onerror="this.onerror=null;this.src='/db-media/pharmacies/pm.jpg';"></div></li>`;
+    }).join("");
+    return `<div class="splide site-splide checkout-popup__splide" data-site-splide data-per-page="1" data-gap="10px"><div class="splide__track"><ul class="splide__list">${slides}</ul></div></div>`;
+}
+
+pharmacyList.forEach(function(pharmacy){
+    const marker = L.marker([pharmacy.lat, pharmacy.lng], { icon: pharmacyIcon }).addTo(checkoutMap);
+    const popupContent = `<div class="checkout-popup">${buildCheckoutPopupGallery(pharmacy)}<strong>${escapeCheckoutHtml(pharmacy.name)}</strong><div class="mt-2">${escapeCheckoutHtml(pharmacy.address)}</div></div>`;
+    marker.bindPopup(popupContent, { autoPan:false });
+    marker.on("popupopen", function(){
+        if(window.siteUtils && typeof window.siteUtils.initSplideCarousels === "function"){
+            window.siteUtils.initSplideCarousels();
+        }
+    });
+    pharmacyMarkers[pharmacy.id] = marker;
+});
+
+function showCheckoutLoading(){ document.getElementById("checkout-loading-overlay").style.display = "flex"; }
+function hideCheckoutLoading(){ document.getElementById("checkout-loading-overlay").style.display = "none"; }
+function showSiteNotice(message, tone){ if(window.siteUtils && typeof window.siteUtils.showToast === "function"){ window.siteUtils.showToast(message, tone || "info"); return; } window.alert(message); }
+function getGeoErrorMessage(error){ if(!error || typeof error.code === "undefined"){ return "Không thể lấy vị trí hiện tại."; } if(error.code === 1){ return "Bạn đã từ chối cấp quyền truy cập vị trí."; } if(error.code === 2){ return "Không thể xác định vị trí hiện tại."; } if(error.code === 3){ return "Yêu cầu lấy vị trí đã hết thời gian chờ."; } return "Không thể lấy vị trí hiện tại."; }
+function refreshCheckoutMap(){ window.setTimeout(function(){ checkoutMap.invalidateSize(); }, 0); window.setTimeout(function(){ checkoutMap.invalidateSize(); }, 180); }
+function hasValue(value){ return value && value.trim() !== ""; }
+function updateSubmitButtonState(){ submitOrderButton.disabled = !(hasValue(fullNameInput.value) && hasValue(phoneInput.value) && hasValue(addressInput.value) && hasValue(deliveryLatInput.value) && hasValue(deliveryLngInput.value) && hasValue(selectedPharmacyInput.value)); }
+function clearRoute(){ if(deliveryRouteLayer){ checkoutMap.removeLayer(deliveryRouteLayer); deliveryRouteLayer = null; } }
+function updateCheckoutSelectedAddress(text){ if(checkoutSelectedAddressText){ checkoutSelectedAddressText.textContent = text || "Chưa chọn vị trí giao hàng."; } }
+function setCheckoutSearchStatus(message, tone){ if(!checkoutMapSearchStatus){ return; } checkoutMapSearchStatus.textContent = message || ""; checkoutMapSearchStatus.classList.remove("is-error", "is-success"); if(tone === "error"){ checkoutMapSearchStatus.classList.add("is-error"); } else if(tone === "success"){ checkoutMapSearchStatus.classList.add("is-success"); } }
+function clearCheckoutSearchPreview(options){ options = options || {}; checkoutSearchPreview = null; if(checkoutSearchPreviewMarker && checkoutMap.hasLayer(checkoutSearchPreviewMarker)){ checkoutMap.removeLayer(checkoutSearchPreviewMarker); } checkoutSearchPreviewMarker = null; if(checkoutMapSearchResult){ checkoutMapSearchResult.classList.add("is-hidden"); } if(checkoutMapSearchResultAddress){ checkoutMapSearchResultAddress.textContent = "Chưa có kết quả nào."; } if(checkoutMapSearchResultMeta){ checkoutMapSearchResultMeta.textContent = ""; } if(!options.keepStatus){ setCheckoutSearchStatus('Ô này chỉ dùng để tìm trước vị trí trên bản đồ, chưa đổi địa chỉ giao hàng cho tới khi bạn bấm "Dùng vị trí này".'); } }
+function setCheckoutSearchPreview(result){ const lat = Number(result.lat); const lng = Number(result.lng); if(!Number.isFinite(lat) || !Number.isFinite(lng)){ throw new Error("Tọa độ kết quả tìm kiếm không hợp lệ."); } checkoutSearchPreview = { lat:lat, lng:lng, addressText: result.display_name || "", sourceLabel: result.type_label || "Địa chỉ tìm kiếm" }; if(!checkoutSearchPreviewMarker){ checkoutSearchPreviewMarker = L.marker([lat, lng], { icon: checkoutSearchPreviewIcon }).addTo(checkoutMap); } else { checkoutSearchPreviewMarker.setLatLng([lat, lng]); if(!checkoutMap.hasLayer(checkoutSearchPreviewMarker)){ checkoutMap.addLayer(checkoutSearchPreviewMarker); } } checkoutSearchPreviewMarker.bindPopup(checkoutSearchPreview.addressText || "Kết quả tìm kiếm", { autoPan:false }); if(checkoutMapSearchResult){ checkoutMapSearchResult.classList.remove("is-hidden"); } if(checkoutMapSearchResultAddress){ checkoutMapSearchResultAddress.textContent = checkoutSearchPreview.addressText || "Đã tìm thấy một vị trí trên bản đồ."; } if(checkoutMapSearchResultMeta){ checkoutMapSearchResultMeta.textContent = `${checkoutSearchPreview.sourceLabel} • Chưa áp dụng làm vị trí giao hàng cho tới khi bạn bấm "Dùng vị trí này".`; } checkoutMap.stop(); checkoutMap.setView([lat, lng], 16); checkoutSearchPreviewMarker.openPopup(); }
+function applyCheckoutSearchPreview(){ if(!checkoutSearchPreview){ setCheckoutSearchStatus("Chưa có kết quả tìm kiếm nào để sử dụng.", "error"); return; } setDeliveryLocation(checkoutSearchPreview.lat, checkoutSearchPreview.lng, { addressText: checkoutSearchPreview.addressText || "Địa chỉ vừa tìm", lookupAddress:false, recenter:true, zoom:16 }); clearCheckoutSearchPreview({ keepStatus:true }); setCheckoutSearchStatus("Đã áp dụng kết quả tìm kiếm làm vị trí giao hàng.", "success"); }
+async function searchCheckoutAddress(){ const keyword = checkoutMapSearchInput ? String(checkoutMapSearchInput.value || "").trim() : ""; if(!keyword){ setCheckoutSearchStatus("Hãy nhập địa chỉ cần tìm trước khi ghim lên bản đồ.", "error"); return; } setCheckoutSearchStatus("Đang tìm vị trí phù hợp..."); try { const response = await fetch(`/api/search-address/?q=${encodeURIComponent(keyword)}`); const data = await response.json(); if(!response.ok || !data.results || !data.results.length){ throw new Error(data.error || "Không tìm thấy vị trí phù hợp."); } setCheckoutSearchPreview(data.results[0]); setCheckoutSearchStatus('Đã tìm thấy vị trí. Kiểm tra kết quả bên dưới rồi bấm "Dùng vị trí này" nếu muốn áp dụng.', "success"); } catch (error){ clearCheckoutSearchPreview({ keepStatus:true }); setCheckoutSearchStatus(error.message || "Không thể tìm địa chỉ này.", "error"); } }
+async function syncAddressFromCoordinates(lat, lng, fallbackAddress){ const requestId = ++addressLookupRequestId; const fallbackText = fallbackAddress || `Tọa độ: ${Number(lat).toFixed(5)}, ${Number(lng).toFixed(5)}`; if(fallbackAddress){ addressInput.value = fallbackAddress; } updateCheckoutSelectedAddress(fallbackText); try { const response = await fetch(`/api/reverse-address/?lat=${encodeURIComponent(lat)}&lng=${encodeURIComponent(lng)}`); const data = await response.json(); if(requestId !== addressLookupRequestId){ return; } if(!response.ok){ throw new Error(data.error || "Không thể cập nhật địa chỉ."); } const addressText = data.address || fallbackAddress || addressInput.value || fallbackText; addressInput.value = addressText; updateCheckoutSelectedAddress(addressText); } catch (error){ if(requestId === addressLookupRequestId && fallbackAddress){ addressInput.value = fallbackAddress; } updateCheckoutSelectedAddress(addressInput.value || fallbackText); } finally { updateSubmitButtonState(); } }
+function getClientDepartureTime(){ const now = new Date(); const hours = String(now.getHours()).padStart(2, "0"); const minutes = String(now.getMinutes()).padStart(2, "0"); return `${hours}:${minutes}`; }
+function getCheckoutDepartureTime(){ const currentTime = getClientDepartureTime(); if(departureTimeHiddenInput){ departureTimeHiddenInput.value = currentTime; return departureTimeHiddenInput.value; } return currentTime; }
+function buildEstimatedDeliveryLabel(departureTime, durationMinutes){ const sourceTime = String(departureTime || '').trim(); const matched = sourceTime.match(/^(\d{2}):(\d{2})$/); let baseHours = new Date().getHours(); let baseMinutes = new Date().getMinutes(); if(matched){ baseHours = Number(matched[1]); baseMinutes = Number(matched[2]); } const safeDuration = Math.max(0, Number(durationMinutes || 0)); const totalMinutes = (baseHours * 60) + baseMinutes + safeDuration; const dayOffset = Math.floor(totalMinutes / (24 * 60)); const minutesOfDay = totalMinutes % (24 * 60); const resultHours = String(Math.floor(minutesOfDay / 60)).padStart(2, "0"); const resultMinutes = String(minutesOfDay % 60).padStart(2, "0"); let label = `${resultHours}:${resultMinutes}`; if(dayOffset === 1){ label += " (ngày hôm sau)"; } else if(dayOffset > 1){ label += ` (+${dayOffset} ngày)`; } return label; }
+function getSelectedPaymentMethod(){ const active = paymentMethodInputs.find(function(input){ return input.checked; }); return active ? active.value : "cod"; }
+function refreshPaymentOptionState(){ document.querySelectorAll("[data-payment-option]").forEach(function(option){ const input = option.querySelector('input[name="payment_method"]'); option.classList.toggle("is-active", !!(input && input.checked)); }); }
+function setRouteInfoVisibility(visible){
+    routeInfoVisible = !!visible;
+    const hasContent = routeInfoBox && routeInfoBox.dataset.hasContent === "true";
+    if(routeInfoBox){ routeInfoBox.style.display = routeInfoVisible && hasContent ? "block" : "none"; }
+    if(routeInfoCollapsedButton){ routeInfoCollapsedButton.style.display = !routeInfoVisible && hasContent ? "inline-flex" : "none"; }
+}
+function bindRouteInfoActions(){
+    const hideButton = routeInfoBox ? routeInfoBox.querySelector('[data-route-info-toggle="hide"]') : null;
+    if(hideButton){ hideButton.addEventListener("click", function(){ setRouteInfoVisibility(false); }); }
+}
+function renderPaymentPreview(data){
+    if(!paymentPreviewPanel){ return; }
+    const hasBranch = !!selectedPharmacyInput.value;
+    const timingNote = hasBranch ? "Số tiền hiển thị đã gồm tiền hàng và phí giao theo địa chỉ hiện tại." : "Đây là số tiền tạm tính theo giỏ hàng. Sau khi chọn địa chỉ giao, hệ thống sẽ cộng phí ship chính xác.";
+    if(!data.show_qr){
+        paymentPreviewPanel.innerHTML = `<div class="checkout-payment-preview__header"><h3>${data.payment_label}</h3><span class="checkout-payment-preview__badge"><i class="fas fa-hand-holding-usd"></i> Thanh toán trực tiếp</span></div><p class="checkout-payment-preview__helper">${data.helper_text}</p><div class="checkout-payment-preview__rows"><div class="checkout-payment-preview__row checkout-payment-preview__row--wide"><small>Tổng cần thu</small><strong>${data.amount_text}</strong></div><div class="checkout-payment-preview__row"><small>Thời điểm thanh toán</small><strong>Khi nhân viên giao hàng bàn giao đơn</strong></div><div class="checkout-payment-preview__row"><small>Chi nhánh xử lý</small><strong>${data.branch_name || "Sẽ cập nhật sau khi chọn địa chỉ"}</strong></div><div class="checkout-payment-preview__row checkout-payment-preview__row--wide"><small>Mã đối soát</small><strong>${data.transfer_note}</strong></div></div><div class="checkout-payment-preview__tip">${timingNote}</div>`;
+        return;
+    }
+    paymentPreviewPanel.innerHTML = `<div class="checkout-payment-preview__header"><h3>${data.payment_label}</h3><span class="checkout-payment-preview__badge"><i class="fas fa-qrcode"></i> Quét để thanh toán</span></div><p class="checkout-payment-preview__helper">${data.helper_text}</p><div class="checkout-payment-preview__rows"><div class="checkout-payment-preview__row checkout-payment-preview__row--wide"><small>Số tiền cần thanh toán</small><strong>${data.amount_text}</strong></div><div class="checkout-payment-preview__row"><small>Nội dung thanh toán</small><strong>${data.transfer_note}</strong></div><div class="checkout-payment-preview__row"><small>Chi nhánh xử lý</small><strong>${data.branch_name || "Sẽ cập nhật sau khi chọn địa chỉ"}</strong></div><div class="checkout-payment-preview__row"><small>Đơn vị nhận</small><strong>${data.provider_name}</strong></div><div class="checkout-payment-preview__row"><small>Tài khoản / ví nhận</small><strong>${data.account_number}</strong></div><div class="checkout-payment-preview__row checkout-payment-preview__row--wide"><small>Chủ tài khoản</small><strong>${data.recipient_name}</strong></div></div><div class="checkout-payment-preview__qr-block"><h4 class="checkout-payment-preview__qr-title">Mã QR thanh toán</h4><div class="checkout-payment-preview__qr"><img src="${data.qr_image}" alt="Mã QR thanh toán ${data.payment_label}"></div><p class="checkout-payment-preview__qr-caption">Mở ứng dụng phù hợp, quét mã QR bên dưới để điền sẵn số tiền và nội dung thanh toán.</p></div><div class="checkout-payment-preview__tip">${timingNote}</div>`;
+}
+async function refreshPaymentPreview(){ if(!paymentPreviewPanel){ return; } refreshPaymentOptionState(); paymentPreviewPanel.classList.add("is-loading"); try { const params = new URLSearchParams({ payment_method: getSelectedPaymentMethod(), amount: String(checkoutGrandTotalValue || cartTotalValue || 0), pharmacy_id: selectedPharmacyInput.value || "", reference: `TAM-${selectedPharmacyInput.value || "X"}-${checkoutGrandTotalValue || cartTotalValue || 0}` }); const response = await fetch(`/api/payment-preview/?${params.toString()}`); const data = await response.json(); if(!response.ok){ throw new Error(data.error || "Không thể tạo xem trước thanh toán."); } renderPaymentPreview(data); } catch (error) { paymentPreviewPanel.innerHTML = `<div class="text-danger">${error.message || "Không thể tạo mã thanh toán."}</div>`; } finally { paymentPreviewPanel.classList.remove("is-loading"); } }
+function renderDeliverySummary(data){ const selectedPharmacy = data.pharmacy; const route = data.route; const productSubtotalValue = Number(data.product_total_before_loyalty || cartSubtotalValue || 0); const loyaltyDiscountValue = Number(data.loyalty_discount_total || customerTierDiscountValue || 0); const productTotalValue = Number(data.product_total_value || cartTotalValue); const grandTotalValue = productTotalValue + Number(route.shipping_fee_value || 0); checkoutGrandTotalValue = grandTotalValue; const notices = []; if(data.notice){ notices.push(data.notice); } if(route.traffic_notice && notices.indexOf(route.traffic_notice) === -1){ notices.push(route.traffic_notice); } const effectiveDepartureTime = route.departure_time || getCheckoutDepartureTime(); const estimatedDeliveryLabel = route.estimated_delivery_label || buildEstimatedDeliveryLabel(effectiveDepartureTime, route.duration_min); if(departureTimeHiddenInput){ departureTimeHiddenInput.value = effectiveDepartureTime; } selectedPharmacyInput.value = selectedPharmacy.id; document.getElementById("product-subtotal-text").innerText = productSubtotalValue.toLocaleString("vi-VN") + " đ"; if(customerTierDiscountElement){ customerTierDiscountElement.innerText = loyaltyDiscountValue > 0 ? `-${loyaltyDiscountValue.toLocaleString("vi-VN")} đ` : `0 đ`; } document.getElementById("shipping-fee-text").innerText = route.shipping_fee; document.getElementById("grand-total-text").innerText = grandTotalValue.toLocaleString("vi-VN") + " đ"; const noticeHtml = notices.map(function(item){ return `<div class="checkout-route-info__notice">${item}</div>`; }).join(""); const feeLabel = route.fee_increase_percent ? `${route.shipping_fee} · tăng ${route.fee_increase_percent}% so với mức cơ bản ${route.base_shipping_fee}` : route.shipping_fee; routeInfoBox.dataset.hasContent = "true"; routeInfoBox.innerHTML = `${noticeHtml}<div class="checkout-route-info__head"><div><div class="checkout-route-info__eyebrow"><i class="fas fa-store"></i> Chi nhánh xử lý</div><h3 class="checkout-route-info__title">${selectedPharmacy.name}</h3></div><button type="button" class="checkout-route-info__toggle" data-route-info-toggle="hide">Ẩn thông tin</button></div><div class="checkout-route-info__body"><div><p class="checkout-route-info__address">${selectedPharmacy.address}</p><div class="checkout-route-info__stats"><div class="checkout-route-info__stat"><small>Thời gian giao dự kiến</small><strong>${estimatedDeliveryLabel}</strong></div><div class="checkout-route-info__stat"><small>Quãng đường</small><strong>${route.distance_km} km • ${route.duration_min} phút</strong></div><div class="checkout-route-info__stat"><small>Phí giao hàng</small><strong>${feeLabel}</strong></div></div></div><div class="checkout-route-info__thumb"><img src="${selectedPharmacy.image}" alt="${selectedPharmacy.name}" onerror="this.onerror=null;this.src='/db-media/pharmacies/pm.jpg';"></div></div>`; bindRouteInfoActions(); setRouteInfoVisibility(routeInfoVisible); if(pharmacyMarkers[selectedPharmacy.id]){ pharmacyMarkers[selectedPharmacy.id].openPopup(); } refreshPaymentPreview(); updateSubmitButtonState(); }
+function drawSelectedRoute(routePoints){ clearRoute(); deliveryRouteLayer = L.polyline(routePoints, { color:"#1f64e0", weight:6 }).addTo(checkoutMap); refreshCheckoutMap(); }
+async function loadBestPharmacy(lat, lng, options){ options = options || {}; const requestId = ++bestPharmacyRequestId; showCheckoutLoading(); routeInfoBox.dataset.hasContent = "false"; setRouteInfoVisibility(false); clearRoute(); try { const params = new URLSearchParams({ delivery_lat: lat, delivery_lng: lng, mode:"motorbike", departure_time:getCheckoutDepartureTime() }); if(options.preserveSelectedPharmacy === true && selectedPharmacyInput.value){ params.set("pharmacy_id", selectedPharmacyInput.value); } const response = await fetch(`/api/find-best-pharmacy/?${params.toString()}`); const data = await response.json(); if(requestId !== bestPharmacyRequestId){ return; } if(!response.ok){ throw new Error(data.error || "Không thể tìm chi nhánh phù hợp."); } renderDeliverySummary(data); drawSelectedRoute(data.route.route_points); } catch (error){ if(requestId !== bestPharmacyRequestId){ return; } selectedPharmacyInput.value = ""; checkoutGrandTotalValue = cartTotalValue; routeInfoBox.dataset.hasContent = "true"; routeInfoBox.innerHTML = `<div class="text-danger">${error.message || "Có lỗi khi tính chi nhánh giao hàng."}</div>`; setRouteInfoVisibility(true); refreshPaymentPreview(); updateSubmitButtonState(); } finally { if(requestId === bestPharmacyRequestId){ hideCheckoutLoading(); } } }
+function mountMarker(lat, lng){ if(!deliveryMarker){ deliveryMarker = L.marker([lat, lng], { draggable:true }).addTo(checkoutMap).bindPopup("Vị trí nhận hàng", { autoPan:false }); deliveryMarker.on("dragend", function(){ const dragged = deliveryMarker.getLatLng(); setDeliveryLocation(dragged.lat, dragged.lng, { recenter:false }); }); } else { deliveryMarker.setLatLng([lat, lng]); deliveryMarker.bindPopup("Vị trí nhận hàng", { autoPan:false }); } }
+function setDeliveryLocation(lat, lng, options){ options = options || {}; const lookupAddress = options.lookupAddress !== false; const preserveSelected = options.preserveSelectedPharmacy === true; const selectedAddress = options.addressText || addressInput.value || "Địa chỉ giao hàng đã chọn"; deliveryLatInput.value = lat; deliveryLngInput.value = lng; if(!preserveSelected){ selectedPharmacyInput.value = ""; } mountMarker(lat, lng); clearCheckoutSearchPreview({ keepStatus:true }); if(lookupAddress){ syncAddressFromCoordinates(lat, lng, options.addressText || ""); } else { addressInput.value = selectedAddress; updateCheckoutSelectedAddress(selectedAddress); } if(options.recenter === true){ checkoutMap.stop(); checkoutMap.setView([lat, lng], options.zoom || 16); } loadBestPharmacy(lat, lng, { preserveSelectedPharmacy: preserveSelected }); updateSubmitButtonState(); }
+function findMyLocation(){ if(!navigator.geolocation){ showSiteNotice("Trình duyệt hiện tại không hỗ trợ định vị vị trí.", "error"); return; } showCheckoutLoading(); navigator.geolocation.getCurrentPosition(function(position){ setDeliveryLocation(position.coords.latitude, position.coords.longitude, { recenter:true, zoom:16 }); }, function(error){ hideCheckoutLoading(); showSiteNotice(getGeoErrorMessage(error), "error"); }); }
+function useSavedAddress(){ if(!savedAddress || savedAddress.lat === null || savedAddress.lng === null){ return; } setDeliveryLocation(savedAddress.lat, savedAddress.lng, { addressText: savedAddress.address_text || "", lookupAddress:false, recenter:true, zoom:16 }); }
+
+fullNameInput.addEventListener("input", updateSubmitButtonState); phoneInput.addEventListener("input", updateSubmitButtonState); addressInput.addEventListener("input", function(){ updateSubmitButtonState(); if(hasValue(deliveryLatInput.value) && hasValue(deliveryLngInput.value)){ updateCheckoutSelectedAddress(addressInput.value || "Địa chỉ giao hàng đã chọn"); } }); if(noteInput){ noteInput.addEventListener("input", updateSubmitButtonState); } paymentMethodInputs.forEach(function(input){ input.addEventListener("change", function(){ refreshPaymentPreview(); updateSubmitButtonState(); }); });
+if(routeInfoCollapsedButton){ routeInfoCollapsedButton.addEventListener("click", function(){ setRouteInfoVisibility(true); }); }
+if(departureTimeHiddenInput){ departureTimeHiddenInput.value = getClientDepartureTime(); }
+checkoutMap.on("click", function(event){ setDeliveryLocation(event.latlng.lat, event.latlng.lng, { recenter:false }); });
+if(checkoutMapSearchSubmit){ checkoutMapSearchSubmit.addEventListener("click", searchCheckoutAddress); }
+if(checkoutMapSearchInput){ checkoutMapSearchInput.addEventListener("keydown", function(event){ if(event.key === "Enter"){ event.preventDefault(); searchCheckoutAddress(); } }); }
+if(checkoutMapSearchUseButton){ checkoutMapSearchUseButton.addEventListener("click", applyCheckoutSearchPreview); }
+if(checkoutMapSearchClearButton){ checkoutMapSearchClearButton.addEventListener("click", function(){ clearCheckoutSearchPreview(); }); }
+document.getElementById("checkout-form").addEventListener("submit", function(event){ getCheckoutDepartureTime(); updateSubmitButtonState(); if(submitOrderButton.disabled){ event.preventDefault(); } });
+if(preselectedDelivery && preselectedDelivery.lat !== null && preselectedDelivery.lng !== null){ setDeliveryLocation(preselectedDelivery.lat, preselectedDelivery.lng, { addressText: preselectedDelivery.address_text || "", lookupAddress:false, recenter:true, zoom:16, preserveSelectedPharmacy:false }); } else { updateCheckoutSelectedAddress(savedAddress && savedAddress.address_text ? 'Địa chỉ mặc định đang sẵn sàng. Bấm "Dùng địa chỉ đã lưu" hoặc tìm vị trí mới trên bản đồ.' : "Chưa chọn vị trí giao hàng. Hãy chấm lên bản đồ hoặc dùng ô tìm kiếm bên dưới."); }
+refreshCheckoutMap(); refreshPaymentOptionState(); refreshPaymentPreview(); updateSubmitButtonState();
+</script>
+{% endblock %}

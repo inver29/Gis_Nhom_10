@@ -1,0 +1,111 @@
+{% load static %}
+{% load currency_filters %}
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Hóa đơn {{ order.resolved_invoice_code }}</title>
+    <link rel="stylesheet" href="{% static 'css/account/orders/invoice_detail.css' %}">
+</head>
+<body>
+    <div class="invoice-shell">
+        <div class="invoice-toolbar">
+            <a href="{% url 'order_history' %}" class="invoice-btn">← Quay lại lịch sử đơn hàng</a>
+            <button type="button" class="invoice-btn primary" onclick="window.print()">In / xuất hóa đơn</button>
+        </div>
+
+        <section class="invoice-paper">
+            <div class="invoice-head">
+                <div class="invoice-brand">
+                    <h1>HÓA ĐƠN BÁN HÀNG</h1>
+                    <p><strong>GIS Pharma</strong></p>
+                    <p>Chi nhánh: {{ order.pharmacy.name|default:"Chưa gán chi nhánh" }}</p>
+                    <p>{{ order.pharmacy.address|default:"Địa chỉ chi nhánh đang cập nhật" }}</p>
+                </div>
+                <div class="invoice-code-box">
+                    <div class="invoice-code-row"><span>Mã hóa đơn</span><strong>{{ order.resolved_invoice_code }}</strong></div>
+                    <div class="invoice-code-row"><span>Mã đơn hàng</span><strong>{{ order.order_code }}</strong></div>
+                    <div class="invoice-code-row"><span>Ngày lập</span><strong>{{ order.created_at|date:"d/m/Y H:i" }}</strong></div>
+                </div>
+            </div>
+
+            <div class="invoice-grid">
+                <div class="invoice-card">
+                    <h3>Thông tin người mua</h3>
+                    <p><strong>{{ order.full_name }}</strong></p>
+                    <p>{{ order.phone }}</p>
+                    <p>{{ order.address_text }}</p>
+                    {% if order.note %}<p>Ghi chú: {{ order.note }}</p>{% endif %}
+                </div>
+                <div class="invoice-card">
+                    <h3>Thông tin xử lý đơn</h3>
+                    <p>Nhân viên phụ trách: <strong>{{ invoice_staff_display_name|default:order.resolved_invoice_staff_name|default:"Nhân viên quầy thuốc" }}</strong></p>
+                    <p>Phương thức thanh toán: <strong>{{ order.get_payment_method_display }}</strong></p>
+                    <p>Trạng thái thanh toán: <strong>{{ order.get_payment_status_display }}</strong></p>
+                </div>
+            </div>
+
+            <div class="invoice-meta-grid">
+                <div class="invoice-meta-item">
+                    <small>Tạm tính sau khuyến mãi hệ thống</small>
+                    <strong>{{ order.product_subtotal_before_tier_discount|vnd }}</strong>
+                </div>
+                <div class="invoice-meta-item">
+                    <small>Phí giao hàng</small>
+                    <strong>{{ order.shipping_fee|vnd }}</strong>
+                </div>
+                <div class="invoice-meta-item">
+                    <small>Nội dung thanh toán</small>
+                    <strong>{{ order.resolved_payment_reference }}</strong>
+                </div>
+            </div>
+
+            <div class="invoice-table-wrap">
+                <table>
+                    <thead>
+                        <tr>
+                            <th>STT</th>
+                            <th>Sản phẩm</th>
+                            <th>Đơn giá</th>
+                            <th>SL</th>
+                            <th>Thành tiền</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for item in order_items %}
+                        <tr>
+                            <td>{{ forloop.counter }}</td>
+                            <td><span class="item-name">{{ item.medicine_name }}</span></td>
+                            <td>{{ item.price|vnd }}</td>
+                            <td>{{ item.quantity }}</td>
+                            <td><strong>{{ item.line_total|vnd }}</strong></td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+
+            <div class="invoice-summary">
+                <div class="invoice-summary-box">
+                    <div class="invoice-summary-row"><span>Tạm tính sau khuyến mãi hệ thống</span><strong>{{ order.product_subtotal_before_tier_discount|vnd }}</strong></div>
+                    {% if order.has_customer_tier_discount %}<div class="invoice-summary-row"><span>Ưu đãi hạng {{ order.customer_tier_name }}</span><strong>-{{ order.customer_tier_discount_total|vnd }}</strong></div>{% endif %}
+                    <div class="invoice-summary-row"><span>Phí giao hàng</span><strong>{{ order.shipping_fee|vnd }}</strong></div>
+                    <div class="invoice-summary-row total"><span>Tổng thanh toán</span><strong>{{ order.final_total_price|vnd }}</strong></div>
+                </div>
+            </div>
+
+            <div class="invoice-foot">
+                <div class="invoice-sign">
+                    <h4>Người mua hàng</h4>
+                    <p>{{ order.full_name }}</p>
+                </div>
+                <div class="invoice-sign">
+                    <h4>Người lập hóa đơn</h4>
+                    <p>{{ invoice_staff_display_name|default:order.resolved_invoice_staff_name|default:"Nhân viên quầy thuốc" }}</p>
+                </div>
+            </div>
+        </section>
+    </div>
+</body>
+</html>

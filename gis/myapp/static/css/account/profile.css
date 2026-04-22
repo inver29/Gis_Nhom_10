@@ -1,0 +1,7 @@
+.account-password-trigger{max-width:240px}
+    .account-password-modal .modal-content{border:none;border-radius:26px;overflow:hidden;box-shadow:0 22px 52px rgba(17,70,184,.16)}
+    .account-password-modal .modal-header{padding:20px 24px;background:linear-gradient(135deg,#1f64e0 0%,#1146b8 100%);color:#fff;border-bottom:none}
+    .account-password-modal .modal-title{font-weight:900}
+    .account-password-modal .modal-body{padding:24px}
+    .account-password-modal .modal-footer{padding:0 24px 24px;border-top:none}
+    .account-password-modal .account-form__field{margin-bottom:16px}

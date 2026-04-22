@@ -1,0 +1,346 @@
+{% extends "admin_panel/base.html" %}
+{% load static %}
+
+{% block extra_head %}
+<link rel="stylesheet" href="{% static 'css/admin_panel/content/home_page_form.css' %}">
+{% endblock %}
+
+{% block admin_content %}
+<div class="home-editor">
+    <!-- Quan ly trang chu -->
+    <section class="home-editor__hero">
+        <div>
+            <h2>Quản lý trang chủ</h2>
+            <p>Giữ nguyên bố cục dễ dùng hiện tại nhưng mở rộng để bạn có thể thêm mới, xóa, sắp xếp và chỉnh từng thẻ ngay trên trang. Các ô icon và liên kết giờ có sẵn danh sách gợi ý để gõ vài ký tự rồi chọn nhanh.</p>
+        </div>
+        <a href="{% url 'home' %}" class="btn-admin btn-admin-light" target="_blank" rel="noopener">
+            <i class="fas fa-eye"></i>
+            <span>Xem trang ngoài</span>
+        </a>
+    </section>
+
+    <form method="post" enctype="multipart/form-data" id="home-admin-form">
+        {% csrf_token %}
+        {% for hidden in form.hidden_fields %}{{ hidden }}{% endfor %}
+        {{ hero_slide_formset.management_form }}
+        {{ category_item_formset.management_form }}
+        {{ commitment_item_formset.management_form }}
+
+        {% if form.non_field_errors %}
+        <div class="alert alert-danger">{{ form.non_field_errors }}</div>
+        {% endif %}
+        {% if hero_slide_formset.non_form_errors %}
+        <div class="alert alert-danger">{{ hero_slide_formset.non_form_errors }}</div>
+        {% endif %}
+        {% if category_item_formset.non_form_errors %}
+        <div class="alert alert-danger">{{ category_item_formset.non_form_errors }}</div>
+        {% endif %}
+        {% if commitment_item_formset.non_form_errors %}
+        <div class="alert alert-danger">{{ commitment_item_formset.non_form_errors }}</div>
+        {% endif %}
+
+        {% for group in field_groups %}
+        <section class="home-editor__section">
+            <div class="home-editor__section-head">
+                <div>
+                    <h3>{{ group.title }}</h3>
+                    <p>
+                        {% if group.title == 'Slider đầu trang' %}
+                        Chỉnh thời gian tự chuyển của slider ngoài trang chủ. Giá trị tính theo mili giây.
+                        {% elif group.title == 'Khối danh mục nổi bật' %}
+                        Đây là tiêu đề, nhãn và liên kết của khối “Tìm thuốc theo nhóm sản phẩm”.
+                        {% else %}
+                        Đây là phần tiêu đề của khối “Những giá trị chính của hệ thống”.
+                        {% endif %}
+                    </p>
+                </div>
+                <span class="admin-badge admin-badge-info">{{ group.fields|length }} trường</span>
+            </div>
+            <div class="home-editor__grid">
+                {% for item in group.fields %}
+                <div class="home-editor__field {% if item.is_textarea or item.is_rich_text %}home-editor__field--wide{% endif %}">
+                    <label for="{{ item.field.id_for_label }}">{{ item.field.label }}</label>
+                    {{ item.field }}
+                    {% if item.field.help_text %}
+                    <div class="admin-inline-help">{{ item.field.help_text }}</div>
+                    {% endif %}
+                    {% if item.field.errors %}
+                    <div class="admin-field-error">{{ item.field.errors }}</div>
+                    {% endif %}
+                </div>
+                {% endfor %}
+            </div>
+        </section>
+        {% endfor %}
+
+        <section class="home-editor__section" data-dynamic-formset data-prefix="hero_slides" data-item-label-singular="slide" data-item-label-plural="slide">
+            <div class="home-editor__section-head">
+                <div>
+                    <h3>Slider đầu trang</h3>
+                    <p>Mỗi thẻ là một banner trong slider ngoài trang chủ. Bạn có thể thêm slide mới, đổi ảnh, gắn liên kết, sắp xếp thứ tự hoặc đánh dấu xóa trước khi lưu.</p>
+                </div>
+                <div class="home-editor__section-actions">
+                    <span class="admin-badge admin-badge-info" data-formset-count>{{ hero_slide_formset.forms|length }} slide</span>
+                    <button type="button" class="btn-admin btn-admin-light" data-formset-add>
+                        <i class="fas fa-plus"></i>
+                        <span>Thêm slide</span>
+                    </button>
+                </div>
+            </div>
+            <div class="home-editor__hint">Liên kết của slide có danh sách gợi ý sẵn. Nếu không thấy đường dẫn bạn cần, chọn “Tự nhập liên kết khác” rồi nhập tay.</div>
+            <div class="home-editor__list" data-formset-list>
+                {% for slide_form in hero_slide_formset.forms %}
+                <article class="home-editor__item-card" data-formset-card>
+                    {% for hidden in slide_form.hidden_fields %}{{ hidden }}{% endfor %}
+                    <div class="home-editor__preview">
+                        {% if slide_form.instance.image %}
+                        <img src="{{ slide_form.instance.image.url }}" alt="{{ slide_form.instance.alt_text|default:'Slide trang chủ' }}">
+                        {% elif slide_form.instance.legacy_static_path %}
+                        <img src="{% static slide_form.instance.legacy_static_path %}" alt="{{ slide_form.instance.alt_text|default:'Slide trang chủ' }}">
+                        {% else %}
+                        <div class="home-editor__placeholder">
+                            <i class="fas fa-images fa-2x"></i>
+                            <span>Chưa có ảnh cho slide này</span>
+                        </div>
+                        {% endif %}
+                    </div>
+                    <div class="home-editor__item-grid">
+                        {% for field in slide_form.visible_fields %}
+                        {% if field.name == 'DELETE' %}
+                        <label class="home-editor__delete">
+                            {{ field }}
+                            <span>Xóa slide này khi lưu</span>
+                        </label>
+                        {% else %}
+                        <div class="home-editor__item-field {% if field.field.widget.input_type == 'file' %}home-editor__item-field--wide{% endif %} {% if field.name == 'link_url' %}is-hidden{% endif %}" {% if field.name == 'link_url' %}data-quick-wrapper{% endif %}>
+                            <label for="{{ field.id_for_label }}">{{ field.label }}</label>
+                            {{ field }}
+                            {% if field.help_text %}<div class="admin-inline-help">{{ field.help_text }}</div>{% endif %}
+                            {% if field.errors %}<div class="admin-field-error">{{ field.errors }}</div>{% endif %}
+                        </div>
+                        {% endif %}
+                        {% endfor %}
+                        {% if slide_form.non_field_errors %}
+                        <div class="alert alert-danger home-editor__item-field--wide mb-0">{{ slide_form.non_field_errors }}</div>
+                        {% endif %}
+                    </div>
+                </article>
+                {% endfor %}
+            </div>
+            <template data-formset-template>
+                <article class="home-editor__item-card" data-formset-card>
+                    {% with slide_form=hero_slide_formset.empty_form %}
+                    {% for hidden in slide_form.hidden_fields %}{{ hidden }}{% endfor %}
+                    <div class="home-editor__preview">
+                        <div class="home-editor__placeholder">
+                            <i class="fas fa-images fa-2x"></i>
+                            <span>Slide mới</span>
+                        </div>
+                    </div>
+                    <div class="home-editor__item-grid">
+                        {% for field in slide_form.visible_fields %}
+                        {% if field.name == 'DELETE' %}
+                        <label class="home-editor__delete">
+                            {{ field }}
+                            <span>Xóa slide này khi lưu</span>
+                        </label>
+                        {% else %}
+                        <div class="home-editor__item-field {% if field.field.widget.input_type == 'file' %}home-editor__item-field--wide{% endif %} {% if field.name == 'link_url' %}is-hidden{% endif %}" {% if field.name == 'link_url' %}data-quick-wrapper{% endif %}>
+                            <label for="{{ field.id_for_label }}">{{ field.label }}</label>
+                            {{ field }}
+                            {% if field.help_text %}<div class="admin-inline-help">{{ field.help_text }}</div>{% endif %}
+                            {% if field.errors %}<div class="admin-field-error">{{ field.errors }}</div>{% endif %}
+                        </div>
+                        {% endif %}
+                        {% endfor %}
+                    </div>
+                    {% endwith %}
+                </article>
+            </template>
+        </section>
+
+        <section class="home-editor__section" data-dynamic-formset data-prefix="category_items" data-item-label-singular="mục" data-item-label-plural="mục">
+            <div class="home-editor__section-head">
+                <div>
+                    <h3>Danh mục nổi bật</h3>
+                    <p>Mỗi thẻ tương ứng một ô trong khối nhóm sản phẩm. Bạn có thể thêm mục mới, đổi tên, đổi icon, liên kết và bật/tắt từng mục.</p>
+                </div>
+                <div class="home-editor__section-actions">
+                    <span class="admin-badge admin-badge-info" data-formset-count>{{ category_item_formset.forms|length }} mục</span>
+                    <button type="button" class="btn-admin btn-admin-light" data-formset-add>
+                        <i class="fas fa-plus"></i>
+                        <span>Thêm mục danh mục</span>
+                    </button>
+                </div>
+            </div>
+            <div class="home-editor__hint">Icon và liên kết đều có ô chọn nhanh dạng tìm kiếm. Nếu chưa có trong danh sách, chọn mục “Tự nhập...” để điền mã hoặc đường dẫn riêng.</div>
+            <div class="home-editor__list" data-formset-list>
+                {% for item_form in category_item_formset.forms %}
+                <article class="home-editor__item-card" data-formset-card>
+                    {% for hidden in item_form.hidden_fields %}{{ hidden }}{% endfor %}
+                    <div class="home-editor__preview">
+                        <div class="home-editor__placeholder">
+                            <i class="{{ item_form.instance.icon_class|default:'fas fa-capsules' }} fa-2x"></i>
+                            <span>{{ item_form.instance.title|default:'Mục danh mục mới' }}</span>
+                        </div>
+                    </div>
+                    <div class="home-editor__item-grid">
+                        {% for field in item_form.visible_fields %}
+                        {% if field.name == 'DELETE' %}
+                        <label class="home-editor__delete">
+                            {{ field }}
+                            <span>Xóa mục này khi lưu</span>
+                        </label>
+                        {% else %}
+                        <div class="home-editor__item-field {% if field.name == 'icon_class' or field.name == 'link_url' %}is-hidden{% endif %}" {% if field.name == 'icon_class' or field.name == 'link_url' %}data-quick-wrapper{% endif %}>
+                            <label for="{{ field.id_for_label }}">{{ field.label }}</label>
+                            {{ field }}
+                            {% if field.help_text %}<div class="admin-inline-help">{{ field.help_text }}</div>{% endif %}
+                            {% if field.errors %}<div class="admin-field-error">{{ field.errors }}</div>{% endif %}
+                        </div>
+                        {% endif %}
+                        {% endfor %}
+                        {% if item_form.non_field_errors %}
+                        <div class="alert alert-danger home-editor__item-field--wide mb-0">{{ item_form.non_field_errors }}</div>
+                        {% endif %}
+                    </div>
+                </article>
+                {% endfor %}
+            </div>
+            <template data-formset-template>
+                <article class="home-editor__item-card" data-formset-card>
+                    {% with item_form=category_item_formset.empty_form %}
+                    {% for hidden in item_form.hidden_fields %}{{ hidden }}{% endfor %}
+                    <div class="home-editor__preview">
+                        <div class="home-editor__placeholder">
+                            <i class="fas fa-capsules fa-2x"></i>
+                            <span>Mục danh mục mới</span>
+                        </div>
+                    </div>
+                    <div class="home-editor__item-grid">
+                        {% for field in item_form.visible_fields %}
+                        {% if field.name == 'DELETE' %}
+                        <label class="home-editor__delete">
+                            {{ field }}
+                            <span>Xóa mục này khi lưu</span>
+                        </label>
+                        {% else %}
+                        <div class="home-editor__item-field {% if field.name == 'icon_class' or field.name == 'link_url' %}is-hidden{% endif %}" {% if field.name == 'icon_class' or field.name == 'link_url' %}data-quick-wrapper{% endif %}>
+                            <label for="{{ field.id_for_label }}">{{ field.label }}</label>
+                            {{ field }}
+                            {% if field.help_text %}<div class="admin-inline-help">{{ field.help_text }}</div>{% endif %}
+                            {% if field.errors %}<div class="admin-field-error">{{ field.errors }}</div>{% endif %}
+                        </div>
+                        {% endif %}
+                        {% endfor %}
+                    </div>
+                    {% endwith %}
+                </article>
+            </template>
+        </section>
+
+        <section class="home-editor__section" data-dynamic-formset data-prefix="commitment_items" data-item-label-singular="mục" data-item-label-plural="mục">
+            <div class="home-editor__section-head">
+                <div>
+                    <h3>Cam kết dịch vụ</h3>
+                    <p>Mỗi thẻ là một giá trị trong khối cam kết. Bạn có thể thêm thẻ mới, đổi icon, đổi nội dung hoặc đánh dấu xóa từng mục.</p>
+                </div>
+                <div class="home-editor__section-actions">
+                    <span class="admin-badge admin-badge-info" data-formset-count>{{ commitment_item_formset.forms|length }} mục</span>
+                    <button type="button" class="btn-admin btn-admin-light" data-formset-add>
+                        <i class="fas fa-plus"></i>
+                        <span>Thêm thẻ cam kết</span>
+                    </button>
+                </div>
+            </div>
+            <div class="home-editor__hint">Nếu cần icon khác danh sách gợi ý, chọn “Tự nhập mã icon khác” rồi điền mã Font Awesome ở ô tùy chỉnh.</div>
+            <div class="home-editor__list" data-formset-list>
+                {% for item_form in commitment_item_formset.forms %}
+                <article class="home-editor__item-card" data-formset-card>
+                    {% for hidden in item_form.hidden_fields %}{{ hidden }}{% endfor %}
+                    <div class="home-editor__preview">
+                        <div class="home-editor__placeholder">
+                            <i class="{{ item_form.instance.icon_class|default:'fas fa-certificate' }} fa-2x"></i>
+                            <span>{{ item_form.instance.title|default:'Thẻ cam kết mới' }}</span>
+                        </div>
+                    </div>
+                    <div class="home-editor__item-grid">
+                        {% for field in item_form.visible_fields %}
+                        {% if field.name == 'DELETE' %}
+                        <label class="home-editor__delete">
+                            {{ field }}
+                            <span>Xóa mục này khi lưu</span>
+                        </label>
+                        {% else %}
+                        <div class="home-editor__item-field {% if field.name == 'body' %}home-editor__item-field--wide{% endif %} {% if field.name == 'icon_class' %}is-hidden{% endif %}" {% if field.name == 'icon_class' %}data-quick-wrapper{% endif %}>
+                            <label for="{{ field.id_for_label }}">{{ field.label }}</label>
+                            {{ field }}
+                            {% if field.help_text %}<div class="admin-inline-help">{{ field.help_text }}</div>{% endif %}
+                            {% if field.errors %}<div class="admin-field-error">{{ field.errors }}</div>{% endif %}
+                        </div>
+                        {% endif %}
+                        {% endfor %}
+                        {% if item_form.non_field_errors %}
+                        <div class="alert alert-danger home-editor__item-field--wide mb-0">{{ item_form.non_field_errors }}</div>
+                        {% endif %}
+                    </div>
+                </article>
+                {% endfor %}
+            </div>
+            <template data-formset-template>
+                <article class="home-editor__item-card" data-formset-card>
+                    {% with item_form=commitment_item_formset.empty_form %}
+                    {% for hidden in item_form.hidden_fields %}{{ hidden }}{% endfor %}
+                    <div class="home-editor__preview">
+                        <div class="home-editor__placeholder">
+                            <i class="fas fa-certificate fa-2x"></i>
+                            <span>Thẻ cam kết mới</span>
+                        </div>
+                    </div>
+                    <div class="home-editor__item-grid">
+                        {% for field in item_form.visible_fields %}
+                        {% if field.name == 'DELETE' %}
+                        <label class="home-editor__delete">
+                            {{ field }}
+                            <span>Xóa mục này khi lưu</span>
+                        </label>
+                        {% else %}
+                        <div class="home-editor__item-field {% if field.name == 'body' %}home-editor__item-field--wide{% endif %} {% if field.name == 'icon_class' %}is-hidden{% endif %}" {% if field.name == 'icon_class' %}data-quick-wrapper{% endif %}>
+                            <label for="{{ field.id_for_label }}">{{ field.label }}</label>
+                            {{ field }}
+                            {% if field.help_text %}<div class="admin-inline-help">{{ field.help_text }}</div>{% endif %}
+                            {% if field.errors %}<div class="admin-field-error">{{ field.errors }}</div>{% endif %}
+                        </div>
+                        {% endif %}
+                        {% endfor %}
+                    </div>
+                    {% endwith %}
+                </article>
+            </template>
+        </section>
+
+        <div class="home-editor__actions">
+            <div class="home-editor__actions-group">
+                <a href="{% url 'home' %}" class="btn-admin btn-admin-light" target="_blank" rel="noopener">
+                    <i class="fas fa-external-link-alt"></i>
+                    <span>Mở trang chủ</span>
+                </a>
+            </div>
+            <div class="home-editor__actions-group">
+                {% if can_update_home_page %}
+                <button type="submit" class="btn-admin btn-admin-primary">
+                    <i class="fas fa-save"></i>
+                    <span>Lưu nội dung trang chủ</span>
+                </button>
+                {% else %}
+                <span class="admin-badge admin-badge-warning">Tài khoản này chỉ có quyền xem.</span>
+                {% endif %}
+            </div>
+        </div>
+    </form>
+</div>
+{% endblock %}
+
+{% block extra_scripts %}
+<script src="{% static 'js/admin-dynamic-formsets.js' %}?v=20260421-home3"></script>
+{% endblock %}

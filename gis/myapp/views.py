@@ -120,14 +120,13 @@ from .models import (
     fold_text_for_match,
     sync_medicine_catalog_metadata,
 )
-from .tool import (
-    DeliveryRoutingService,
+from .tools.calculations import (
     calculate_air_distance_km,
     estimate_road_distance_km,
     normalize_departure_time_str,
-    reverse_geocode_coordinates,
-    search_address_candidates,
 )
+from .tools.geocode import reverse_geocode_coordinates, search_address_candidates
+from .tools.routing import DeliveryRoutingService
 from .tokens import email_activation_token
 
 try:
@@ -4080,7 +4079,7 @@ def home(request):
         'featured_medicine_total': medicines_queryset.count() if search_keyword else Medicine.objects.count(),
         'available_pharmacy_total': get_available_pharmacies().count(),
     }
-    return render(request, 'home.html', context)
+    return render(request, 'pages/home.html', context)
 
 
 def about_view(request):
@@ -4141,7 +4140,7 @@ def about_view(request):
         "order_total": Order.objects.count(),
         "review_total": MedicineReview.objects.count() + PharmacyReview.objects.count(),
     }
-    return render(request, "about.html", context)
+    return render(request, "pages/about.html", context)
 
 
 def news_list_view(request):
@@ -4153,7 +4152,7 @@ def news_list_view(request):
         "page_obj": page_obj,
         "latest_articles": list(article_queryset[:5]),
     }
-    return render(request, "news_list.html", context)
+    return render(request, "news/list.html", context)
 
 
 def news_detail_view(request, slug):
@@ -4163,7 +4162,7 @@ def news_detail_view(request, slug):
     )
     return render(
         request,
-        "news_detail.html",
+        "news/detail.html",
         {
             "article": article,
             "related_articles": related_articles,
@@ -4355,7 +4354,7 @@ def product_list(request):
 
     return render(
         request,
-        'products.html',
+        'catalog/products.html',
         {
             'page_obj': page_obj,
             'products': page_obj.object_list,
@@ -4491,7 +4490,7 @@ def medicine_detail(request, medicine_id):
         Medicine.objects.select_related('pharmacy'),
         pk=medicine_id,
     )
-    return render(request, 'medicine_detail.html', build_medicine_detail_context(request, medicine))
+    return render(request, 'catalog/medicine_detail.html', build_medicine_detail_context(request, medicine))
 
 
 @login_required(login_url='/login/')
@@ -4522,7 +4521,7 @@ def submit_medicine_review(request, medicine_id):
         return redirect('medicine_detail', medicine_id=medicine.id)
 
     messages.error(request, 'Vui lòng chọn số sao hợp lệ trước khi gửi đánh giá.')
-    return render(request, 'medicine_detail.html', build_medicine_detail_context(request, medicine, form))
+    return render(request, 'catalog/medicine_detail.html', build_medicine_detail_context(request, medicine, form))
 
 
 def build_pharmacy_detail_context(request, pharmacy, review_form=None):
@@ -4568,7 +4567,7 @@ def pharmacy_detail(request, pharmacy_id):
     Trang chi tiết một nhà thuốc.
     """
     pharmacy = get_object_or_404(Pharmacy, pk=pharmacy_id)
-    return render(request, 'pharmacy_detail.html', build_pharmacy_detail_context(request, pharmacy))
+    return render(request, 'locations/pharmacy_detail.html', build_pharmacy_detail_context(request, pharmacy))
 
 
 @login_required(login_url='/login/')
@@ -4599,7 +4598,7 @@ def submit_pharmacy_review(request, pharmacy_id):
         return redirect('pharmacy_detail', pharmacy_id=pharmacy.id)
 
     messages.error(request, 'Vui lòng chọn số sao hợp lệ trước khi gửi đánh giá.')
-    return render(request, 'pharmacy_detail.html', build_pharmacy_detail_context(request, pharmacy, form))
+    return render(request, 'locations/pharmacy_detail.html', build_pharmacy_detail_context(request, pharmacy, form))
 
 
 def medicine_reviews_api(request, medicine_id):
@@ -4704,7 +4703,7 @@ def cart_detail(request):
     cart_pricing = build_cart_pricing_snapshot(cart, request.user)
     return render(
         request,
-        'cart.html',
+        'shop/cart.html',
         {
             'cart': cart,
             'cart_items': cart_pricing['items'],
@@ -4899,7 +4898,7 @@ def checkout(request):
 
         if not form.is_valid():
             messages.error(request, 'Thông tin chưa hợp lệ. Vui lòng kiểm tra lại biểu mẫu.')
-            return render(request, 'checkout.html', build_checkout_context(form))
+            return render(request, 'shop/checkout.html', build_checkout_context(form))
 
         delivery_lat = request.POST.get('delivery_lat', '').strip()
         delivery_lng = request.POST.get('delivery_lng', '').strip()
@@ -4910,7 +4909,7 @@ def checkout(request):
 
         if not delivery_lat or not delivery_lng:
             messages.error(request, 'Vui lòng chọn vị trí giao hàng trên bản đồ để hệ thống tính chi nhánh và phí ship.')
-            return render(request, 'checkout.html', build_checkout_context(form))
+            return render(request, 'shop/checkout.html', build_checkout_context(form))
 
         best_delivery_result = None
 
@@ -4948,7 +4947,7 @@ def checkout(request):
 
         if 'error' in best_delivery_result:
             messages.error(request, best_delivery_result['error'])
-            return render(request, 'checkout.html', build_checkout_context(form))
+            return render(request, 'shop/checkout.html', build_checkout_context(form))
 
         selected_pharmacy = best_delivery_result['pharmacy']
         selected_route = best_delivery_result['route']
@@ -5071,7 +5070,7 @@ def checkout(request):
         initial_data['address_text'] = requested_address
 
     form = CheckoutForm(initial=initial_data)
-    return render(request, 'checkout.html', build_checkout_context(form))
+    return render(request, 'shop/checkout.html', build_checkout_context(form))
 
 
 def checkout_page(request):
@@ -5113,7 +5112,7 @@ def register_view(request):
     else:
         form = RegisterForm()
 
-    return render(request, 'register.html', {'form': form})
+    return render(request, 'account/register.html', {'form': form})
 
 
 def activate_account_view(request, uidb64, token):
@@ -5167,7 +5166,7 @@ def login_view(request):
     else:
         form = LoginForm()
 
-    return render(request, 'login.html', {'form': form})
+    return render(request, 'account/login.html', {'form': form})
 
 
 def logout_view(request):
@@ -5267,7 +5266,7 @@ def account_view(request):
         'loyalty_context': loyalty_context,
         'show_password_modal': show_password_modal,
     }
-    return render(request, 'account.html', context)
+    return render(request, 'account/profile.html', context)
 
 
 @login_required(login_url='/login/')
@@ -5289,7 +5288,7 @@ def order_history(request):
         'payment_method_choices': Order.PAYMENT_METHOD_CHOICES,
         'refund_status_choices': [("none", "Chưa tạo yêu cầu"), (ReturnRefundRequest.STATUS_PROCESSING, "Đang xử lý"), (ReturnRefundRequest.STATUS_APPROVED, "Chấp nhận hoàn tiền"), (ReturnRefundRequest.STATUS_REJECTED, "Từ chối hoàn tiền")],
     }
-    return render(request, 'order_history.html', context)
+    return render(request, 'account/orders/history.html', context)
 
 
 @login_required(login_url='/login/')
@@ -5307,7 +5306,7 @@ def order_history_detail(request, order_id):
         'order_items': order_items,
         'return_request': return_request,
     }
-    return render(request, 'order_history_detail.html', context)
+    return render(request, 'account/orders/detail.html', context)
 
 
 @login_required(login_url='/login/')
@@ -5443,7 +5442,7 @@ def create_or_update_return_request(request, order_id):
         'form': form,
         'evidence_images': existing_request.evidences.all() if existing_request else [],
     }
-    return render(request, 'return_request_form.html', context)
+    return render(request, 'account/returns/request_form.html', context)
 
 
 @login_required(login_url='/login/')
@@ -5466,7 +5465,7 @@ def order_invoice_view(request, order_id):
         'invoice_printed_at': timezone.localtime(),
         'invoice_staff_display_name': get_invoice_staff_display_name(order),
     }
-    return render(request, 'invoice_detail.html', context)
+    return render(request, 'account/orders/invoice_detail.html', context)
 
 
 def payment_preview_api(request):
@@ -5865,7 +5864,7 @@ def map_view(request):
         saved_address = build_saved_address_payload(get_or_create_user_profile(request.user))
     return render(
         request,
-        'map.html',
+        'locations/map.html',
         {
             'pharmacies': pharmacy_payload,
             'saved_address': saved_address,
@@ -6111,6 +6110,7 @@ def build_review_insight_context(request):
 
 
 def build_admin_reports_context(request):
+    reports_page_size = 6
     managed_pharmacy = get_admin_scope_pharmacy(request.user)
     orders_base = filter_queryset_by_admin_scope(Order.objects.select_related('pharmacy'), request.user, 'order')
     medicines_base = filter_queryset_by_admin_scope(Medicine.objects.select_related('pharmacy'), request.user, 'medicine')
@@ -6247,6 +6247,14 @@ def build_admin_reports_context(request):
         if diff_value > 0:
             return {'text': f'Tăng {percent_value}% so với kỳ trước', 'tone': 'up'}
         return {'text': f'Giảm {percent_value}% so với kỳ trước', 'tone': 'down'}
+
+    def paginate_report_items(items, page_param):
+        paginator = Paginator(items, reports_page_size)
+        page_obj = paginator.get_page(request.GET.get(page_param))
+        query_params = request.GET.copy()
+        if page_param in query_params:
+            del query_params[page_param]
+        return page_obj, query_params.urlencode()
 
     def start_of_week(day_value):
         return day_value - timedelta(days=day_value.weekday())
@@ -6456,7 +6464,7 @@ def build_admin_reports_context(request):
             -current_item['revenue'],
             (current_item['name'] or 'Sản phẩm không xác định').casefold(),
         )
-    )[:8]
+    )
 
     branch_map = {}
     for order in filtered_completed_orders:
@@ -6480,14 +6488,12 @@ def build_admin_reports_context(request):
         item['average_order_value'] = round(item['revenue'] / item['order_count']) if item['order_count'] else 0
         item['share_percent'] = round(item['revenue'] * 100 / total_completed_revenue) if total_completed_revenue else 0
         item['bar_percent'] = max(12, round(item['revenue'] * 100 / max_branch_revenue)) if item['revenue'] and max_branch_revenue else 0
-    if managed_pharmacy is None and not selected_pharmacy:
-        branch_performance = branch_performance[:8]
 
-    low_stock_medicines = list(medicines_base.filter(quantity__gt=0, quantity__lte=LOW_STOCK_THRESHOLD).order_by('quantity', 'name')[:6])
+    low_stock_queryset = medicines_base.filter(quantity__gt=0, quantity__lte=LOW_STOCK_THRESHOLD).order_by('quantity', 'name')
     out_of_stock_count = medicines_base.filter(quantity__lte=0).count()
     expiring_soon_qs = get_expiring_soon_medicines_queryset(medicines_base)
-    expiring_soon_medicines = list(expiring_soon_qs.order_by('expiry_date', 'name')[:6])
-    low_stock_count = medicines_base.filter(quantity__gt=0, quantity__lte=LOW_STOCK_THRESHOLD).count()
+    expiring_soon_queryset = expiring_soon_qs.order_by('expiry_date', 'name')
+    low_stock_count = low_stock_queryset.count()
     expiring_soon_count = expiring_soon_qs.count()
 
     return_requests = list(return_requests_base.order_by('-created_at', '-id'))
@@ -6635,6 +6641,16 @@ def build_admin_reports_context(request):
         },
     ]
 
+    top_products_page_obj, top_products_query_string = paginate_report_items(top_products, 'top_page')
+    branch_performance_page_obj, branch_performance_query_string = paginate_report_items(branch_performance, 'branch_page')
+    low_stock_page_obj, low_stock_query_string = paginate_report_items(low_stock_queryset, 'stock_page')
+    expiring_soon_page_obj, expiring_soon_query_string = paginate_report_items(expiring_soon_queryset, 'expiry_page')
+
+    top_products = list(top_products_page_obj.object_list)
+    branch_performance = list(branch_performance_page_obj.object_list)
+    low_stock_medicines = list(low_stock_page_obj.object_list)
+    expiring_soon_medicines = list(expiring_soon_page_obj.object_list)
+
     filter_chips = [
         {'icon': 'fas fa-calendar-alt', 'label': f"{start_date.strftime('%d/%m/%Y')} - {end_date.strftime('%d/%m/%Y')}"},
         {'icon': 'fas fa-layer-group', 'label': selected_pharmacy.name if selected_pharmacy else 'Toàn hệ thống'},
@@ -6691,9 +6707,17 @@ def build_admin_reports_context(request):
         'payment_method_breakdown': payment_method_breakdown,
         'status_breakdown': status_breakdown,
         'top_products': top_products,
+        'top_products_page_obj': top_products_page_obj,
+        'top_products_query_string': top_products_query_string,
         'branch_performance': branch_performance,
+        'branch_performance_page_obj': branch_performance_page_obj,
+        'branch_performance_query_string': branch_performance_query_string,
         'low_stock_medicines': low_stock_medicines,
+        'low_stock_page_obj': low_stock_page_obj,
+        'low_stock_query_string': low_stock_query_string,
         'expiring_soon_medicines': expiring_soon_medicines,
+        'expiring_soon_page_obj': expiring_soon_page_obj,
+        'expiring_soon_query_string': expiring_soon_query_string,
         'low_stock_count': low_stock_count,
         'expiring_soon_count': expiring_soon_count,
         'out_of_stock_count': out_of_stock_count,
@@ -8255,7 +8279,7 @@ def custom_admin_list(request, model_key):
                 ),
             }
         )
-        return render(request, 'admin_panel/news_list.html', context)
+        return render(request, 'admin_panel/content/news_list.html', context)
     if model_key == 'inventory_lot':
         context['inventory_alert_center'] = build_inventory_alert_center(
             filter_queryset_by_admin_scope(
@@ -8265,7 +8289,7 @@ def custom_admin_list(request, model_key):
             ),
             request=request,
         )
-    return render(request, 'admin_panel/list.html', context)
+    return render(request, 'admin_panel/shared/list.html', context)
 
 
 @admin_panel_required
@@ -8341,7 +8365,7 @@ def custom_admin_home_page(request):
         'commitment_item_formset': commitment_item_formset,
         'can_update_home_page': can_update_home_page,
     }
-    return render(request, 'admin_panel/home_page_form.html', context)
+    return render(request, 'admin_panel/content/home_page_form.html', context)
 
 
 @admin_panel_required
@@ -8475,7 +8499,7 @@ def custom_admin_permissions_center(request):
         'selected_module_count': selected_module_count,
         'can_update_permissions': user_has_admin_permission(request.user, 'permission', 'update'),
     }
-    return render(request, 'admin_panel/permissions.html', context)
+    return render(request, 'admin_panel/system/permissions.html', context)
 
 
 @admin_panel_required
@@ -8600,11 +8624,16 @@ def custom_admin_about_page(request):
             form_kwargs={'link_choices': quick_link_choices},
         )
 
+    about_field_groups = build_singleton_field_groups(form, AboutPageContentForm.FIELD_GROUPS)
+    hero_field_group = about_field_groups[0] if about_field_groups else None
+    remaining_field_groups = about_field_groups[1:] if len(about_field_groups) > 1 else []
+
     context = {
         'page_title': 'Quản lý trang Giới thiệu',
         'current_model': 'about_page',
         'form': form,
-        'field_groups': build_singleton_field_groups(form, AboutPageContentForm.FIELD_GROUPS),
+        'field_groups': remaining_field_groups,
+        'hero_field_group': hero_field_group,
         'about_content': about_content,
         'builtin_section_formset': builtin_section_formset,
         'slide_formset': slide_formset,
@@ -8613,7 +8642,7 @@ def custom_admin_about_page(request):
         'can_update_about_page': can_update_about_page,
         'has_rich_editors': form_has_rich_editors(form),
     }
-    return render(request, 'admin_panel/about_page_form.html', context)
+    return render(request, 'admin_panel/content/about_page_form.html', context)
 
 
 @admin_panel_required
@@ -8650,7 +8679,7 @@ def custom_admin_create(request, model_key):
             'sample_columns': ['medicine_id', 'medicine_name', 'manufacturer', 'unit', 'quantity', 'expiry_date', 'import_price', 'sale_price', 'category', 'origin', 'note'],
             'purchase_import_preview_payload': build_purchase_import_preview_payload(request.user),
         }
-        return render(request, 'admin_panel/purchase_import_form.html', context)
+        return render(request, 'admin_panel/inventory/purchase_import_form.html', context)
 
     if model_key == 'stock_export':
         if request.method == 'POST':
@@ -8711,7 +8740,7 @@ def custom_admin_create(request, model_key):
             'selected_export_scope': selected_export_scope,
             'stock_export_insights': stock_export_insights,
         }
-        return render(request, 'admin_panel/stock_export_form.html', context)
+        return render(request, 'admin_panel/inventory/stock_export_form.html', context)
 
     if model_key not in {'pharmacy', 'medicine', 'user', 'promotion', 'news'}:
         raise Http404('Không tìm thấy trang thêm dữ liệu')
@@ -8747,8 +8776,8 @@ def custom_admin_create(request, model_key):
                 'can_delete_current': False,
             }
         )
-        return render(request, 'admin_panel/news_form.html', context)
-    return render(request, 'admin_panel/form.html', context)
+        return render(request, 'admin_panel/content/news_form.html', context)
+    return render(request, 'admin_panel/shared/form.html', context)
 
 
 @admin_panel_required
@@ -8818,8 +8847,8 @@ def custom_admin_update(request, model_key, pk):
                 'can_delete_current': can_delete_object(request.user, 'news', obj),
             }
         )
-        return render(request, 'admin_panel/news_form.html', context)
-    return render(request, 'admin_panel/form.html', context)
+        return render(request, 'admin_panel/content/news_form.html', context)
+    return render(request, 'admin_panel/shared/form.html', context)
 
 
 @admin_panel_required
@@ -8877,7 +8906,7 @@ def custom_admin_order_detail(request, pk):
         'return_request': getattr(order, 'return_request', None),
         'can_delete_order': can_delete_object(request.user, 'order', order),
     }
-    return render(request, 'admin_panel/order_detail.html', context)
+    return render(request, 'admin_panel/orders/order_detail.html', context)
 
 
 def apply_return_request_status_change(*, updated_request, new_status, actor):
@@ -8971,7 +9000,7 @@ def custom_admin_return_request_detail(request, pk):
         'evidence_images': return_request.evidences.all(),
         'can_delete_return_request': can_delete_object(request.user, 'return_request', return_request),
     }
-    return render(request, 'admin_panel/return_request_detail.html', context)
+    return render(request, 'admin_panel/returns/return_request_detail.html', context)
 
 
 @admin_panel_required
@@ -8993,7 +9022,7 @@ def custom_admin_purchase_import_detail(request, pk):
         'purchase_items': purchase_batch.items.all(),
         'can_delete_purchase_import': can_delete_object(request.user, 'purchase_import', purchase_batch),
     }
-    return render(request, 'admin_panel/purchase_import_detail.html', context)
+    return render(request, 'admin_panel/inventory/purchase_import_detail.html', context)
 
 
 @admin_panel_required
@@ -9033,7 +9062,7 @@ def custom_admin_stock_export_detail(request, pk):
         'export_items': export_batch.items.all(),
         'can_delete_stock_export': can_delete_object(request.user, 'stock_export', export_batch),
     }
-    return render(request, 'admin_panel/stock_export_detail.html', context)
+    return render(request, 'admin_panel/inventory/stock_export_detail.html', context)
 
 
 @admin_panel_required
@@ -9184,7 +9213,7 @@ def custom_admin_delete(request, model_key, pk):
         'object': obj,
         'object_name': get_object_label(obj),
     }
-    return render(request, 'admin_panel/delete.html', context)
+    return render(request, 'admin_panel/shared/delete.html', context)
 
 
 
@@ -9193,7 +9222,7 @@ def custom_admin_reports(request):
     denied_response = require_admin_model_access(request, 'reports')
     if denied_response:
         return denied_response
-    return render(request, 'admin_panel/reports.html', build_admin_reports_context(request))
+    return render(request, 'admin_panel/analytics/reports.html', build_admin_reports_context(request))
 
 
 @admin_panel_required

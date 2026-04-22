@@ -1,0 +1,476 @@
+{% extends "admin_panel/base.html" %}
+{% load static %}
+
+{% block extra_head %}
+<link rel="stylesheet" href="{% static 'css/admin-rich-editor.css' %}?v=20260421-about3">
+<link rel="stylesheet" href="{% static 'css/admin_panel/content/about_page_form.css' %}">
+{% endblock %}
+
+{% block admin_content %}
+<div class="about-editor">
+    <!-- Quản lý nội dung trang Giới thiệu -->
+    <section class="about-editor__hero">
+        <div>
+            <h2>Quản lý trang Giới thiệu</h2>
+            <p>Trang này được chia thành các khối rõ ràng để bạn thêm, xóa và sắp xếp lại từng phần thật sự. Các khối hệ thống có danh sách bố cục riêng, còn khối tùy chỉnh mới vẫn có thể thêm bằng rich text ngay bên dưới.</p>
+        </div>
+        <div class="about-editor__hero-actions">
+            <a href="{% url 'about' %}" class="btn-admin btn-admin-light" target="_blank" rel="noopener">
+                <i class="fas fa-external-link-alt"></i>
+                <span>Mở trang Giới thiệu</span>
+            </a>
+        </div>
+    </section>
+
+    <form method="post" enctype="multipart/form-data">
+        {% csrf_token %}
+        {% for hidden in form.hidden_fields %}{{ hidden }}{% endfor %}
+        {{ builtin_section_formset.management_form }}
+        {{ slide_formset.management_form }}
+        {{ featured_branch_formset.management_form }}
+        {{ custom_block_formset.management_form }}
+
+        {% if form.non_field_errors %}
+        <div class="alert alert-danger">{{ form.non_field_errors }}</div>
+        {% endif %}
+        {% if builtin_section_formset.non_form_errors %}
+        <div class="alert alert-danger">{{ builtin_section_formset.non_form_errors }}</div>
+        {% endif %}
+        {% if slide_formset.non_form_errors %}
+        <div class="alert alert-danger">{{ slide_formset.non_form_errors }}</div>
+        {% endif %}
+        {% if featured_branch_formset.non_form_errors %}
+        <div class="alert alert-danger">{{ featured_branch_formset.non_form_errors }}</div>
+        {% endif %}
+        {% if custom_block_formset.non_form_errors %}
+        <div class="alert alert-danger">{{ custom_block_formset.non_form_errors }}</div>
+        {% endif %}
+
+        {% if hero_field_group %}
+        <section class="about-editor__section about-editor__section--hero-content">
+            <div class="about-editor__section-head">
+                <div>
+                    <h3>{{ hero_field_group.title }}</h3>
+                    <p>Nhóm này điều khiển phần trên cùng của trang giới thiệu. Hãy chỉnh nội dung mở đầu và phần đi cùng slider trước, rồi mới xuống các khối story, value, chi nhánh và CTA bên dưới.</p>
+                </div>
+                <span class="admin-badge admin-badge-info">{{ hero_field_group.fields|length }} trường</span>
+            </div>
+            <div class="about-editor__grid">
+                {% for item in hero_field_group.fields %}
+                <div class="about-editor__field {% if item.is_textarea or item.is_rich_text %}about-editor__field--wide{% endif %}">
+                    <label for="{{ item.field.id_for_label }}">{{ item.field.label }}</label>
+                    {% if item.is_rich_text %}
+                        {% include "admin_panel/_partials/rich_editor_field.html" with field=item.field %}
+                    {% else %}
+                        {{ item.field }}
+                    {% endif %}
+                    {% if item.field.help_text %}<div class="admin-inline-help">{{ item.field.help_text }}</div>{% endif %}
+                    {% if item.field.errors %}<div class="admin-field-error">{{ item.field.errors }}</div>{% endif %}
+                </div>
+                {% endfor %}
+            </div>
+        </section>
+        {% endif %}
+
+        <section class="about-editor__section" data-dynamic-formset data-prefix="builtin_sections" data-item-label-singular="khối" data-item-label-plural="khối">
+            <div class="about-editor__section-head">
+                <div>
+                    <h3>Bố cục khối hệ thống</h3>
+                    <p>Đây là nơi quyết định khối mặc định nào sẽ xuất hiện ngoài trang Giới thiệu. Muốn bỏ một khối thì xóa dòng đó; muốn thêm lại thì tạo dòng mới và chọn đúng loại khối hệ thống.</p>
+                </div>
+                <div class="about-editor__section-actions">
+                    <span class="admin-badge admin-badge-info" data-formset-count>{{ builtin_section_formset.forms|length }} khối</span>
+                    <button type="button" class="btn-admin btn-admin-light" data-formset-add>
+                        <i class="fas fa-plus"></i>
+                        <span>Thêm khối hệ thống</span>
+                    </button>
+                </div>
+            </div>
+            <div class="about-editor__hint">Phần này thay cho kiểu bật/tắt cũ. Khi bạn xóa một dòng ở đây và lưu lại, khối đó sẽ không còn xuất hiện ngoài trang About nữa. Nội dung chi tiết của từng khối vẫn chỉnh ở các nhóm trường bên dưới.</div>
+            <div class="about-editor__list" data-formset-list>
+                {% for builtin_form in builtin_section_formset.forms %}
+                <article class="about-editor__item-card" data-formset-card>
+                    {% for hidden in builtin_form.hidden_fields %}{{ hidden }}{% endfor %}
+                    <div class="about-editor__preview">
+                        <div class="about-editor__placeholder">
+                            <i class="fas fa-cubes fa-2x"></i>
+                            <span>{{ builtin_form.instance.get_section_key_display|default:'Khối hệ thống mới' }}</span>
+                        </div>
+                    </div>
+                    <div class="about-editor__item-grid">
+                        {% for field in builtin_form.visible_fields %}
+                        {% if field.name == 'DELETE' %}
+                        <label class="about-editor__delete">
+                            {{ field }}
+                            <span>Xóa khối này khi lưu</span>
+                        </label>
+                        {% else %}
+                        <div class="about-editor__item-field">
+                            <label for="{{ field.id_for_label }}">{{ field.label }}</label>
+                            {{ field }}
+                            {% if field.help_text %}<div class="admin-inline-help">{{ field.help_text }}</div>{% endif %}
+                            {% if field.errors %}<div class="admin-field-error">{{ field.errors }}</div>{% endif %}
+                        </div>
+                        {% endif %}
+                        {% endfor %}
+                        {% if builtin_form.non_field_errors %}
+                        <div class="alert alert-danger about-editor__item-field--wide mb-0">{{ builtin_form.non_field_errors }}</div>
+                        {% endif %}
+                    </div>
+                </article>
+                {% endfor %}
+            </div>
+            <template data-formset-template>
+                <article class="about-editor__item-card" data-formset-card>
+                    {% with builtin_form=builtin_section_formset.empty_form %}
+                    {% for hidden in builtin_form.hidden_fields %}{{ hidden }}{% endfor %}
+                    <div class="about-editor__preview">
+                        <div class="about-editor__placeholder">
+                            <i class="fas fa-cubes fa-2x"></i>
+                            <span>Khối hệ thống mới</span>
+                        </div>
+                    </div>
+                    <div class="about-editor__item-grid">
+                        {% for field in builtin_form.visible_fields %}
+                        {% if field.name == 'DELETE' %}
+                        <label class="about-editor__delete">
+                            {{ field }}
+                            <span>Xóa khối này khi lưu</span>
+                        </label>
+                        {% else %}
+                        <div class="about-editor__item-field">
+                            <label for="{{ field.id_for_label }}">{{ field.label }}</label>
+                            {{ field }}
+                            {% if field.help_text %}<div class="admin-inline-help">{{ field.help_text }}</div>{% endif %}
+                            {% if field.errors %}<div class="admin-field-error">{{ field.errors }}</div>{% endif %}
+                        </div>
+                        {% endif %}
+                        {% endfor %}
+                    </div>
+                    {% endwith %}
+                </article>
+            </template>
+        </section>
+
+        {% for group in field_groups %}
+        <section class="about-editor__section">
+            <div class="about-editor__section-head">
+                <div>
+                    <h3>{{ group.title }}</h3>
+                    <p>
+                        {% if group.title == 'Đầu trang và nút điều hướng' %}
+                        Đây là phần nhìn thấy đầu tiên khi người dùng mở trang Giới thiệu.
+                        {% elif group.title == 'Chi nhánh tiêu biểu' %}
+                        Đây là tiêu đề chung của khối showcase; danh sách từng thẻ chi nhánh được quản lý ở phần ngay bên dưới.
+                        {% elif group.title == 'Lời kêu gọi hành động' %}
+                        Đây là khối chốt cuối trang để dẫn người xem sang trang sản phẩm hoặc bản đồ.
+                        {% else %}
+                        Các ô dưới đây chỉnh trực tiếp nội dung của từng khối. Khối nào đang hiển thị và thứ tự hiển thị được quản lý ở phần “Bố cục khối hệ thống” ngay bên dưới.
+                        {% endif %}
+                    </p>
+                </div>
+                <span class="admin-badge admin-badge-info">{{ group.fields|length }} trường</span>
+            </div>
+            <div class="about-editor__grid">
+                {% for item in group.fields %}
+                <div class="about-editor__field {% if item.is_textarea or item.is_rich_text %}about-editor__field--wide{% endif %}">
+                    <label for="{{ item.field.id_for_label }}">{{ item.field.label }}</label>
+                    {% if item.is_rich_text %}
+                        {% include "admin_panel/_partials/rich_editor_field.html" with field=item.field %}
+                    {% else %}
+                        {{ item.field }}
+                    {% endif %}
+                    {% if item.field.help_text %}<div class="admin-inline-help">{{ item.field.help_text }}</div>{% endif %}
+                    {% if item.field.errors %}<div class="admin-field-error">{{ item.field.errors }}</div>{% endif %}
+                </div>
+                {% endfor %}
+            </div>
+        </section>
+        {% endfor %}
+
+        <section class="about-editor__section" data-dynamic-formset data-prefix="slides" data-item-label-singular="slide" data-item-label-plural="slide">
+            <div class="about-editor__section-head">
+                <div>
+                    <h3>Slider đầu trang</h3>
+                    <p>Mỗi slide ở đây sẽ hiển thị trong cụm ảnh đầu trang giới thiệu. Bạn có thể thêm slide mới, đổi ảnh, đổi liên kết và đánh dấu xóa trước khi lưu.</p>
+                </div>
+                <div class="about-editor__section-actions">
+                    <span class="admin-badge admin-badge-info" data-formset-count>{{ slide_formset.forms|length }} slide</span>
+                    <button type="button" class="btn-admin btn-admin-light" data-formset-add>
+                        <i class="fas fa-plus"></i>
+                        <span>Thêm slide</span>
+                    </button>
+                </div>
+            </div>
+            <div class="about-editor__hint">Liên kết của từng slide có danh sách gợi ý sẵn. Nếu đường dẫn bạn cần không có trong danh sách, chọn “Tự nhập liên kết khác”.</div>
+            <div class="about-editor__list" data-formset-list>
+                {% for slide_form in slide_formset.forms %}
+                <article class="about-editor__item-card about-editor__item-card--slide" data-formset-card>
+                    {% for hidden in slide_form.hidden_fields %}{{ hidden }}{% endfor %}
+                    <div class="about-editor__preview about-editor__preview--slide">
+                        {% if slide_form.instance.image %}
+                        <img src="{{ slide_form.instance.image.url }}" alt="{{ slide_form.instance.alt_text|default:'Slide giới thiệu' }}">
+                        {% elif slide_form.instance.legacy_static_path %}
+                        <img src="{% static slide_form.instance.legacy_static_path %}" alt="{{ slide_form.instance.alt_text|default:'Slide giới thiệu' }}">
+                        {% else %}
+                        <div class="about-editor__placeholder">
+                            <i class="fas fa-images fa-2x"></i>
+                            <span>Chưa có ảnh cho slide này</span>
+                        </div>
+                        {% endif %}
+                    </div>
+                    <div class="about-editor__item-grid">
+                        {% for field in slide_form.visible_fields %}
+                        {% if field.name == 'DELETE' %}
+                        <label class="about-editor__delete">
+                            {{ field }}
+                            <span>Xóa slide này khi lưu</span>
+                        </label>
+                        {% else %}
+                        <div class="about-editor__item-field {% if field.field.widget.input_type == 'file' %}about-editor__item-field--wide{% endif %} {% if field.name == 'link_url' %}is-hidden{% endif %}" {% if field.name == 'link_url' %}data-quick-wrapper{% endif %}>
+                            <label for="{{ field.id_for_label }}">{{ field.label }}</label>
+                            {{ field }}
+                            {% if field.help_text %}<div class="admin-inline-help">{{ field.help_text }}</div>{% endif %}
+                            {% if field.errors %}<div class="admin-field-error">{{ field.errors }}</div>{% endif %}
+                        </div>
+                        {% endif %}
+                        {% endfor %}
+                        {% if slide_form.non_field_errors %}
+                        <div class="alert alert-danger about-editor__item-field--wide mb-0">{{ slide_form.non_field_errors }}</div>
+                        {% endif %}
+                    </div>
+                </article>
+                {% endfor %}
+            </div>
+            <template data-formset-template>
+                <article class="about-editor__item-card about-editor__item-card--slide" data-formset-card>
+                    {% with slide_form=slide_formset.empty_form %}
+                    {% for hidden in slide_form.hidden_fields %}{{ hidden }}{% endfor %}
+                    <div class="about-editor__preview about-editor__preview--slide">
+                        <div class="about-editor__placeholder">
+                            <i class="fas fa-images fa-2x"></i>
+                            <span>Slide mới</span>
+                        </div>
+                    </div>
+                    <div class="about-editor__item-grid">
+                        {% for field in slide_form.visible_fields %}
+                        {% if field.name == 'DELETE' %}
+                        <label class="about-editor__delete">
+                            {{ field }}
+                            <span>Xóa slide này khi lưu</span>
+                        </label>
+                        {% else %}
+                        <div class="about-editor__item-field {% if field.field.widget.input_type == 'file' %}about-editor__item-field--wide{% endif %} {% if field.name == 'link_url' %}is-hidden{% endif %}" {% if field.name == 'link_url' %}data-quick-wrapper{% endif %}>
+                            <label for="{{ field.id_for_label }}">{{ field.label }}</label>
+                            {{ field }}
+                            {% if field.help_text %}<div class="admin-inline-help">{{ field.help_text }}</div>{% endif %}
+                            {% if field.errors %}<div class="admin-field-error">{{ field.errors }}</div>{% endif %}
+                        </div>
+                        {% endif %}
+                        {% endfor %}
+                    </div>
+                    {% endwith %}
+                </article>
+            </template>
+        </section>
+
+        <section class="about-editor__section" data-dynamic-formset data-prefix="featured_branches" data-item-label-singular="thẻ" data-item-label-plural="thẻ">
+            <div class="about-editor__section-head">
+                <div>
+                    <h3>Danh sách chi nhánh tiêu biểu</h3>
+                    <p>Mỗi thẻ trong khối này phải chọn từ danh sách chi nhánh đang có sẵn trong hệ thống. Bạn chỉ cần chọn chi nhánh, sắp xếp thứ tự, thêm badge hoặc ghi chú ngắn nếu cần.</p>
+                </div>
+                <div class="about-editor__section-actions">
+                    <span class="admin-badge admin-badge-info" data-formset-count>{{ featured_branch_formset.forms|length }} thẻ</span>
+                    <button type="button" class="btn-admin btn-admin-light" data-formset-add>
+                        <i class="fas fa-plus"></i>
+                        <span>Thêm thẻ chi nhánh</span>
+                    </button>
+                </div>
+            </div>
+            <div class="about-editor__hint">Ô chọn chi nhánh hỗ trợ tìm kiếm nhanh từ dữ liệu chi nhánh hiện có. Nội dung tên, địa chỉ, giờ hoạt động và ảnh sẽ lấy theo chi nhánh đã chọn để hiển thị ngoài trang giới thiệu.</div>
+            <div class="about-editor__list" data-formset-list>
+                {% for item_form in featured_branch_formset.forms %}
+                <article class="about-editor__item-card" data-formset-card>
+                    {% for hidden in item_form.hidden_fields %}{{ hidden }}{% endfor %}
+                    <div class="about-editor__preview">
+                        {% if item_form.instance.pharmacy and item_form.instance.pharmacy.primary_image_url %}
+                        <img src="{{ item_form.instance.pharmacy.primary_image_url }}" alt="{{ item_form.instance.pharmacy.name|default:'Chi nhánh tiêu biểu' }}">
+                        {% elif item_form.instance.image %}
+                        <img src="{{ item_form.instance.image.url }}" alt="{{ item_form.instance.title|default:'Chi nhánh tiêu biểu' }}">
+                        {% else %}
+                        <div class="about-editor__placeholder">
+                            <i class="fas fa-clinic-medical fa-2x"></i>
+                            <span>{% if item_form.instance.pharmacy %}{{ item_form.instance.pharmacy.name }}{% else %}Thẻ chi nhánh mới{% endif %}</span>
+                        </div>
+                        {% endif %}
+                    </div>
+                    <div class="about-editor__item-grid">
+                        {% for field in item_form.visible_fields %}
+                        {% if field.name == 'DELETE' %}
+                        <label class="about-editor__delete">
+                            {{ field }}
+                            <span>Xóa thẻ này khi lưu</span>
+                        </label>
+                        {% else %}
+                        <div class="about-editor__item-field {% if field.name == 'link_url' %}is-hidden{% endif %}" {% if field.name == 'link_url' %}data-quick-wrapper{% endif %}>
+                            <label for="{{ field.id_for_label }}">{{ field.label }}</label>
+                            {{ field }}
+                            {% if field.help_text %}<div class="admin-inline-help">{{ field.help_text }}</div>{% endif %}
+                            {% if field.errors %}<div class="admin-field-error">{{ field.errors }}</div>{% endif %}
+                        </div>
+                        {% endif %}
+                        {% endfor %}
+                        {% if item_form.non_field_errors %}
+                        <div class="alert alert-danger about-editor__item-field--wide mb-0">{{ item_form.non_field_errors }}</div>
+                        {% endif %}
+                    </div>
+                </article>
+                {% endfor %}
+            </div>
+            <template data-formset-template>
+                <article class="about-editor__item-card" data-formset-card>
+                    {% with item_form=featured_branch_formset.empty_form %}
+                    {% for hidden in item_form.hidden_fields %}{{ hidden }}{% endfor %}
+                    <div class="about-editor__preview">
+                        <div class="about-editor__placeholder">
+                            <i class="fas fa-clinic-medical fa-2x"></i>
+                            <span>Thẻ chi nhánh mới</span>
+                        </div>
+                    </div>
+                    <div class="about-editor__item-grid">
+                        {% for field in item_form.visible_fields %}
+                        {% if field.name == 'DELETE' %}
+                        <label class="about-editor__delete">
+                            {{ field }}
+                            <span>Xóa thẻ này khi lưu</span>
+                        </label>
+                        {% else %}
+                        <div class="about-editor__item-field {% if field.name == 'link_url' %}is-hidden{% endif %}" {% if field.name == 'link_url' %}data-quick-wrapper{% endif %}>
+                            <label for="{{ field.id_for_label }}">{{ field.label }}</label>
+                            {{ field }}
+                            {% if field.help_text %}<div class="admin-inline-help">{{ field.help_text }}</div>{% endif %}
+                            {% if field.errors %}<div class="admin-field-error">{{ field.errors }}</div>{% endif %}
+                        </div>
+                        {% endif %}
+                        {% endfor %}
+                    </div>
+                    {% endwith %}
+                </article>
+            </template>
+        </section>
+
+        <section class="about-editor__section" data-dynamic-formset data-prefix="custom_blocks" data-item-label-singular="khối" data-item-label-plural="khối">
+            <div class="about-editor__section-head">
+                <div>
+                    <h3>Khối tùy chỉnh thêm</h3>
+                    <p>Nếu bạn muốn thêm một khối nội dung mới vào trang Giới thiệu, hãy tạo tại đây. Mỗi khối có thể tự nhập tiêu đề, nội dung, icon và nút dẫn sang trang khác.</p>
+                </div>
+                <div class="about-editor__section-actions">
+                    <span class="admin-badge admin-badge-info" data-formset-count>{{ custom_block_formset.forms|length }} khối</span>
+                    <button type="button" class="btn-admin btn-admin-light" data-formset-add>
+                        <i class="fas fa-plus"></i>
+                        <span>Thêm khối mới</span>
+                    </button>
+                </div>
+            </div>
+            <div class="about-editor__hint">Các khối ở phần này là khối mới hoàn toàn do bạn tự tạo. Chúng tách biệt với danh sách khối hệ thống ở phía trên và hỗ trợ rich text để nhập nội dung linh hoạt.</div>
+            <div class="about-editor__list" data-formset-list>
+                {% for block_form in custom_block_formset.forms %}
+                <article class="about-editor__item-card" data-formset-card>
+                    {% for hidden in block_form.hidden_fields %}{{ hidden }}{% endfor %}
+                    <div class="about-editor__preview">
+                        <div class="about-editor__placeholder">
+                            <i class="{{ block_form.instance.icon_class|default:'fas fa-layer-group' }} fa-2x"></i>
+                            <span>{{ block_form.instance.title|default:'Khối tùy chỉnh mới' }}</span>
+                        </div>
+                    </div>
+                    <div class="about-editor__item-grid">
+                        {% for field in block_form.visible_fields %}
+                        {% if field.name == 'DELETE' %}
+                        <label class="about-editor__delete">
+                            {{ field }}
+                            <span>Xóa khối này khi lưu</span>
+                        </label>
+                        {% else %}
+                        <div class="about-editor__item-field {% if field.name == 'body' %}about-editor__item-field--wide{% endif %} {% if field.name == 'icon_class' or field.name == 'link_url' %}is-hidden{% endif %}" {% if field.name == 'icon_class' or field.name == 'link_url' %}data-quick-wrapper{% endif %}>
+                            <label for="{{ field.id_for_label }}">{{ field.label }}</label>
+                            {% if field.name == 'body' %}
+                                {% include "admin_panel/_partials/rich_editor_field.html" with field=field %}
+                            {% else %}
+                                {{ field }}
+                            {% endif %}
+                            {% if field.help_text %}<div class="admin-inline-help">{{ field.help_text }}</div>{% endif %}
+                            {% if field.errors %}<div class="admin-field-error">{{ field.errors }}</div>{% endif %}
+                        </div>
+                        {% endif %}
+                        {% endfor %}
+                        {% if block_form.non_field_errors %}
+                        <div class="alert alert-danger about-editor__item-field--wide mb-0">{{ block_form.non_field_errors }}</div>
+                        {% endif %}
+                    </div>
+                </article>
+                {% endfor %}
+            </div>
+            <template data-formset-template>
+                <article class="about-editor__item-card" data-formset-card>
+                    {% with block_form=custom_block_formset.empty_form %}
+                    {% for hidden in block_form.hidden_fields %}{{ hidden }}{% endfor %}
+                    <div class="about-editor__preview">
+                        <div class="about-editor__placeholder">
+                            <i class="fas fa-layer-group fa-2x"></i>
+                            <span>Khối tùy chỉnh mới</span>
+                        </div>
+                    </div>
+                    <div class="about-editor__item-grid">
+                        {% for field in block_form.visible_fields %}
+                        {% if field.name == 'DELETE' %}
+                        <label class="about-editor__delete">
+                            {{ field }}
+                            <span>Xóa khối này khi lưu</span>
+                        </label>
+                        {% else %}
+                        <div class="about-editor__item-field {% if field.name == 'body' %}about-editor__item-field--wide{% endif %} {% if field.name == 'icon_class' or field.name == 'link_url' %}is-hidden{% endif %}" {% if field.name == 'icon_class' or field.name == 'link_url' %}data-quick-wrapper{% endif %}>
+                            <label for="{{ field.id_for_label }}">{{ field.label }}</label>
+                            {% if field.name == 'body' %}
+                                {% include "admin_panel/_partials/rich_editor_field.html" with field=field %}
+                            {% else %}
+                                {{ field }}
+                            {% endif %}
+                            {% if field.help_text %}<div class="admin-inline-help">{{ field.help_text }}</div>{% endif %}
+                            {% if field.errors %}<div class="admin-field-error">{{ field.errors }}</div>{% endif %}
+                        </div>
+                        {% endif %}
+                        {% endfor %}
+                    </div>
+                    {% endwith %}
+                </article>
+            </template>
+        </section>
+
+        <div class="about-editor__actions">
+            <div class="about-editor__actions-group">
+                <a href="{% url 'about' %}" class="btn-admin btn-admin-light" target="_blank" rel="noopener">
+                    <i class="fas fa-external-link-alt"></i>
+                    <span>Mở trang Giới thiệu</span>
+                </a>
+            </div>
+            <div class="about-editor__actions-group">
+                {% if can_update_about_page %}
+                <button type="submit" class="btn-admin btn-admin-primary">
+                    <i class="fas fa-save"></i>
+                    <span>Lưu nội dung trang Giới thiệu</span>
+                </button>
+                {% else %}
+                <span class="admin-badge admin-badge-warning">Tài khoản này chỉ có quyền xem.</span>
+                {% endif %}
+            </div>
+        </div>
+    </form>
+</div>
+{% endblock %}
+
+{% block extra_scripts %}
+<script src="{% static 'js/admin-rich-editor.js' %}?v=20260421-about3"></script>
+<script src="{% static 'js/admin-dynamic-formsets.js' %}?v=20260421-about3"></script>
+{% endblock %}

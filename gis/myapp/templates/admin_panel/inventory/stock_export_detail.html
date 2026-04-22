@@ -1,0 +1,131 @@
+{% extends "admin_panel/base.html" %}
+{% load static %}
+{% load currency_filters %}
+
+{% block extra_head %}
+<link rel="stylesheet" href="{% static 'css/admin_panel/inventory/stock_export_detail.css' %}">
+{% endblock %}
+
+{% block admin_content %}
+<section class="admin-section-head mb-4">
+    <div>
+        <h2 class="admin-section-title">Chi tiết phiếu xuất {{ export_batch.resolved_export_code }}</h2>
+        <p class="admin-section-muted">Phiếu xuất đã lưu cả dữ liệu nghiệp vụ lẫn file PDF biên nhận trong database.</p>
+    </div>
+    <div class="admin-toolbar">
+        <a href="{% url 'custom_admin_stock_export_receipt' export_batch.pk %}" class="btn-admin btn-admin-primary">
+            <i class="fas fa-file-pdf"></i>
+            <span>Mở phiếu PDF</span>
+        </a>
+        {% if can_delete_stock_export %}
+        <a href="{% url 'custom_admin_delete' 'stock_export' export_batch.pk %}" class="btn-admin btn-admin-light">
+            <i class="fas fa-trash-alt"></i>
+            <span>Hủy phiếu xuất</span>
+        </a>
+        {% endif %}
+    </div>
+</section>
+
+<div class="stock-export-detail-grid">
+    <aside class="stock-export-detail-card">
+        <div class="stock-export-meta">
+            <div class="stock-export-meta__item">
+                <small>Chi nhánh xuất kho</small>
+                <strong>{{ export_batch.pharmacy.name }}</strong>
+            </div>
+            <div class="stock-export-meta__item">
+                <small>Loại phiếu xuất</small>
+                <strong>
+                    <span class="stock-export-pill {% if export_batch.export_scope == 'expired' %}stock-export-pill--danger{% elif export_batch.export_scope == 'reconcile' %}stock-export-pill--info{% else %}stock-export-pill--success{% endif %}">
+                        {{ export_batch.get_export_scope_display }}
+                    </span>
+                </strong>
+            </div>
+            <div class="stock-export-meta__item">
+                <small>Người lập phiếu</small>
+                <strong>{{ export_batch.resolved_exported_by_name }}</strong>
+            </div>
+            <div class="stock-export-meta__item">
+                <small>Email người lập</small>
+                <strong>{{ export_batch.exported_by_email|default:"Chưa cập nhật" }}</strong>
+            </div>
+            <div class="stock-export-meta__item">
+                <small>Chức vụ</small>
+                <strong>{{ export_batch.exported_by_role|default:"Chưa cập nhật" }}</strong>
+            </div>
+            <div class="stock-export-meta__item">
+                <small>Nơi nhận / mục đích</small>
+                <strong>{{ export_batch.destination_name|default:"Chưa ghi chú" }}</strong>
+            </div>
+            <div class="stock-export-meta__item">
+                <small>Thời gian xuất</small>
+                <strong>{{ export_batch.created_at|date:"d/m/Y H:i" }}</strong>
+            </div>
+            <div class="stock-export-meta__item">
+                <small>Tổng dòng / tổng số lượng</small>
+                <strong>{{ export_batch.total_lines }} dòng • {{ export_batch.total_quantity }} sản phẩm</strong>
+            </div>
+            {% if export_batch.note %}
+            <div class="stock-export-meta__item">
+                <small>Ghi chú</small>
+                <strong>{{ export_batch.note }}</strong>
+            </div>
+            {% endif %}
+        </div>
+    </aside>
+
+    <section class="stock-export-detail-card">
+        <div class="admin-section-head">
+            <div>
+                <h3>Danh sách dòng xuất kho</h3>
+                <p>Mỗi dòng cho biết tồn trước, số lượng đã xuất, tồn sau và lô thực tế bị trừ khỏi kho.</p>
+            </div>
+        </div>
+
+        <div class="stock-export-lines">
+            {% for item in export_items %}
+            <article class="stock-export-line">
+                <strong>{{ item.medicine_name }}</strong>
+                <div class="text-muted small mt-1">{{ item.manufacturer|default:"Chưa cập nhật nhà sản xuất" }} • {{ item.unit|default:"Đơn vị chưa rõ" }}</div>
+
+                <div class="stock-export-line__stats">
+                    <div>
+                        <small>Tồn trước khi xuất</small>
+                        <strong>{{ item.previous_quantity }}</strong>
+                    </div>
+                    <div>
+                        <small>Số lượng đã xuất</small>
+                        <strong>{{ item.exported_quantity }}</strong>
+                    </div>
+                    <div>
+                        <small>Tồn sau khi xuất</small>
+                        <strong>{{ item.remaining_quantity }}</strong>
+                    </div>
+                </div>
+
+                {% if item.note %}
+                <div class="mt-3 text-muted">{{ item.note }}</div>
+                {% endif %}
+
+                {% if item.lot_allocations.all %}
+                <div class="stock-export-lots">
+                    {% for allocation in item.lot_allocations.all %}
+                    <div class="stock-export-lot">
+                        <strong>{{ allocation.quantity }} đơn vị</strong>
+                        <div class="small text-muted mt-1">
+                            {{ allocation.lot_source_label|default:"Lô hệ thống" }}
+                            {% if allocation.lot_expiry_date %} • HSD {{ allocation.lot_expiry_date|date:"d/m/Y" }}{% endif %}
+                            {% if allocation.lot_import_price %} • Giá nhập {{ allocation.lot_import_price|vnd }}{% endif %}
+                        </div>
+                    </div>
+                    {% endfor %}
+                </div>
+                {% endif %}
+            </article>
+            {% empty %}
+            <div class="alert alert-warning mb-0">Phiếu xuất này chưa có dòng dữ liệu.</div>
+            {% endfor %}
+        </div>
+    </section>
+</div>
+{% endblock %}

@@ -1,0 +1,449 @@
+{% extends "admin_panel/base.html" %}
+
+{% load static %}
+{% block extra_head %}
+<link rel="stylesheet" href="{% static 'css/admin_panel/inventory/stock_export_form.css' %}">
+{% endblock %}
+
+{% block admin_content %}
+<section class="admin-section-head mb-4">
+    <div>
+        <h2 class="admin-section-title">Tạo phiếu xuất kho</h2>
+        <p class="admin-section-muted">Trang xuất kho đã được thiết kế lại để xử lý ba tình huống rõ ràng: xuất nội bộ, đối soát tồn vật lý và xử lý hàng hết hạn.</p>
+    </div>
+    <div class="admin-toolbar">
+        <a href="{% url 'custom_admin_list' 'stock_export' %}" class="btn-admin btn-admin-light">
+            <i class="fas fa-arrow-left"></i>
+            <span>Quay lại danh sách</span>
+        </a>
+    </div>
+</section>
+
+<form method="post" novalidate id="stock-export-form">
+    {% csrf_token %}
+    {{ item_formset.management_form }}
+
+    <div class="stock-export-shell">
+        <section class="stock-export-hero">
+            <article class="stock-export-card stock-export-card--hero">
+                <h3>Chọn đúng chế độ trước khi xuất kho</h3>
+                <p>Xuất kho thường dùng cho chuyển kho hoặc loại bỏ hàng bán được khỏi tồn. Đối soát dùng khi tồn web lệch với tồn thực tế. Xử lý hết hạn chỉ lấy từ các lô đã quá hạn để loại khỏi kho cho đúng nghiệp vụ.</p>
+
+                <div class="stock-export-mode-grid">
+                    <a
+                        href="?{% if selected_pharmacy %}pharmacy={{ selected_pharmacy.pk }}&{% endif %}export_scope=standard"
+                        class="stock-export-mode {% if selected_export_scope == 'standard' %}is-active{% endif %}"
+                        data-tone="success"
+                    >
+                        <span class="stock-export-mode__label">Xuất nội bộ</span>
+                        <span class="stock-export-mode__desc">Dùng cho điều chuyển, sử dụng nội bộ hoặc rút bớt hàng bán được.</span>
+                    </a>
+                    <a
+                        href="?{% if selected_pharmacy %}pharmacy={{ selected_pharmacy.pk }}&{% endif %}export_scope=reconcile"
+                        class="stock-export-mode {% if selected_export_scope == 'reconcile' %}is-active{% endif %}"
+                        data-tone="info"
+                    >
+                        <span class="stock-export-mode__label">Đối soát tồn vật lý</span>
+                        <span class="stock-export-mode__desc">Dùng khi kiểm kho thực tế thấp hơn tồn đang hiển thị trên hệ thống.</span>
+                    </a>
+                    <a
+                        href="?{% if selected_pharmacy %}pharmacy={{ selected_pharmacy.pk }}&{% endif %}export_scope=expired"
+                        class="stock-export-mode {% if selected_export_scope == 'expired' %}is-active{% endif %}"
+                        data-tone="danger"
+                    >
+                        <span class="stock-export-mode__label">Xử lý hàng hết hạn</span>
+                        <span class="stock-export-mode__desc">Chỉ xuất từ các lô hết hạn để loại bỏ, tránh ảnh hưởng lô còn bán được.</span>
+                    </a>
+                </div>
+            </article>
+
+            <aside class="stock-export-card">
+                <h3>Thông tin phiếu xuất</h3>
+                <p>Đổi chi nhánh hoặc loại phiếu sẽ tải lại danh sách sản phẩm gợi ý và cảnh báo liên quan.</p>
+
+                {% if batch_form.non_field_errors %}
+                <div class="alert alert-danger mt-3">{{ batch_form.non_field_errors }}</div>
+                {% endif %}
+
+                <div class="stock-export-batch-grid mt-4">
+                    {% for field in batch_form %}
+                    <div class="admin-field">
+                        <label for="{{ field.id_for_label }}">{{ field.label }}</label>
+                        {{ field }}
+                        {% if field.help_text %}
+                        <div class="admin-inline-help">{{ field.help_text }}</div>
+                        {% endif %}
+                        {% if field.errors %}
+                        <div class="admin-field-error">{{ field.errors }}</div>
+                        {% endif %}
+                    </div>
+                    {% endfor %}
+                </div>
+            </aside>
+        </section>
+
+        {% if selected_pharmacy %}
+        <section class="stock-export-card">
+            <div class="admin-section-head">
+                <div>
+                    <h3>Tổng quan chi nhánh {{ selected_pharmacy.name }}</h3>
+                    <p>Những chỉ số này giúp nhân viên biết đang nên tập trung xử lý hàng nào trước khi lập phiếu xuất.</p>
+                </div>
+            </div>
+            <div class="stock-export-summary-grid">
+                {% for card in stock_export_insights.summary_cards %}
+                <article class="stock-export-summary-card">
+                    <span class="stock-export-summary-card__label">{{ card.label }}</span>
+                    <div class="stock-export-summary-card__value">{{ card.value }}</div>
+                    <div class="stock-export-summary-card__hint">{{ card.hint }}</div>
+                </article>
+                {% endfor %}
+            </div>
+        </section>
+
+        {% if stock_export_insights.alert_groups %}
+        <section class="stock-export-card">
+            <div class="admin-section-head">
+                <div>
+                    <h3>Cảnh báo cần xử lý</h3>
+                    <p>Các nhóm dưới đây giúp nhìn ra nhanh hàng hết hạn, cận hạn hoặc chênh lệch tồn để quyết định lập phiếu đúng chế độ.</p>
+                </div>
+            </div>
+            <div class="stock-export-alert-grid">
+                {% for group in stock_export_insights.alert_groups %}
+                <article class="stock-export-alert" data-tone="{{ group.tone }}">
+                    <div class="stock-export-alert__head">
+                        <div>
+                            <strong>{{ group.title }}</strong>
+                            <p>{{ group.description }}</p>
+                        </div>
+                        <span class="stock-export-alert__count">{{ group.count }}</span>
+                    </div>
+                    <div class="stock-export-alert__items">
+                        {% for item in group.items %}
+                        <div class="stock-export-alert__item">
+                            <strong>{{ item.name }}</strong>
+                            <small>
+                                {{ item.product_type_label }} • {{ item.manufacturer }}<br>
+                                Tồn bán được: {{ item.sellable_quantity }} {{ item.unit }} •
+                                Hết hạn: {{ item.expired_quantity }} {{ item.unit }} •
+                                Chênh lệch: {{ item.discrepancy_quantity }}
+                            </small>
+                        </div>
+                        {% endfor %}
+                    </div>
+                </article>
+                {% endfor %}
+            </div>
+        </section>
+        {% endif %}
+        {% endif %}
+
+        <section class="stock-export-workspace">
+            <section class="stock-export-card">
+                <div class="admin-section-head">
+                    <div>
+                        <h3>Bảng chọn sản phẩm để xuất</h3>
+                        <p>
+                            {% if selected_pharmacy %}
+                            Danh sách được lọc theo chi nhánh <strong>{{ selected_pharmacy.name }}</strong> và chế độ <strong>{{ stock_export_insights.mode_label }}</strong>.
+                            {% else %}
+                            Hãy chọn chi nhánh trước để tải danh sách sản phẩm có thể xuất.
+                            {% endif %}
+                        </p>
+                    </div>
+                </div>
+
+                {% if selected_pharmacy and stock_export_insights.medicine_options %}
+                <div class="stock-export-catalog-toolbar">
+                    <label class="stock-export-catalog-search">
+                        <i class="fas fa-search"></i>
+                        <input type="text" id="stock-export-catalog-search" placeholder="Tìm theo tên thuốc, nhà sản xuất hoặc loại sản phẩm">
+                    </label>
+                    <div class="stock-export-filter-pills">
+                        <button type="button" class="is-active" data-export-filter="all">Tất cả</button>
+                        <button type="button" data-export-filter="warning">Cận hạn</button>
+                        <button type="button" data-export-filter="expired">Hết hạn</button>
+                        <button type="button" data-export-filter="discrepancy">Chênh lệch</button>
+                    </div>
+                </div>
+
+                <div class="stock-export-catalog-grid" id="stock-export-catalog">
+                    {% for item in stock_export_insights.medicine_options %}
+                    <article
+                        class="stock-export-product"
+                        data-export-item
+                        data-name="{{ item.name|lower }}"
+                        data-maker="{{ item.manufacturer|lower }}"
+                        data-type="{{ item.product_type_label|lower }}"
+                        data-warning="{% if item.warning_quantity %}1{% else %}0{% endif %}"
+                        data-expired="{% if item.expired_quantity %}1{% else %}0{% endif %}"
+                        data-discrepancy="{% if item.discrepancy_quantity %}1{% else %}0{% endif %}"
+                    >
+                        <div class="stock-export-product__head">
+                            <div class="stock-export-product__title">
+                                <strong>{{ item.name }}</strong>
+                                <small>{{ item.manufacturer }} • {{ item.category }} • {{ item.product_type_label }}</small>
+                            </div>
+                            <span class="stock-export-pill stock-export-pill--info">{{ item.unit }}</span>
+                        </div>
+
+                        <div class="stock-export-metric-grid">
+                            <div class="stock-export-metric">
+                                <small>{{ item.preferred_quantity_label }}</small>
+                                <strong>{{ item.preferred_quantity }} {{ item.unit }}</strong>
+                            </div>
+                            <div class="stock-export-metric">
+                                <small>Tồn snapshot trên web</small>
+                                <strong>{{ item.snapshot_quantity }} {{ item.unit }}</strong>
+                            </div>
+                            <div class="stock-export-metric">
+                                <small>Lô còn bán được</small>
+                                <strong>{{ item.available_lot_count }} lô • HSD gần nhất {{ item.next_sellable_expiry_label }}</strong>
+                            </div>
+                            <div class="stock-export-metric">
+                                <small>Lô hết hạn</small>
+                                <strong>{{ item.expired_lot_count }} lô • {{ item.next_expired_expiry_label }}</strong>
+                            </div>
+                        </div>
+
+                        <div class="stock-export-product__footer">
+                            <div class="stock-export-product__tags">
+                                <span class="stock-export-pill stock-export-pill--success">Bán được {{ item.sellable_quantity }}</span>
+                                {% if item.warning_quantity %}
+                                <span class="stock-export-pill stock-export-pill--warning">Cận hạn {{ item.warning_quantity }}</span>
+                                {% endif %}
+                                {% if item.expired_quantity %}
+                                <span class="stock-export-pill stock-export-pill--danger">Hết hạn {{ item.expired_quantity }}</span>
+                                {% endif %}
+                                {% if item.discrepancy_quantity %}
+                                <span class="stock-export-pill stock-export-pill--info">Chênh lệch {{ item.discrepancy_quantity }}</span>
+                                {% endif %}
+                            </div>
+                            <button
+                                type="button"
+                                class="btn-admin btn-admin-primary stock-export-quick-add"
+                                data-medicine-id="{{ item.id }}"
+                                data-medicine-name="{{ item.name }}"
+                                data-quantity="{% if selected_export_scope == 'expired' %}{{ item.expired_quantity }}{% elif selected_export_scope == 'reconcile' and item.discrepancy_quantity > 0 %}{{ item.discrepancy_quantity }}{% else %}1{% endif %}"
+                            >
+                                <i class="fas fa-plus"></i>
+                                <span>
+                                    {% if selected_export_scope == 'expired' %}
+                                    Đưa hàng hết hạn vào phiếu
+                                    {% elif selected_export_scope == 'reconcile' and item.discrepancy_quantity > 0 %}
+                                    Gợi ý đối soát {{ item.discrepancy_quantity }}
+                                    {% else %}
+                                    Thêm vào phiếu xuất
+                                    {% endif %}
+                                </span>
+                            </button>
+                        </div>
+                    </article>
+                    {% endfor %}
+                </div>
+                {% else %}
+                <div class="stock-export-empty-note">
+                    {% if selected_pharmacy %}
+                    Không có sản phẩm phù hợp với chế độ xuất hiện tại. Hãy đổi loại phiếu hoặc chọn chi nhánh khác để tiếp tục.
+                    {% else %}
+                    Chọn chi nhánh trước để tải danh sách sản phẩm có thể xuất kho.
+                    {% endif %}
+                </div>
+                {% endif %}
+            </section>
+
+            <section class="stock-export-card">
+                <div class="admin-section-head">
+                    <div>
+                        <h3>Chi tiết các dòng xuất kho</h3>
+                        <p>Mỗi dòng sẽ được trừ tồn theo đúng logic của loại phiếu đang chọn. Với hàng hết hạn, hệ thống chỉ lấy từ lô đã quá hạn. Với xuất thường và đối soát, hệ thống lấy theo FEFO.</p>
+                    </div>
+                </div>
+
+                <div class="stock-export-lines">
+                    {% for form in item_formset %}
+                    <article class="stock-export-line">
+                        {% for hidden in form.hidden_fields %}{{ hidden }}{% endfor %}
+                        <span class="stock-export-line__index">{{ forloop.counter }}</span>
+                        {% if form.non_field_errors %}
+                        <div class="alert alert-danger">{{ form.non_field_errors }}</div>
+                        {% endif %}
+                        <div class="stock-export-line__grid">
+                            <div class="admin-field mb-0">
+                                <label for="{{ form.medicine.id_for_label }}">{{ form.medicine.label }}</label>
+                                {{ form.medicine }}
+                                {% if form.medicine.errors %}
+                                <div class="admin-field-error">{{ form.medicine.errors }}</div>
+                                {% endif %}
+                            </div>
+                            <div class="admin-field mb-0">
+                                <label for="{{ form.quantity.id_for_label }}">{{ form.quantity.label }}</label>
+                                {{ form.quantity }}
+                                {% if form.quantity.errors %}
+                                <div class="admin-field-error">{{ form.quantity.errors }}</div>
+                                {% endif %}
+                            </div>
+                            <div class="admin-field mb-0">
+                                <label for="{{ form.note.id_for_label }}">{{ form.note.label }}</label>
+                                {{ form.note }}
+                                {% if form.note.errors %}
+                                <div class="admin-field-error">{{ form.note.errors }}</div>
+                                {% endif %}
+                            </div>
+                            <div class="stock-export-remove">
+                                {% if form.DELETE %}
+                                <label class="mb-0">{{ form.DELETE }} <span>Bỏ dòng này</span></label>
+                                {% endif %}
+                            </div>
+                        </div>
+                        <div class="stock-export-line__hint">
+                            Gợi ý: chọn sản phẩm trực tiếp từ bảng bên trái để tự điền nhanh vào dòng trống gần nhất. Điều này giúp nhân viên thao tác nhanh hơn khi cần xuất nhiều mặt hàng trong một lần.
+                        </div>
+                    </article>
+                    {% endfor %}
+                </div>
+
+                <div class="admin-toolbar mt-4">
+                    <button type="submit" class="btn-admin btn-admin-primary">
+                        <i class="fas fa-save"></i>
+                        <span>Lưu phiếu xuất kho</span>
+                    </button>
+                </div>
+            </section>
+        </section>
+    </div>
+</form>
+{% endblock %}
+
+{% block extra_scripts %}
+<script>
+    (function () {
+        var pharmacySelect = document.getElementById('id_pharmacy');
+        var exportScopeSelect = document.getElementById('id_export_scope');
+        var searchInput = document.getElementById('stock-export-catalog-search');
+        var filterButtons = Array.from(document.querySelectorAll('[data-export-filter]'));
+        var catalogItems = Array.from(document.querySelectorAll('[data-export-item]'));
+        var quickAddButtons = Array.from(document.querySelectorAll('.stock-export-quick-add'));
+        var currentFilter = 'all';
+
+        function reloadBySelection() {
+            if (!pharmacySelect || !pharmacySelect.value) {
+                return;
+            }
+            var url = new URL(window.location.href);
+            url.searchParams.set('pharmacy', pharmacySelect.value);
+            if (exportScopeSelect && exportScopeSelect.value) {
+                url.searchParams.set('export_scope', exportScopeSelect.value);
+            }
+            window.location.href = url.toString();
+        }
+
+        function matchesFilter(item) {
+            if (currentFilter === 'warning') {
+                return item.dataset.warning === '1';
+            }
+            if (currentFilter === 'expired') {
+                return item.dataset.expired === '1';
+            }
+            if (currentFilter === 'discrepancy') {
+                return item.dataset.discrepancy === '1';
+            }
+            return true;
+        }
+
+        function filterCatalog() {
+            var keyword = String(searchInput ? searchInput.value : '').trim().toLowerCase();
+            catalogItems.forEach(function (item) {
+                var haystack = [item.dataset.name, item.dataset.maker, item.dataset.type].join(' ');
+                var visible = matchesFilter(item) && (!keyword || haystack.indexOf(keyword) !== -1);
+                item.classList.toggle('is-hidden', !visible);
+            });
+        }
+
+        function getLineRows() {
+            return Array.from(document.querySelectorAll('.stock-export-line'));
+        }
+
+        function findTargetRow() {
+            var rows = getLineRows();
+            for (var i = 0; i < rows.length; i += 1) {
+                var select = rows[i].querySelector('select[name$="-medicine"]');
+                if (select && !select.value) {
+                    return rows[i];
+                }
+            }
+            return rows[0] || null;
+        }
+
+        function syncChoicesLabel(select) {
+            var choice = select.closest('.admin-field').querySelector('.choices__inner .choices__item--selectable');
+            if (!choice) {
+                return;
+            }
+            var selectedOption = select.options[select.selectedIndex];
+            choice.textContent = selectedOption ? selectedOption.textContent : '';
+        }
+
+        quickAddButtons.forEach(function (button) {
+            button.addEventListener('click', function () {
+                var targetRow = findTargetRow();
+                if (!targetRow) {
+                    return;
+                }
+
+                var select = targetRow.querySelector('select[name$="-medicine"]');
+                var quantityInput = targetRow.querySelector('input[name$="-quantity"]');
+                var noteInput = targetRow.querySelector('input[name$="-note"], textarea[name$="-note"]');
+                var medicineId = button.getAttribute('data-medicine-id');
+                var suggestedQuantity = button.getAttribute('data-quantity') || '1';
+                var medicineName = button.getAttribute('data-medicine-name') || 'Sản phẩm';
+
+                if (select) {
+                    select.value = medicineId;
+                    select.dispatchEvent(new Event('change', { bubbles: true }));
+                    syncChoicesLabel(select);
+                }
+                if (quantityInput && (!quantityInput.value || quantityInput.value === '0')) {
+                    quantityInput.value = suggestedQuantity;
+                }
+                if (noteInput && !noteInput.value) {
+                    noteInput.value = 'Thêm từ bảng gợi ý xuất kho';
+                }
+
+                targetRow.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                targetRow.style.boxShadow = '0 0 0 3px rgba(17,70,184,.12)';
+                window.setTimeout(function () {
+                    targetRow.style.boxShadow = '';
+                }, 1400);
+
+                if (window.siteUtils && typeof window.siteUtils.showToast === 'function') {
+                    window.siteUtils.showToast('Đã đưa "' + medicineName + '" vào dòng phiếu xuất gần nhất.', 'success');
+                }
+            });
+        });
+
+        filterButtons.forEach(function (button) {
+            button.addEventListener('click', function () {
+                currentFilter = button.getAttribute('data-export-filter') || 'all';
+                filterButtons.forEach(function (item) {
+                    item.classList.toggle('is-active', item === button);
+                });
+                filterCatalog();
+            });
+        });
+
+        if (searchInput) {
+            searchInput.addEventListener('input', filterCatalog);
+        }
+        if (pharmacySelect) {
+            pharmacySelect.addEventListener('change', reloadBySelection);
+        }
+        if (exportScopeSelect) {
+            exportScopeSelect.addEventListener('change', reloadBySelection);
+        }
+
+        filterCatalog();
+    })();
+</script>
+{% endblock %}

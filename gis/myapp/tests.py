@@ -10,7 +10,8 @@ from django.utils import timezone
 
 from .forms import AccountProfileForm, AboutPageContentForm, CheckoutForm, MedicineAdminForm, PharmacyAdminForm, ProfilePasswordChangeForm, ReturnRefundRequestForm
 from .models import AccountOtpChallenge, AboutPageContent, Cart, CartItem, Medicine, MedicineLot, MedicineReview, NewsArticle, Order, OrderItem, Pharmacy, ReturnRefundRequest, UserProfile, fold_text_for_match
-from .tool import DeliveryRoutingService
+from .tools.calculations import estimate_road_distance_km
+from .tools.routing import DeliveryRoutingService
 from .views import get_or_create_medicine_for_import
 
 
@@ -24,11 +25,17 @@ class DeliveryRoutingServiceTest(TestCase):
         self.assertIn('distance_km', result['routes'][0])
         self.assertIn('shipping_fee_value', result['routes'][0])
 
+    def test_estimate_road_distance_uses_factor_for_each_delivery_mode(self):
+        self.assertAlmostEqual(estimate_road_distance_km(10, 'motorbike'), 12.0)
+        self.assertAlmostEqual(estimate_road_distance_km(10, 'car'), 13.0)
+        self.assertAlmostEqual(estimate_road_distance_km(10, 'walking'), 10.5)
+        self.assertAlmostEqual(estimate_road_distance_km(10, 'unknown-mode'), 12.0)
+
 
 class PharmacyAvailabilityTest(TestCase):
     def test_has_available_medicines_property(self):
         pharmacy = Pharmacy.objects.create(
-            name='NhÃ  thuá»c A',
+            name='Nhà thuốc A',
             address='123 Test',
             phone='0900000000',
             opening_hours='8:00 - 22:00',
@@ -49,8 +56,8 @@ class PharmacyAvailabilityTest(TestCase):
 class InventoryWorkflowTest(TestCase):
     def setUp(self):
         self.pharmacy = Pharmacy.objects.create(
-            name='NhÃ  thuá»c Test',
-            address='123 ÄÆ°á»ng Test',
+            name='Nhà thuốc Test',
+            address='123 Đường Test',
             phone='0900000001',
             opening_hours='08:00 - 22:00',
             lat=10.77,
@@ -67,7 +74,7 @@ class InventoryWorkflowTest(TestCase):
             name='Paracetamol 500mg',
             price=12000,
             quantity=10,
-            unit='Há»p',
+            unit='Hộp',
         )
         cart = Cart.objects.create(user=self.customer)
         CartItem.objects.create(cart=cart, medicine=medicine, quantity=3)
@@ -76,9 +83,9 @@ class InventoryWorkflowTest(TestCase):
         response = self.client.post(
             reverse('checkout'),
             {
-                'full_name': 'KhÃ¡ch Test',
+                'full_name': 'Khách Test',
                 'phone': '0900000002',
-                'address_text': '1 Nguyá»n Huá», Quáº­n 1',
+                'address_text': '1 Nguyễn Huệ, Quận 1',
                 'note': '',
                 'delivery_lat': '10.7750',
                 'delivery_lng': '106.7000',
@@ -98,13 +105,13 @@ class InventoryWorkflowTest(TestCase):
             name='Vitamin C',
             price=50000,
             quantity=7,
-            unit='Há»p',
+            unit='Hộp',
         )
         order = Order.objects.create(
             user=self.customer,
-            full_name='KhÃ¡ch Test',
+            full_name='Khách Test',
             phone='0900000002',
-            address_text='1 Nguyá»n Huá», Quáº­n 1',
+            address_text='1 Nguyễn Huệ, Quận 1',
             pharmacy=self.pharmacy,
             total_product_price=150000,
             final_total_price=165000,
@@ -137,13 +144,13 @@ class InventoryWorkflowTest(TestCase):
             name='Omega 3',
             price=90000,
             quantity=5,
-            unit='Há»p',
+            unit='Hộp',
         )
         order = Order.objects.create(
             user=self.customer,
-            full_name='KhÃ¡ch Test',
+            full_name='Khách Test',
             phone='0900000002',
-            address_text='1 Nguyá»n Huá», Quáº­n 1',
+            address_text='1 Nguyễn Huệ, Quận 1',
             pharmacy=self.pharmacy,
             total_product_price=180000,
             final_total_price=195000,
@@ -176,8 +183,8 @@ class InventoryWorkflowTest(TestCase):
 class PaymentExperienceTest(TestCase):
     def setUp(self):
         self.pharmacy = Pharmacy.objects.create(
-            name='NhÃ  thuá»c Thanh ToÃ¡n',
-            address='456 ÄÆ°á»ng QR',
+            name='Nhà thuốc Thanh Toán',
+            address='456 Đường QR',
             phone='0900000009',
             opening_hours='08:00 - 22:00',
             lat=10.77,
@@ -240,9 +247,9 @@ class PaymentExperienceTest(TestCase):
     def test_invoice_view_is_available_for_order_owner(self):
         order = Order.objects.create(
             user=self.customer,
-            full_name='KhÃ¡ch Invoice',
+            full_name='Khách Invoice',
             phone='0900000010',
-            address_text='789 ÄÆ°á»ng In HÃ³a ÄÆ¡n',
+            address_text='789 Đường In Hóa Đơn',
             pharmacy=self.pharmacy,
             total_product_price=150000,
             shipping_fee=15000,
@@ -251,7 +258,7 @@ class PaymentExperienceTest(TestCase):
             payment_status=Order.PAYMENT_STATUS_AWAITING_TRANSFER,
             payment_reference='DH000123-0604',
             invoice_code='HD20260406-000123',
-            invoice_staff_name='NhÃ¢n viÃªn Test',
+            invoice_staff_name='Nhân viên Test',
         )
         OrderItem.objects.create(
             order=order,
@@ -264,8 +271,8 @@ class PaymentExperienceTest(TestCase):
         self.client.force_login(self.customer)
         response = self.client.get(reverse('order_invoice_view', args=[order.pk]))
         self.assertEqual(response.status_code, 200)
-        self.assertContains(response, 'HÃA ÄÆ N BÃN HÃNG')
-        self.assertContains(response, 'NhÃ¢n viÃªn Test')
+        self.assertContains(response, 'HÓA ĐƠN BÁN HÀNG')
+        self.assertContains(response, 'Nhân viên Test')
 
 
 class OrderPostPurchaseWorkflowTest(TestCase):
@@ -276,8 +283,8 @@ class OrderPostPurchaseWorkflowTest(TestCase):
 
     def setUp(self):
         self.pharmacy = Pharmacy.objects.create(
-            name='NhÃ  thuá»c Háº­u mÃ£i',
-            address='12 Nguyá»n TrÃ£i',
+            name='Nhà thuốc Hậu mãi',
+            address='12 Nguyễn Trãi',
             phone='0900000099',
             opening_hours='08:00 - 22:00',
             lat=10.77,
@@ -286,18 +293,18 @@ class OrderPostPurchaseWorkflowTest(TestCase):
         self.customer = User.objects.create_user(username='buyer_case', password='Test@123456', email='buyer@example.com')
         self.medicine = Medicine.objects.create(
             pharmacy=self.pharmacy,
-            name='Thuá»c A',
+            name='Thuốc A',
             price=100000,
             quantity=20,
-            unit='Há»p',
+            unit='Hộp',
         )
 
     def create_order(self, status=Order.STATUS_PENDING, payment_method=Order.PAYMENT_COD, estimated_delivery_at=None):
         order = Order.objects.create(
             user=self.customer,
-            full_name='KhÃ¡ch hÃ ng A',
+            full_name='Khách hàng A',
             phone='0900000011',
-            address_text='1 Nguyá»n Huá»',
+            address_text='1 Nguyễn Huệ',
             pharmacy=self.pharmacy,
             total_product_price=200000,
             shipping_fee=15000,
@@ -364,7 +371,7 @@ class OrderPostPurchaseWorkflowTest(TestCase):
         response = self.client.post(
             reverse('return_request', args=[order.pk]),
             {
-                'reason': 'Giao sai sáº£n pháº©m',
+                'reason': 'Giao sai sản phẩm',
                 'bank_account_number': '123456789',
                 'momo_account_number': '',
                 'contact_email': 'buyer@example.com',
@@ -382,16 +389,16 @@ class OrderPostPurchaseWorkflowTest(TestCase):
 class ReviewUpdateFlagTest(TestCase):
     def test_review_update_flag_only_true_after_real_update(self):
         pharmacy = Pharmacy.objects.create(
-            name='NhÃ  thuá»c Review',
+            name='Nhà thuốc Review',
             address='456 Test',
             phone='0900000022',
             opening_hours='08:00 - 22:00',
             lat=10.77,
             lng=106.69,
         )
-        medicine = Medicine.objects.create(pharmacy=pharmacy, name='Thuá»c Review', price=10000, quantity=5)
+        medicine = Medicine.objects.create(pharmacy=pharmacy, name='Thuốc Review', price=10000, quantity=5)
         user = User.objects.create_user(username='review_user', password='Test@123456')
-        review = MedicineReview.objects.create(user=user, medicine=medicine, rating=5, comment='Tá»t')
+        review = MedicineReview.objects.create(user=user, medicine=medicine, rating=5, comment='Tốt')
         self.assertFalse(review.was_updated_by_user)
         MedicineReview.objects.filter(pk=review.pk).update(is_edited=True)
         review.refresh_from_db()

@@ -1,0 +1,432 @@
+{% extends "admin_panel/base.html" %}
+{% load static %}
+{% load currency_filters %}
+
+{% block extra_head %}
+<link rel="stylesheet" href="{% static 'css/admin_panel/analytics/reports.css' %}">
+{% endblock %}
+
+{% block admin_content %}
+<div class="admin-dashboard admin-reports">
+    <section class="report-hero">
+        <div class="report-hero-card">
+            <h2>Báo cáo vận hành & doanh thu</h2>
+            <p>Theo dõi doanh thu, đơn hàng, hoàn tiền và cảnh báo tồn kho trong cùng một màn hình. Báo cáo này chỉ dùng dữ liệu trong phạm vi bạn được phép quản lý, không làm thay đổi bất kỳ logic bán hàng hay dữ liệu đơn hiện có.</p>
+            <div class="report-chip-row">
+                {% for chip in filter_chips %}
+                <span class="report-chip"><i class="{{ chip.icon }}"></i>{{ chip.label }}</span>
+                {% endfor %}
+            </div>
+        </div>
+        <div class="report-highlight-grid">
+            {% for item in insight_cards %}
+            <div class="report-highlight-card">
+                <small>{{ item.label }}</small>
+                <strong>{% if item.format == 'currency' %}{{ item.value|vnd }}{% else %}{{ item.value }}{% endif %}</strong>
+                <span>{{ item.note }}</span>
+            </div>
+            {% endfor %}
+        </div>
+    </section>
+
+    <section class="admin-surface admin-section mb-4">
+        <div class="admin-section-head">
+            <div>
+                <h2>Bộ lọc báo cáo</h2>
+                <p>Chọn khoảng thời gian, chi nhánh, phương thức thanh toán và cách nhóm biểu đồ để xem đúng lát cắt bạn cần.</p>
+            </div>
+        </div>
+        <form method="get" class="report-filter-grid">
+            <div class="admin-field mb-0">
+                <label>Kỳ báo cáo</label>
+                <select name="range">
+                    {% for value, label in filter_form.range_options %}
+                    <option value="{{ value }}" {% if filter_form.range_key == value %}selected{% endif %}>{{ label }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+
+            <div class="admin-field mb-0">
+                <label>Từ ngày</label>
+                <input type="date" name="start_date" value="{{ filter_form.start_date }}">
+            </div>
+
+            <div class="admin-field mb-0">
+                <label>Đến ngày</label>
+                <input type="date" name="end_date" value="{{ filter_form.end_date }}">
+            </div>
+
+            {% if not managed_pharmacy %}
+            <div class="admin-field mb-0">
+                <label>Chi nhánh</label>
+                <select name="pharmacy">
+                    {% for item in filter_form.pharmacy_options %}
+                    <option value="{{ item.value }}" {% if filter_form.selected_pharmacy_id == item.value %}selected{% endif %}>{{ item.label }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            {% endif %}
+
+            <div class="admin-field mb-0">
+                <label>Phương thức thanh toán</label>
+                <select name="payment_method">
+                    {% for value, label in filter_form.payment_options %}
+                    <option value="{{ value }}" {% if filter_form.selected_payment_method == value %}selected{% endif %}>{{ label }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+
+            <div class="admin-field mb-0">
+                <label>Nhóm biểu đồ</label>
+                <select name="group_by">
+                    {% for value, label in filter_form.group_by_options %}
+                    <option value="{{ value }}" {% if filter_form.group_by == value %}selected{% endif %}>{{ label }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+
+            <div class="report-actions">
+                <button type="submit" class="btn-admin btn-admin-primary">
+                    <i class="fas fa-filter"></i>
+                    <span>Áp dụng</span>
+                </button>
+                <a href="{% url 'custom_admin_reports' %}" class="btn-admin btn-admin-light">
+                    <i class="fas fa-undo-alt"></i>
+                    <span>Đặt lại</span>
+                </a>
+            </div>
+        </form>
+        <div class="report-filter-note">
+            Kỳ hiện tại: <strong>{{ range_label }}</strong> • {{ report_period_label }}. So sánh với kỳ trước: {{ previous_period_label }}.
+        </div>
+    </section>
+
+    <section class="report-kpi-grid">
+        {% for card in summary_cards %}
+        <article class="admin-surface admin-summary-card tone-{{ card.tone }}">
+            <div class="admin-summary-card__label">{{ card.label }}</div>
+            <div class="admin-summary-card__value">
+                {% if card.format == 'currency' %}
+                    {{ card.value|vnd }}
+                {% elif card.format == 'percent' %}
+                    {{ card.value }}%
+                {% else %}
+                    {{ card.value }}
+                {% endif %}
+            </div>
+            <div class="report-card-helper">{{ card.helper }}</div>
+            <div class="report-card-delta is-{{ card.delta.tone }}">
+                {% if card.delta.tone == 'up' %}
+                    <i class="fas fa-arrow-up"></i>
+                {% elif card.delta.tone == 'down' %}
+                    <i class="fas fa-arrow-down"></i>
+                {% else %}
+                    <i class="fas fa-minus"></i>
+                {% endif %}
+                <span>{{ card.delta.text }}</span>
+            </div>
+        </article>
+        {% endfor %}
+    </section>
+
+    <section class="report-split">
+        <div class="admin-surface admin-section">
+            <div class="admin-section-head">
+                <div>
+                    <h2>Xu hướng doanh thu theo {{ timeline_group_label }}</h2>
+                    <p>Biểu đồ dùng doanh thu của các đơn đã hoàn thành trong kỳ lọc, giúp xem nhịp tăng giảm theo từng mốc thời gian.</p>
+                </div>
+                <span class="admin-badge admin-badge-primary">{{ total_completed_revenue|vnd }}</span>
+            </div>
+            {% if timeline_chart %}
+            <div class="report-chart-scroll">
+                <div class="report-vertical-chart" data-report-chart-columns="{{ timeline_chart|length }}" data-report-chart-min-width="{{ timeline_chart_min_width }}">
+                    {% for item in timeline_chart %}
+                    <div class="report-vertical-bar">
+                        <div class="report-vertical-bar__value">
+                            {% if item.value > 0 %}{{ item.value|vnd }}{% else %}0 đ{% endif %}<br>{{ item.order_count }} đơn
+                        </div>
+                        <div class="report-vertical-bar__track">
+                            <div class="report-vertical-bar__fill" data-report-fill-height="{{ item.height_percent }}"></div>
+                        </div>
+                        <div class="report-vertical-bar__label">{{ item.label }}</div>
+                        <div class="report-vertical-bar__range">{{ item.range_label }}</div>
+                    </div>
+                    {% endfor %}
+                </div>
+            </div>
+            {% else %}
+            <div class="report-empty">Chưa có dữ liệu đơn hoàn thành để dựng biểu đồ trong kỳ lọc này.</div>
+            {% endif %}
+        </div>
+
+        <div class="admin-surface admin-section">
+            <div class="admin-section-head">
+                <div>
+                    <h2>Tình trạng đơn hàng</h2>
+                    <p>Tổng hợp toàn bộ đơn phát sinh trong kỳ, không chỉ riêng đơn hoàn thành.</p>
+                </div>
+                <span class="admin-badge admin-badge-info">{{ total_orders }} đơn</span>
+            </div>
+            {% if status_breakdown %}
+            <div class="report-status-list">
+                {% for item in status_breakdown %}
+                <div class="report-status-item">
+                    <div class="report-status-item__icon"><i class="{{ item.icon }}"></i></div>
+                    <div>
+                        <div class="report-status-item__label">{{ item.label }}</div>
+                        <div class="report-status-item__meta">{{ item.share_percent }}% tổng đơn trong kỳ</div>
+                    </div>
+                    <div class="report-status-item__value">{{ item.count }}</div>
+                    <div class="report-bar-track"><div class="report-bar-fill" data-report-fill-width="{{ item.bar_percent }}"></div></div>
+                </div>
+                {% endfor %}
+            </div>
+            {% else %}
+            <div class="report-empty">Chưa có đơn hàng nào trong khoảng thời gian đang chọn.</div>
+            {% endif %}
+
+            <div class="report-mini-metrics mt-3">
+                <div class="report-mini-card">
+                    <small>Tiền hàng trước ưu đãi hạng</small>
+                    <strong>{{ gross_product_revenue|vnd }}</strong>
+                    <span>Giúp kiểm tra phần doanh thu sản phẩm trước khi trừ giảm theo hạng khách hàng.</span>
+                </div>
+                <div class="report-mini-card">
+                    <small>Yêu cầu trả hàng trong kỳ</small>
+                    <strong>{{ return_total }}</strong>
+                    <span>Số yêu cầu hậu mãi được tạo trong cùng giai đoạn báo cáo.</span>
+                </div>
+                <div class="report-mini-card">
+                    <small>Đơn chờ xử lý</small>
+                    <strong>{{ pending_order_count }}</strong>
+                    <span>Cần ưu tiên xác nhận hoặc chuẩn bị hàng.</span>
+                </div>
+                <div class="report-mini-card">
+                    <small>Đơn đang giao</small>
+                    <strong>{{ shipping_order_count }}</strong>
+                    <span>Theo dõi tiến độ giao hàng để hạn chế khiếu nại chậm đơn.</span>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <section class="report-split">
+        <div class="admin-surface admin-section">
+            <div class="admin-section-head">
+                <div>
+                    <h2>Cơ cấu phương thức thanh toán</h2>
+                    <p>So sánh đóng góp doanh thu của từng phương thức trên các đơn đã hoàn thành trong kỳ.</p>
+                </div>
+                <span class="admin-badge admin-badge-success">{{ completed_order_count }} đơn hoàn thành</span>
+            </div>
+            {% if payment_method_breakdown %}
+            <div class="report-bar-list">
+                {% for item in payment_method_breakdown %}
+                <div class="report-bar-item">
+                    <div class="report-bar-item__head">
+                        <div>
+                            <div class="report-bar-item__title">{{ item.label }}</div>
+                            <div class="report-bar-item__meta">{{ item.order_count }} đơn • chiếm {{ item.share_percent }}% doanh thu hoàn thành</div>
+                        </div>
+                        <div class="report-bar-item__value">{{ item.revenue|vnd }}</div>
+                    </div>
+                    <div class="report-bar-track"><div class="report-bar-fill" data-report-fill-width="{{ item.bar_percent }}"></div></div>
+                </div>
+                {% endfor %}
+            </div>
+            {% else %}
+            <div class="report-empty">Chưa có dữ liệu thanh toán phù hợp với bộ lọc hiện tại.</div>
+            {% endif %}
+        </div>
+
+        <div class="admin-surface admin-section">
+            <div class="admin-section-head">
+                <div>
+                    <h2>Trả hàng / hoàn tiền</h2>
+                    <p>Tình hình xử lý các yêu cầu hậu mãi được tạo trong cùng kỳ báo cáo.</p>
+                </div>
+                <span class="admin-badge admin-badge-warning">{{ return_total }} yêu cầu</span>
+            </div>
+            {% if return_status_breakdown %}
+            <div class="report-bar-list">
+                {% for item in return_status_breakdown %}
+                <div class="report-bar-item">
+                    <div class="report-bar-item__head">
+                        <div>
+                            <div class="report-bar-item__title">{{ item.label }}</div>
+                            <div class="report-bar-item__meta">{{ item.share_percent }}% tổng yêu cầu trong kỳ</div>
+                        </div>
+                        <div class="report-bar-item__value">{{ item.count }}</div>
+                    </div>
+                    <div class="report-bar-track"><div class="report-bar-fill" data-report-fill-width="{{ item.bar_percent }}"></div></div>
+                </div>
+                {% endfor %}
+            </div>
+            {% else %}
+            <div class="report-empty">Không có yêu cầu trả hàng / hoàn tiền nào trong khoảng thời gian đang lọc.</div>
+            {% endif %}
+        </div>
+    </section>
+
+    <section class="report-split">
+        <div class="admin-surface admin-section">
+            <div class="admin-section-head">
+                <div>
+                    <h2>Top sản phẩm bán chạy</h2>
+                    <p>Xếp hạng theo số lượng đã bán trên các đơn hoàn thành. Doanh thu ở đây là doanh thu dòng sản phẩm tại thời điểm bán.</p>
+                </div>
+                <a href="{% url 'custom_admin_list' 'medicine' %}" class="btn-admin btn-admin-light">
+                    <i class="fas fa-pills"></i>
+                    <span>Xem danh mục thuốc</span>
+                </a>
+            </div>
+            {% if top_products %}
+            <div class="report-list">
+                {% for item in top_products %}
+                <article class="report-list__item">
+                    <div>
+                        <h3 class="report-list__title">{{ item.name }}</h3>
+                        <div class="report-list__meta">Đã bán {{ item.quantity }} {{ item.unit|default:'đơn vị'|lower }} • xuất hiện trong {{ item.order_count }} dòng đơn • tồn hiện tại {{ item.current_stock }}</div>
+                    </div>
+                    <div class="report-list__stats">
+                        <span class="report-list__badge"><i class="fas fa-shopping-basket"></i><strong>{{ item.quantity }}</strong></span>
+                        <span class="report-list__badge"><i class="fas fa-wallet"></i><strong>{{ item.revenue|vnd }}</strong></span>
+                    </div>
+                </article>
+                {% endfor %}
+            </div>
+            {% include "admin_panel/shared/report_pagination.html" with page_obj=top_products_page_obj query_string=top_products_query_string page_param='top_page' aria_label='Phân trang top sản phẩm' %}
+            {% else %}
+            <div class="report-empty">Chưa có dữ liệu bán hàng để xếp hạng sản phẩm trong kỳ lọc này.</div>
+            {% endif %}
+        </div>
+
+        <div class="admin-surface admin-section">
+            <div class="admin-section-head">
+                <div>
+                    <h2>{% if selected_pharmacy %}Hiệu suất chi nhánh{% else %}Doanh thu theo chi nhánh{% endif %}</h2>
+                    <p>{% if selected_pharmacy %}Chi nhánh đang được lọc hiện chỉ còn một điểm bán để theo dõi sâu hơn.{% else %}So sánh nhanh mức đóng góp doanh thu giữa các chi nhánh trong cùng khoảng thời gian.{% endif %}</p>
+                </div>
+                <span class="admin-badge admin-badge-secondary">{{ branch_performance_page_obj.paginator.count }} mục</span>
+            </div>
+            {% if branch_performance %}
+            <div class="report-bar-list">
+                {% for item in branch_performance %}
+                <div class="report-bar-item">
+                    <div class="report-bar-item__head">
+                        <div>
+                            <div class="report-bar-item__title">{{ item.label }}</div>
+                            <div class="report-bar-item__meta">{{ item.order_count }} đơn hoàn thành • trung bình {{ item.average_order_value|vnd }}/đơn • chiếm {{ item.share_percent }}% doanh thu</div>
+                        </div>
+                        <div class="report-bar-item__value">{{ item.revenue|vnd }}</div>
+                    </div>
+                    <div class="report-bar-track"><div class="report-bar-fill" data-report-fill-width="{{ item.bar_percent }}"></div></div>
+                </div>
+                {% endfor %}
+            </div>
+            {% include "admin_panel/shared/report_pagination.html" with page_obj=branch_performance_page_obj query_string=branch_performance_query_string page_param='branch_page' aria_label='Phân trang hiệu suất chi nhánh' %}
+            {% else %}
+            <div class="report-empty">Chưa có chi nhánh nào phát sinh doanh thu trong phạm vi báo cáo hiện tại.</div>
+            {% endif %}
+        </div>
+    </section>
+
+    <section class="report-split mb-0">
+        <div class="admin-surface admin-section">
+            <div class="admin-section-head">
+                <div>
+                    <h2>Cảnh báo kho cần chú ý</h2>
+                    <p>Tập trung vào hàng sắp hết, hết hàng và thuốc có hạn sử dụng gần để giữ vận hành ổn định.</p>
+                </div>
+                <div class="report-chip-row mt-0">
+                    <span class="report-chip"><i class="fas fa-exclamation-triangle"></i>{{ low_stock_count }} sắp hết</span>
+                    <span class="report-chip"><i class="fas fa-box-open"></i>{{ out_of_stock_count }} hết hàng</span>
+                    <span class="report-chip"><i class="fas fa-calendar-alt"></i>{{ expiring_soon_count }} HSD ≤ 6 tháng</span>
+                </div>
+            </div>
+            <div class="report-alert-group">
+                <div>
+                    <div class="report-alert-title">Sản phẩm sắp hết hàng</div>
+                    {% if low_stock_medicines %}
+                    <div class="report-list">
+                        {% for medicine in low_stock_medicines %}
+                        <article class="report-list__item">
+                            <div>
+                                <h3 class="report-list__title">{{ medicine.name }}</h3>
+                                <div class="report-list__meta">{{ medicine.pharmacy.name }} • còn {{ medicine.quantity }} {{ medicine.unit|default:'đơn vị'|lower }}</div>
+                            </div>
+                            <div class="report-list__stats">
+                                <span class="report-list__badge"><i class="fas fa-exclamation-triangle"></i><strong>{{ medicine.quantity }}</strong></span>
+                            </div>
+                        </article>
+                        {% endfor %}
+                    </div>
+                    {% include "admin_panel/shared/report_pagination.html" with page_obj=low_stock_page_obj query_string=low_stock_query_string page_param='stock_page' aria_label='Phân trang sản phẩm sắp hết hàng' %}
+                    {% else %}
+                    <div class="report-empty">Không có thuốc nào đang nằm trong ngưỡng cảnh báo tồn kho.</div>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+
+        <div class="admin-surface admin-section">
+            <div class="admin-section-head">
+                <div>
+                    <h2>Thuốc cần ưu tiên xử lý</h2>
+                    <p>Danh sách những thuốc có hạn sử dụng gần để hỗ trợ quyết định trưng bày, bán trước hoặc điều phối tồn kho.</p>
+                </div>
+            </div>
+            {% if expiring_soon_medicines %}
+            <div class="report-list">
+                {% for medicine in expiring_soon_medicines %}
+                <article class="report-list__item">
+                    <div>
+                        <h3 class="report-list__title">{{ medicine.name }}</h3>
+                        <div class="report-list__meta">{{ medicine.pharmacy.name }} • HSD {{ medicine.expiry_date|date:'d/m/Y' }} • còn {{ medicine.quantity }} {{ medicine.unit|default:'đơn vị'|lower }}</div>
+                    </div>
+                    <div class="report-list__stats">
+                        <span class="report-list__badge"><i class="fas fa-calendar-alt"></i><strong>{{ medicine.quantity }}</strong></span>
+                    </div>
+                </article>
+                {% endfor %}
+            </div>
+            {% include "admin_panel/shared/report_pagination.html" with page_obj=expiring_soon_page_obj query_string=expiring_soon_query_string page_param='expiry_page' aria_label='Phân trang thuốc sắp hết hạn' %}
+            {% else %}
+            <div class="report-empty">Không có thuốc nào sắp hết hạn trong 6 tháng tới trong phạm vi đang xem.</div>
+            {% endif %}
+        </div>
+    </section>
+</div>
+{% endblock %}
+
+{% block extra_scripts %}
+<script>
+(function () {
+    document.querySelectorAll('[data-report-chart-columns]').forEach(function (chart) {
+        var columns = parseInt(chart.dataset.reportChartColumns || '', 10);
+        var minWidth = parseInt(chart.dataset.reportChartMinWidth || '', 10);
+        if (!isNaN(columns) && columns > 0) {
+            chart.style.gridTemplateColumns = 'repeat(' + columns + ', minmax(72px, 1fr))';
+        }
+        if (!isNaN(minWidth) && minWidth > 0) {
+            chart.style.minWidth = minWidth + 'px';
+        }
+    });
+
+    document.querySelectorAll('[data-report-fill-width]').forEach(function (bar) {
+        var width = parseFloat(bar.dataset.reportFillWidth || '');
+        if (!isNaN(width) && width >= 0) {
+            bar.style.width = width + '%';
+        }
+    });
+
+    document.querySelectorAll('[data-report-fill-height]').forEach(function (bar) {
+        var height = parseFloat(bar.dataset.reportFillHeight || '');
+        if (!isNaN(height) && height >= 0) {
+            bar.style.height = height + '%';
+        }
+    });
+})();
+</script>
+{% endblock %}

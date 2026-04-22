@@ -159,7 +159,7 @@ def send_templated_email(subject_template, body_template, html_template, context
         message.send(fail_silently=False)
         return True
     except Exception:
-        logger.exception("KhÃ´ng thá» gá»­i email Äáº¿n %s", recipient_list)
+        logger.exception("Không thể gửi email đến %s", recipient_list)
         return False
 
 

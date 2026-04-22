@@ -1,0 +1,525 @@
+{% extends "base.html" %}
+{% load currency_filters %}
+{% block title %}{{ pharmacy.name }}{% endblock %}
+{% block body_class %}site-page pharmacy-page{% endblock %}
+
+{% block content_wrapper %}
+<div class="site-page-section">
+    <div class="container">
+        <div class="section-heading mb-4">
+            <div>
+                <div class="section-heading__eyebrow"><i class="fas fa-clinic-medical"></i> Thông tin chi nhánh</div>
+                <h1>{{ pharmacy.name }}</h1>
+            </div>
+            <a href="{% url 'map_view' %}" class="section-link">Quay lại bản đồ <i class="fas fa-arrow-right"></i></a>
+        </div>
+
+        <section class="content-card detail-showcase detail-showcase--pharmacy mb-4">
+            <div class="detail-grid detail-grid--pharmacy">
+                <div class="detail-media detail-media--pharmacy">
+                    {% if pharmacy_gallery %}
+                    <div class="site-gallery" data-site-gallery>
+                        <div class="splide site-gallery-main">
+                            <div class="splide__track">
+                                <ul class="splide__list">
+                                    {% for image_url in pharmacy_gallery %}
+                                    <li class="splide__slide">
+                                        <div class="site-gallery__slide">
+                                            <img src="{{ image_url }}" alt="{{ pharmacy.name }}">
+                                        </div>
+                                    </li>
+                                    {% endfor %}
+                                </ul>
+                            </div>
+                        </div>
+                        {% if pharmacy_gallery|length > 1 %}
+                        <div class="splide site-gallery-thumbs">
+                            <div class="splide__track">
+                                <ul class="splide__list">
+                                    {% for image_url in pharmacy_gallery %}
+                                    <li class="splide__slide">
+                                        <div class="site-gallery__thumb">
+                                            <img src="{{ image_url }}" alt="{{ pharmacy.name }}">
+                                        </div>
+                                    </li>
+                                    {% endfor %}
+                                </ul>
+                            </div>
+                        </div>
+                        {% endif %}
+                    </div>
+                    {% else %}
+                    <img src="https://cdn-icons-png.flaticon.com/512/4320/4320371.png" alt="{{ pharmacy.name }}">
+                    {% endif %}
+                </div>
+                <div class="detail-copy detail-copy--pharmacy">
+                    <div class="d-flex flex-wrap mb-3 gap-2">
+                        <span class="product-badge mr-2 mb-2 {% if pharmacy_open_state.is_open %}product-badge--success{% elif pharmacy_open_state.is_open == False %}product-badge--danger{% endif %}">{{ pharmacy_open_state.label }}</span>
+                        {% if has_stock %}
+                            <span class="product-badge mr-2 mb-2">{{ medicines|length }} sản phẩm</span>
+                        {% else %}
+                            <span class="product-badge product-badge--danger mr-2 mb-2">Tạm hết sản phẩm</span>
+                        {% endif %}
+                    </div>
+
+                    <h1>{{ pharmacy.name }}</h1>
+                    <div class="detail-rating-inline">
+                        <div class="detail-rating-inline__stars">
+                            {% for _ in '12345' %}
+                            <i class="{% if forloop.counter <= pharmacy_review_summary.rounded %}fas{% else %}far{% endif %} fa-star"></i>
+                            {% endfor %}
+                        </div>
+                        {% if pharmacy_review_summary.count %}
+                        <strong>{{ pharmacy_review_summary.average|floatformat:1 }}/5</strong>
+                        <span>{{ pharmacy_review_summary.count }} đánh giá</span>
+                        {% else %}
+                        <strong>Chưa có đánh giá</strong>
+                        <span>Hãy là người đầu tiên chia sẻ trải nghiệm về chi nhánh này</span>
+                        {% endif %}
+                    </div>
+                    <div class="detail-meta-grid">
+                        <div class="detail-meta-item">
+                            <small>Địa chỉ</small>
+                            <strong>{{ pharmacy.address }}</strong>
+                        </div>
+                        <div class="detail-meta-item">
+                            <small>Điện thoại</small>
+                            <strong>{{ pharmacy.phone }}</strong>
+                        </div>
+                        <div class="detail-meta-item">
+                            <small>Giờ mở cửa</small>
+                            <strong>{{ pharmacy.opening_hours }}</strong>
+                        </div>
+                        <div class="detail-meta-item">
+                            <small>Trạng thái hiện tại</small>
+                            <strong>{{ pharmacy_open_state.label }}</strong>
+                            <span class="detail-meta-helper">{{ pharmacy_open_state.detail }}</span>
+                        </div>
+                    </div>
+
+                    <div class="pharmacy-status-panel">
+                        <div class="pharmacy-status-panel__head">
+                            <div>
+                                <div class="pharmacy-status-panel__eyebrow">Trạng thái phục vụ</div>
+                                <h3>{{ pharmacy_open_state.label }}</h3>
+                            </div>
+                            <span class="pharmacy-status-chip {{ pharmacy_open_state.badge_class }}"><i class="{{ pharmacy_open_state.icon }}"></i>{{ pharmacy_open_state.label }}</span>
+                        </div>
+                        <p class="text-muted mb-3">{{ pharmacy_open_state.detail }}</p>
+                        <div class="product-card__actions">
+                            <a href="{% url 'map_view' %}?pharmacy_id={{ pharmacy.id }}" class="pharma-outline-btn">
+                                <i class="fas fa-map-marked-alt"></i>
+                                <span>Xem trên bản đồ</span>
+                            </a>
+                            {% if has_stock %}
+                                <a href="{% url 'product_list' %}?pharmacy={{ pharmacy.id }}" class="pharma-btn">
+                                    <i class="fas fa-capsules"></i>
+                                    <span>Xem sản phẩm</span>
+                                </a>
+                            {% else %}
+                                <button class="pharma-btn" disabled>
+                                    <i class="fas fa-ban"></i>
+                                    <span>Tạm hết thuốc</span>
+                                </button>
+                            {% endif %}
+                        </div>
+                    </div>
+
+                    <div class="pharmacy-description-panel">
+                        <div class="pharmacy-description-panel__head">
+                            <div>
+                                <div class="pharmacy-status-panel__eyebrow">Mô tả chi nhánh</div>
+                                <h3>Giới thiệu về {{ pharmacy.name }}</h3>
+                            </div>
+                        </div>
+                        <div class="site-rich-content text-muted mb-0">
+                            {{ pharmacy.desc|default:"<p>Thông tin mô tả chi nhánh đang được cập nhật.</p>"|safe }}
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+
+        <section class="section-shell review-section-shell" id="review-form-section">
+            <div class="section-heading">
+                <div>
+                    <div class="section-heading__eyebrow"><i class="fas fa-store"></i> Đánh giá chi nhánh</div>
+                    <h2>Trải nghiệm mua hàng tại {{ pharmacy.name }}</h2>
+                </div>
+            </div>
+
+            <div class="review-layout">
+                <div class="review-summary-card">
+                    <div class="review-summary-card__score">{{ pharmacy_review_summary.average|floatformat:1 }}</div>
+                    <div class="review-summary-card__stars">
+                        {% for _ in '12345' %}
+                        <i class="{% if forloop.counter <= pharmacy_review_summary.rounded %}fas{% else %}far{% endif %} fa-star"></i>
+                        {% endfor %}
+                    </div>
+                    <div class="review-summary-card__meta">{{ pharmacy_review_summary.count }} lượt đánh giá</div>
+                    <div class="review-summary-card__bars">
+                        {% for row in pharmacy_review_summary.distribution %}
+                        <div class="review-bar-row">
+                            <span>{{ row.rating }} sao</span>
+                            <div class="review-bar-track"><div class="review-bar-fill" data-review-bar-width="{{ row.percent }}"></div></div>
+                            <strong>{{ row.count }}</strong>
+                        </div>
+                        {% endfor %}
+                    </div>
+                </div>
+
+                <div class="review-form-card">
+                    <h3>{% if user.is_authenticated %}{% if pharmacy_review_access.can_review %}{% if pharmacy_user_review %}Cập nhật đánh giá của bạn{% else %}Gửi đánh giá cho chi nhánh{% endif %}{% else %}Chỉ khách đã mua mới được đánh giá{% endif %}{% else %}Đăng nhập để đánh giá{% endif %}</h3>
+                    {% if user.is_authenticated and pharmacy_review_access.can_review %}
+                    <p class="text-muted mb-3">Mỗi tài khoản chỉ có một bản ghi đánh giá duy nhất cho mỗi chi nhánh. Nếu gửi lại, hệ thống sẽ cập nhật nội dung đang có.</p>
+                    <form method="post" action="{% url 'submit_pharmacy_review' pharmacy.id %}" class="review-form">
+                        {% csrf_token %}
+                        <div class="review-stars-grid">
+                            {% for radio in pharmacy_review_form.rating %}
+                            <label class="review-radio-card">{{ radio.tag }}<span>{{ radio.choice_label }}</span></label>
+                            {% endfor %}
+                        </div>
+                        {% if pharmacy_review_form.rating.errors %}<div class="text-danger small mt-2">{{ pharmacy_review_form.rating.errors|join:', ' }}</div>{% endif %}
+                        <div class="mt-3">
+                            <label for="{{ pharmacy_review_form.comment.id_for_label }}" class="font-weight-bold">Cảm nhận</label>
+                            {{ pharmacy_review_form.comment }}
+                            {% if pharmacy_review_form.comment.errors %}<div class="text-danger small mt-2">{{ pharmacy_review_form.comment.errors|join:', ' }}</div>{% endif %}
+                        </div>
+                        <button type="submit" class="pharma-btn mt-3"><i class="fas fa-paper-plane"></i><span>{% if pharmacy_user_review %}Cập nhật đánh giá{% else %}Gửi đánh giá{% endif %}</span></button>
+                    </form>
+                    {% elif user.is_authenticated %}
+                    <div class="review-locked-box">
+                        <p>{{ pharmacy_review_access.message }}</p>
+                        <div class="product-card__actions">
+                            <a href="{% url 'order_history' %}" class="pharma-btn"><i class="fas fa-receipt"></i><span>Xem đơn hàng của tôi</span></a>
+                            <a href="{% url 'map_view' %}?pharmacy_id={{ pharmacy.id }}" class="pharma-outline-btn"><i class="fas fa-map-marked-alt"></i><span>Xem chi nhánh trên bản đồ</span></a>
+                        </div>
+                    </div>
+                    {% else %}
+                    <div class="review-login-box">
+                        <p class="mb-3">Bạn cần đăng nhập để gửi đánh giá và chỉ các tài khoản đã mua, có đơn hàng hoàn thành mới được hệ thống ghi nhận đánh giá chi nhánh.</p>
+                        <a href="{% url 'login' %}?next={{ request.path }}" class="pharma-btn"><i class="fas fa-sign-in-alt"></i><span>Đăng nhập ngay</span></a>
+                    </div>
+                    {% endif %}
+                </div>
+            </div>
+
+            <div class="review-list-card" data-review-root="pharmacy" data-review-endpoint="{{ pharmacy_reviews_api_url }}" data-review-empty="Chi nhánh này chưa có đánh giá nào.">
+                <h3>Nhận xét gần đây về chi nhánh</h3>
+                <div class="review-toolbar" data-review-filters>
+                    <div class="review-filter-control">
+                        <span class="review-filter-eyebrow"><i class="fas fa-sliders-h"></i> Bộ lọc đánh giá</span>
+                        <label class="review-filter-label" for="pharmacy-review-filter">Chọn mức sao muốn xem</label>
+                        <div class="review-filter-select-wrap">
+                            <span class="review-filter-select-icon"><i class="fas fa-filter"></i></span>
+                            <select id="pharmacy-review-filter" class="review-filter-select" data-review-select>
+                                <option value="">Tất cả ({{ pharmacy_review_summary.count }})</option>
+                                {% for row in pharmacy_review_summary.distribution %}
+                                <option value="{{ row.rating }}">{{ row.rating }} sao ({{ row.count }})</option>
+                                {% endfor %}
+                            </select>
+                            <i class="fas fa-chevron-down"></i>
+                        </div>
+                    </div>
+                    <div class="review-list-card__meta" data-review-status>
+                        Đang hiển thị {{ pharmacy_review_panel.items|length }} / {{ pharmacy_review_panel.total_count }} đánh giá gần đây.
+                    </div>
+                </div>
+                <div data-review-list>
+                    {% if pharmacy_reviews %}
+                        {% for review in pharmacy_reviews %}
+                        <article class="review-item">
+                            <div class="review-item__head">
+                                <div class="review-item__author">
+                                    <div class="review-item__avatar">{{ review.user.first_name|default:review.user.username|first|upper }}</div>
+                                    <div class="review-item__author-main">
+                                        <div class="review-item__name-row">
+                                            <strong>{{ review.user.first_name|default:review.user.username }}</strong>
+                                            {% if review.was_updated_by_user %}
+                                            <span class="review-item__badge">Đã cập nhật</span>
+                                            {% endif %}
+                                        </div>
+                                        {% if review.was_updated_by_user %}
+                                        <div class="review-item__update-note">Đánh giá do người dùng "{{ review.user.first_name|default:review.user.username }}" cập nhật lại.</div>
+                                        {% endif %}
+                                    <div class="review-item__stars">
+                                        {% for _ in '12345' %}
+                                        <i class="{% if forloop.counter <= review.rating %}fas{% else %}far{% endif %} fa-star"></i>
+                                        {% endfor %}
+                                    </div>
+                                </div>
+                                </div>
+                                <span class="review-item__date">{{ review.updated_at|date:"d/m/Y H:i" }}</span>
+                            </div>
+                            <p class="mb-0 text-muted">{{ review.comment|default:"Khách hàng chưa để lại cảm nhận chi tiết."|linebreaksbr }}</p>
+                        </article>
+                        {% endfor %}
+                    {% else %}
+                        <div class="review-empty-state">Chi nhánh này chưa có đánh giá nào.</div>
+                    {% endif %}
+                </div>
+                <div class="review-list-card__footer">
+                    <button type="button" class="pharma-outline-btn" data-review-load-more data-next-page="{{ pharmacy_review_panel.next_page|default:'' }}" {% if not pharmacy_review_panel.has_next %}hidden{% endif %}>
+                        <i class="fas fa-chevron-down"></i>
+                        <span>Xem thêm đánh giá</span>
+                    </button>
+                </div>
+            </div>
+        </section>
+
+        {% if medicines %}
+        <section class="section-shell">
+            <div class="section-heading">
+                <div>
+                    <div class="section-heading__eyebrow"><i class="fas fa-pills"></i> Sản phẩm tại chi nhánh</div>
+                    <h2>Danh sách thuốc đang kinh doanh</h2>
+                </div>
+                <div class="site-nav__hint">Tổng số: <strong>{{ medicines|length }}</strong> sản phẩm</div>
+            </div>
+
+            <div class="product-grid">
+                {% for m in medicines %}
+                <div class="product-card">
+                    <div class="product-card__image">
+                        {% if m.primary_image_url %}
+                            <img src="{{ m.primary_image_url }}" alt="{{ m.name }}">
+                        {% else %}
+                            <i class="fas fa-pills fa-4x text-secondary"></i>
+                        {% endif %}
+
+                        <div class="product-badge-row">
+                            <span class="product-badge">{{ m.category|default:"Thuốc / Dược phẩm" }}</span>
+                            <span class="product-badge {% if m.is_in_stock %}product-badge--success{% else %}product-badge--danger{% endif %}">
+                                {% if m.is_in_stock %}Còn {{ m.quantity }} {{ m.unit|lower }}{% else %}Hết hàng{% endif %}
+                            </span>
+                        </div>
+                    </div>
+
+                    <div class="product-card__body">
+                        <div class="product-card__title">
+                            <a href="{% url 'medicine_detail' m.id %}">{{ m.name }}</a>
+                        </div>
+                        <div class="price-stack">
+                            <div class="price-stack__value">
+                                {{ m.price|vnd }}
+                                <span class="price-stack__unit">/ {{ m.unit|default:"Hộp" }}</span>
+                            </div>
+                            <span class="price-stack__meta">Nhà sản xuất: {{ m.manufacturer|default:"Đang cập nhật" }}</span>
+                        </div>
+
+                        <div class="product-card__actions">
+                            <a href="{% url 'medicine_detail' m.id %}" class="pharma-outline-btn">
+                                <i class="fas fa-eye"></i>
+                                <span>Xem chi tiết</span>
+                            </a>
+                            {% if m.is_in_stock %}
+                            <form method="post" action="{% url 'add_to_cart' m.id %}" class="js-add-to-cart-form">
+                                {% csrf_token %}
+                                <input type="hidden" name="quantity" value="1">
+                                <button type="submit" class="pharma-btn">
+                                    <i class="fas fa-cart-plus"></i>
+                                    <span>Thêm vào giỏ</span>
+                                </button>
+                            </form>
+                            {% else %}
+                            <button class="pharma-btn" disabled>
+                                <i class="fas fa-ban"></i>
+                                <span>Hết hàng</span>
+                            </button>
+                            {% endif %}
+                        </div>
+                    </div>
+                </div>
+                {% endfor %}
+            </div>
+        </section>
+        {% else %}
+        <div class="site-empty">
+            <div class="site-empty__icon"><i class="fas fa-clinic-medical"></i></div>
+            <h3>Chi nhánh này chưa có sản phẩm khả dụng</h3>
+            <p>Vui lòng chọn chi nhánh khác trên bản đồ hoặc quay lại danh sách sản phẩm.</p>
+            <a href="{% url 'map_view' %}" class="pharma-btn" style="max-width:240px; margin:0 auto;">Quay lại bản đồ</a>
+        </div>
+        {% endif %}
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+(function () {
+    var root = document.querySelector('[data-review-root="pharmacy"]');
+    if (!root) {
+        return;
+    }
+
+    var endpoint = root.getAttribute('data-review-endpoint');
+    var emptyText = root.getAttribute('data-review-empty') || 'Chưa có đánh giá nào.';
+    var listBox = root.querySelector('[data-review-list]');
+    var statusBox = root.querySelector('[data-review-status]');
+    var loadMoreButton = root.querySelector('[data-review-load-more]');
+    var filterSelect = root.querySelector('[data-review-select]');
+    var activeRating = '';
+    var isLoading = false;
+
+    root.querySelectorAll('[data-review-bar-width]').forEach(function (bar) {
+        var width = parseFloat(bar.dataset.reviewBarWidth || '');
+        if (!isNaN(width) && width >= 0) {
+            bar.style.width = width + '%';
+        }
+    });
+
+    function escapeHtml(value) {
+        return String(value || '').replace(/[&<>"']/g, function (char) {
+            return {'&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'}[char] || char;
+        });
+    }
+
+    function renderStars(rating) {
+        var html = '';
+        for (var i = 1; i <= 5; i += 1) {
+            html += '<i class="' + (i <= rating ? 'fas' : 'far') + ' fa-star"></i>';
+        }
+        return html;
+    }
+
+    function renderReviewItem(item) {
+        return [
+            '<article class="review-item">',
+                '<div class="review-item__head">',
+                    '<div class="review-item__author">',
+                        '<div class="review-item__avatar">' + escapeHtml((item.author_name || '?').charAt(0).toUpperCase()) + '</div>',
+                        '<div class="review-item__author-main">',
+                            '<div class="review-item__name-row">',
+                                '<strong>' + escapeHtml(item.author_name) + '</strong>',
+                                (item.was_updated ? '<span class="review-item__badge">Đã cập nhật</span>' : ''),
+                            '</div>',
+                            (item.update_note ? '<div class="review-item__update-note">' + escapeHtml(item.update_note) + '</div>' : ''),
+                        '<div class="review-item__stars">' + renderStars(item.rating) + '</div>',
+                    '</div>',
+                    '</div>',
+                    '<span class="review-item__date">' + escapeHtml(item.updated_at) + '</span>',
+                '</div>',
+                '<p class="mb-0 text-muted">' + escapeHtml(item.comment).replace(/\n/g, '<br>') + '</p>',
+            '</article>'
+        ].join('');
+    }
+
+    function setControlsDisabled(disabled) {
+        if (filterSelect) {
+            filterSelect.disabled = disabled;
+        }
+        if (loadMoreButton) {
+            loadMoreButton.disabled = disabled;
+        }
+    }
+
+    function updateStatus(totalCount, shownCount, rating) {
+        if (!statusBox) {
+            return;
+        }
+        if (!totalCount) {
+            statusBox.textContent = rating ? ('Chưa có đánh giá ' + rating + ' sao.') : emptyText;
+            return;
+        }
+        statusBox.textContent = 'Đang hiển thị ' + shownCount + ' / ' + totalCount + ' đánh giá' + (rating ? (' ' + rating + ' sao.') : ' gần đây.');
+    }
+
+    function updateLoadMore(hasNext, nextPage) {
+        if (!loadMoreButton) {
+            return;
+        }
+        loadMoreButton.dataset.nextPage = hasNext ? String(nextPage || '') : '';
+        loadMoreButton.hidden = !hasNext;
+    }
+
+    function setActiveFilter(rating) {
+        if (filterSelect) {
+            filterSelect.value = rating || '';
+        }
+    }
+
+    function renderEmptyState(message) {
+        listBox.innerHTML = '<div class="review-empty-state">' + escapeHtml(message) + '</div>';
+    }
+
+    function fetchReviews(page, rating, append) {
+        if (isLoading || !endpoint) {
+            return;
+        }
+        isLoading = true;
+        setControlsDisabled(true);
+
+        var params = new URLSearchParams({ page: String(page || 1) });
+        if (rating) {
+            params.set('rating', rating);
+        }
+
+        fetch(endpoint + '?' + params.toString(), {
+            headers: { 'Accept': 'application/json' }
+        })
+            .then(function (response) {
+                return response.json().then(function (data) {
+                    return { ok: response.ok, data: data };
+                });
+            })
+            .then(function (payload) {
+                if (!payload.ok) {
+                    throw new Error(payload.data && payload.data.error ? payload.data.error : 'Không thể tải đánh giá lúc này.');
+                }
+
+                var data = payload.data || {};
+                var items = Array.isArray(data.items) ? data.items : [];
+                var activeItems = listBox.querySelectorAll('.review-item').length;
+
+                if (!append) {
+                    listBox.innerHTML = '';
+                    activeItems = 0;
+                }
+
+                if (!items.length && !append) {
+                    renderEmptyState(data.active_rating ? ('Chưa có đánh giá ' + data.active_rating + ' sao cho chi nhánh này.') : emptyText);
+                } else {
+                    items.forEach(function (item) {
+                        listBox.insertAdjacentHTML('beforeend', renderReviewItem(item));
+                    });
+                }
+
+                activeItems = listBox.querySelectorAll('.review-item').length;
+                updateStatus(data.total_count || 0, activeItems, data.active_rating || '');
+                updateLoadMore(Boolean(data.has_next), data.next_page);
+                setActiveFilter(data.active_rating ? String(data.active_rating) : '');
+                activeRating = data.active_rating ? String(data.active_rating) : '';
+            })
+            .catch(function (error) {
+                if (window.siteUtils && typeof window.siteUtils.showToast === 'function') {
+                    window.siteUtils.showToast(error.message || 'Không thể tải đánh giá lúc này.', 'error');
+                }
+            })
+            .finally(function () {
+                isLoading = false;
+                setControlsDisabled(false);
+            });
+    }
+
+    if (filterSelect) {
+        filterSelect.addEventListener('change', function () {
+            var rating = filterSelect.value || '';
+            activeRating = rating;
+            fetchReviews(1, rating, false);
+        });
+    }
+
+    if (loadMoreButton) {
+        loadMoreButton.addEventListener('click', function () {
+            var nextPage = parseInt(loadMoreButton.dataset.nextPage || '', 10);
+            if (!nextPage) {
+                return;
+            }
+            fetchReviews(nextPage, activeRating, true);
+        });
+    }
+})();
+</script>
+{% endblock %}

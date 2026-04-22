@@ -1,0 +1,444 @@
+{% extends "admin_panel/base.html" %}
+
+{% load static %}
+{% block extra_head %}
+<link rel="stylesheet" href="{% static 'css/admin_panel/system/permissions.css' %}">
+{% endblock %}
+
+{% block admin_content %}
+{% if selected_permission_user %}
+    {% if selected_permission_user.is_superuser %}
+        {% with is_superuser_view=1 %}{% endwith %}
+    {% endif %}
+{% endif %}
+
+<div class="perm-page">
+    <!-- Nhóm 1 · Tổng quan và vận hành chính -->
+    <!-- Nhóm 2 · Sản phẩm, kho và báo cáo -->
+    <!-- Nhóm 3 · Tài khoản và phân quyền -->
+    <section class="perm-hero">
+        <div class="perm-hero__intro">
+            <span class="perm-hero__eyebrow"><i class="fas fa-shield-halved"></i> Trung tâm phân quyền</span>
+            <h2>Phân quyền tài khoản quản trị</h2>
+            <p>Chọn một tài khoản ở cột trái, sau đó bật đúng phần việc mà họ cần dùng. Các quyền được nhóm theo lĩnh vực công việc để người mới cũng biết nên bật gì.</p>
+            <div class="perm-hero__steps">
+                <div class="perm-hero__step">
+                    <span class="perm-hero__step-num">1</span>
+                    <strong>Chọn người</strong>
+                    <span>Tìm theo tên đăng nhập hoặc chi nhánh phụ trách.</span>
+                </div>
+                <div class="perm-hero__step">
+                    <span class="perm-hero__step-num">2</span>
+                    <strong>Dùng preset</strong>
+                    <span>Áp nhanh các bộ quyền mẫu cho đúng vai trò.</span>
+                </div>
+                <div class="perm-hero__step">
+                    <span class="perm-hero__step-num">3</span>
+                    <strong>Tinh chỉnh</strong>
+                    <span>Bật/tắt từng quyền bên trong mỗi module nếu cần.</span>
+                </div>
+            </div>
+        </div>
+
+        <div class="perm-summary">
+            <article class="perm-summary__card is-primary">
+                <span class="perm-summary__label">Tài khoản đang chọn</span>
+                <span class="perm-summary__value">{% if selected_permission_user %}{{ selected_permission_user.username }}{% else %}—{% endif %}</span>
+            </article>
+            <article class="perm-summary__card">
+                <span class="perm-summary__label">Vai trò</span>
+                <span class="perm-summary__value">{% if selected_permission_user %}{% if selected_permission_user.is_superuser %}Quản trị viên cấp cao{% else %}Nhân viên{% endif %}{% else %}—{% endif %}</span>
+            </article>
+            <article class="perm-summary__card">
+                <span class="perm-summary__label">Module đang bật</span>
+                <span class="perm-summary__value">{{ selected_module_count|default:0 }}</span>
+            </article>
+            <article class="perm-summary__card">
+                <span class="perm-summary__label">Tổng quyền đang bật</span>
+                <span class="perm-summary__value">{{ selected_enabled_count|default:0 }}</span>
+            </article>
+        </div>
+    </section>
+
+    {% if selected_permission_user %}
+    <section class="perm-spotlight">
+        <article class="perm-spotlight__main">
+            <span class="perm-spotlight__eyebrow"><i class="fas fa-user-shield"></i> Tài khoản đang chọn</span>
+            <div class="perm-spotlight__head">
+                <div class="perm-spotlight__avatar">{{ selected_permission_user.username|slice:":1"|upper }}</div>
+                <div>
+                    <h3>{{ selected_permission_user.username }}</h3>
+                    <small>{% if selected_permission_user.is_superuser %}Quản trị viên cấp cao{% else %}Nhân viên – {{ selected_profile.managed_pharmacy.name|default:"chưa gán chi nhánh" }}{% endif %}</small>
+                </div>
+            </div>
+            <p>
+                {% if selected_permission_user.is_superuser %}
+                Tài khoản quản trị viên cấp cao. Nhóm này có toàn quyền nên khu phân quyền chỉ dùng để theo dõi, không cần chỉnh chi tiết.
+                {% else %}
+                {{ selected_profile.managed_pharmacy.name|default:"Chưa gán chi nhánh" }} là phạm vi làm việc hiện tại của tài khoản này. Bạn có thể dùng preset rồi tinh chỉnh từng module ngay bên dưới.
+                {% endif %}
+            </p>
+            <div class="perm-spotlight__chips">
+                <span><i class="fas fa-user-tag"></i> {% if selected_permission_user.is_superuser %}Quản trị viên{% else %}Nhân viên{% endif %}</span>
+                <span><i class="fas fa-clinic-medical"></i> {{ selected_profile.managed_pharmacy.name|default:"Chưa gán chi nhánh" }}</span>
+                <span>{% if selected_permission_user.is_active %}<i class="fas fa-circle" style="color:#22a35f;font-size:.6rem"></i> Hoạt động{% else %}<i class="fas fa-lock" style="color:#a31818"></i> Đã khóa{% endif %}</span>
+            </div>
+        </article>
+
+        <div class="perm-spotlight__stats">
+            <div class="perm-spotlight__stat">
+                <small><i class="fas fa-cubes"></i>Module đang bật</small>
+                <strong>{{ selected_module_count|default:0 }}</strong>
+            </div>
+            <div class="perm-spotlight__stat">
+                <small><i class="fas fa-key"></i>Tổng quyền bật</small>
+                <strong>{{ selected_enabled_count|default:0 }}</strong>
+            </div>
+            <div class="perm-spotlight__stat">
+                <small><i class="fas fa-user-tag"></i>Loại tài khoản</small>
+                <strong>{% if selected_permission_user.is_superuser %}Superuser{% else %}Staff{% endif %}</strong>
+            </div>
+            <div class="perm-spotlight__stat">
+                <small><i class="fas fa-clinic-medical"></i>Chi nhánh</small>
+                <strong>{{ selected_profile.managed_pharmacy.name|default:"Chưa gán" }}</strong>
+            </div>
+        </div>
+    </section>
+    {% endif %}
+
+    <div class="perm-layout">
+        <aside class="perm-pane">
+            <section class="perm-card">
+                <div class="perm-card__head">
+                    <div>
+                        <h3>Lọc tài khoản</h3>
+                        <p>Tìm nhanh theo tên hoặc chi nhánh.</p>
+                    </div>
+                    <div class="perm-card__icon"><i class="fas fa-filter"></i></div>
+                </div>
+                <div class="perm-search">
+                    <i class="fas fa-search"></i>
+                    <input type="text" id="perm-user-search" placeholder="Nhập từ khóa…" aria-label="Tìm tài khoản">
+                </div>
+                <div class="perm-chips" role="tablist" aria-label="Lọc vai trò" style="margin-top:12px">
+                    <button type="button" class="perm-chip is-active" data-role-filter="all">Tất cả</button>
+                    <button type="button" class="perm-chip" data-role-filter="staff">Nhân viên</button>
+                    <button type="button" class="perm-chip" data-role-filter="superuser">Quản trị viên</button>
+                </div>
+            </section>
+
+            <section class="perm-card">
+                <div class="perm-card__head">
+                    <div>
+                        <h3>Danh sách tài khoản</h3>
+                        <p>Bấm vào một thẻ để chỉnh quyền cho tài khoản đó.</p>
+                    </div>
+                    <div class="perm-card__icon"><i class="fas fa-users"></i></div>
+                </div>
+                <div class="perm-user-list" id="perm-user-list">
+                    {% for item in permission_user_cards %}
+                    <a href="{% url 'custom_admin_permissions_center' %}?user={{ item.user.pk }}"
+                       class="perm-user-card {% if selected_permission_user and selected_permission_user.pk == item.user.pk %}is-active{% endif %}"
+                       data-user-card
+                       data-role="{% if item.user.is_superuser %}superuser{% else %}staff{% endif %}"
+                       data-search="{{ item.user.username|lower }} {{ item.role_label|lower }} {{ item.managed_branch_label|lower }}">
+                        <div class="perm-user-card__row">
+                            <div class="perm-user-card__info">
+                                <div class="perm-user-avatar">{{ item.user.username|slice:":1"|upper }}</div>
+                                <div class="perm-user-card__text">
+                                    <strong>{{ item.user.username }}</strong>
+                                    <small>{{ item.role_label }}</small>
+                                </div>
+                            </div>
+                            <span class="perm-user-card__count" title="Số quyền đang bật">{{ item.enabled_count }}</span>
+                        </div>
+                        <div class="perm-user-card__meta">
+                            <span><i class="fas fa-clinic-medical"></i> {{ item.managed_branch_label }}</span>
+                            <span>{% if item.user.is_active %}<i class="fas fa-circle" style="color:#22a35f;font-size:.55rem"></i> Hoạt động{% else %}<i class="fas fa-lock" style="color:#a31818"></i> Đã khóa{% endif %}</span>
+                        </div>
+                    </a>
+                    {% empty %}
+                    <div class="perm-note">Chưa có tài khoản nhân viên nào.</div>
+                    {% endfor %}
+                </div>
+            </section>
+        </aside>
+
+        <section class="perm-pane">
+            {% if not selected_permission_user %}
+                <div class="perm-card">
+                    <div class="perm-note">Chưa có tài khoản nào được chọn. Hãy chọn một tài khoản ở cột trái để xem và chỉnh quyền.</div>
+                </div>
+            {% elif selected_permission_user.is_superuser %}
+                <div class="perm-card">
+                    <div class="perm-card__head">
+                        <div>
+                            <h3>{{ selected_permission_user.username }}</h3>
+                            <p>Quản trị viên cấp cao (superuser).</p>
+                        </div>
+                    </div>
+                    <div class="perm-note">
+                        Tài khoản này luôn có toàn quyền và không cần cấu hình chi tiết ở đây. Nếu muốn giới hạn,
+                        hãy chuyển sang dùng tài khoản nhân viên rồi cấp quyền theo từng module.
+                    </div>
+                </div>
+            {% else %}
+            <form method="post" novalidate id="perm-form">
+                {% csrf_token %}
+                <input type="hidden" name="user_id" value="{{ selected_permission_user.pk }}">
+
+                <section class="perm-card">
+                    <div class="perm-card__head">
+                        <div>
+                            <h3>Tìm module &amp; bộ quyền mẫu</h3>
+                            <p>Dùng ô tìm kiếm bên dưới hoặc các nút preset để bật quyền nhanh theo vai trò.</p>
+                        </div>
+                        <div class="perm-card__icon"><i class="fas fa-wand-magic-sparkles"></i></div>
+                    </div>
+                    <div class="perm-search">
+                        <i class="fas fa-filter"></i>
+                        <input type="text" id="perm-module-search" placeholder="Lọc module theo tên (vd: tin tức, đơn hàng…)" aria-label="Lọc module">
+                    </div>
+                    <div class="perm-chips" style="margin-top:12px">
+                        <button type="button" class="perm-chip" data-preset="view" title="Chỉ bật quyền xem trên tất cả module"><i class="fas fa-eye"></i> Bộ xem báo cáo</button>
+                        <button type="button" class="perm-chip" data-preset="warehouse" title="Nhân viên kho: sản phẩm, nhập/xuất, tồn, báo cáo"><i class="fas fa-warehouse"></i> Nhân viên kho</button>
+                        <button type="button" class="perm-chip" data-preset="branch" title="Quản lý chi nhánh: vận hành và sản phẩm"><i class="fas fa-clinic-medical"></i> Quản lý chi nhánh</button>
+                        <button type="button" class="perm-chip" data-preset="content" title="Quyền nội dung website: trang chủ, giới thiệu, tin tức"><i class="fas fa-pen-nib"></i> Biên tập nội dung</button>
+                        <button type="button" class="perm-chip" data-preset="clear" title="Bỏ hết tất cả quyền"><i class="fas fa-eraser"></i> Bỏ hết</button>
+                    </div>
+                </section>
+
+                {% for group in permission_groups %}
+                <div class="perm-group">
+                    <div class="perm-group__title">
+                        <i class="{{ group.icon }}"></i>
+                        <span>{{ group.label }}</span>
+                        <small>{{ group.description }}</small>
+                    </div>
+                    <div class="perm-modules">
+                        {% for row in group.rows %}
+                        <article class="perm-module {% if row.enabled_count %}is-enabled{% endif %}"
+                                 data-module="{{ row.key }}"
+                                 data-module-search="{{ row.label|lower }} {{ row.description|lower }}">
+                            <div class="perm-module__head">
+                                <div>
+                                    <h4>{{ row.label }}</h4>
+                                    <p>{{ row.description }}</p>
+                                </div>
+                                <span class="perm-module__badge" data-module-count="{{ row.key }}">{{ row.enabled_count }}</span>
+                            </div>
+                            <div class="perm-actions">
+                                {% for action in row.actions %}
+                                <label class="perm-toggle {% if not action.supported %}is-disabled{% endif %}">
+                                    <span class="perm-toggle__label">{{ action.label|default:"—" }}</span>
+                                    {% if action.supported %}
+                                    <span class="perm-switch">
+                                        <input type="checkbox"
+                                               name="permission__{{ row.key }}__{{ action.key }}"
+                                               value="1"
+                                               data-module-input="{{ row.key }}"
+                                               {% if action.checked %}checked{% endif %}
+                                               {% if not can_update_permissions %}disabled{% endif %}>
+                                        <span></span>
+                                    </span>
+                                    {% else %}
+                                    <span style="color:#9aa6bc;font-size:.8rem">Không áp dụng</span>
+                                    {% endif %}
+                                </label>
+                                {% endfor %}
+                            </div>
+                            <div class="perm-module__quick">
+                                <button type="button" class="perm-chip" data-row-mode="all" data-row-module="{{ row.key }}">Bật hết</button>
+                                <button type="button" class="perm-chip" data-row-mode="view" data-row-module="{{ row.key }}">Chỉ xem</button>
+                                <button type="button" class="perm-chip" data-row-mode="clear" data-row-module="{{ row.key }}">Bỏ</button>
+                            </div>
+                        </article>
+                        {% endfor %}
+                    </div>
+                </div>
+                {% endfor %}
+
+                <div class="perm-actionbar">
+                    <div class="perm-actionbar__left">
+                        <span class="perm-actionbar__counter">
+                            Đang bật <strong id="perm-live-count">{{ selected_enabled_count|default:0 }}</strong> quyền trên
+                            <strong id="perm-live-modules">{{ selected_module_count|default:0 }}</strong> module
+                        </span>
+                    </div>
+                    {% if can_update_permissions %}
+                    <div style="display:flex;gap:10px;flex-wrap:wrap">
+                        <button type="button" class="btn-admin btn-admin-light" id="perm-reset">
+                            <i class="fas fa-rotate-left"></i>
+                            <span>Đặt lại</span>
+                        </button>
+                        <button type="submit" class="btn-admin btn-admin-primary">
+                            <i class="fas fa-save"></i>
+                            <span>Lưu phân quyền</span>
+                        </button>
+                    </div>
+                    {% else %}
+                    <span class="admin-badge admin-badge-warning">Tài khoản bạn đang dùng không có quyền cập nhật phân quyền.</span>
+                    {% endif %}
+                </div>
+            </form>
+            {% endif %}
+        </section>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_scripts %}
+<script>
+(function () {
+    var searchInput = document.getElementById('perm-user-search');
+    var roleButtons = Array.prototype.slice.call(document.querySelectorAll('[data-role-filter]'));
+    var userCards = Array.prototype.slice.call(document.querySelectorAll('[data-user-card]'));
+    var currentRole = 'all';
+
+    function filterUsers() {
+        var keyword = String(searchInput ? searchInput.value : '').trim().toLowerCase();
+        userCards.forEach(function (card) {
+            var roleMatch = currentRole === 'all' || card.dataset.role === currentRole;
+            var keywordMatch = !keyword || String(card.dataset.search || '').indexOf(keyword) !== -1;
+            card.classList.toggle('is-hidden', !(roleMatch && keywordMatch));
+        });
+    }
+    roleButtons.forEach(function (btn) {
+        btn.addEventListener('click', function () {
+            currentRole = btn.getAttribute('data-role-filter') || 'all';
+            roleButtons.forEach(function (b) { b.classList.toggle('is-active', b === btn); });
+            filterUsers();
+        });
+    });
+    if (searchInput) searchInput.addEventListener('input', filterUsers);
+    filterUsers();
+
+    var form = document.getElementById('perm-form');
+    if (!form) return;
+
+    var moduleSearch = document.getElementById('perm-module-search');
+    var moduleEls = Array.prototype.slice.call(form.querySelectorAll('[data-module]'));
+    var liveCountEl = document.getElementById('perm-live-count');
+    var liveModulesEl = document.getElementById('perm-live-modules');
+    var initialState = serializeForm();
+
+    function serializeForm() {
+        var state = {};
+        Array.prototype.forEach.call(form.querySelectorAll('input[type="checkbox"]'), function (input) {
+            state[input.name] = input.checked;
+        });
+        return state;
+    }
+
+    function moduleInputs(moduleKey) {
+        return form.querySelectorAll('input[data-module-input="' + moduleKey + '"]');
+    }
+
+    function refreshModule(moduleKey) {
+        var inputs = moduleInputs(moduleKey);
+        var enabled = 0;
+        Array.prototype.forEach.call(inputs, function (input) { if (input.checked) enabled++; });
+        var badge = form.querySelector('[data-module-count="' + moduleKey + '"]');
+        if (badge) badge.textContent = enabled;
+        var moduleEl = form.querySelector('[data-module="' + moduleKey + '"]');
+        if (moduleEl) moduleEl.classList.toggle('is-enabled', enabled > 0);
+    }
+
+    function refreshCounters() {
+        var total = 0, activeModules = 0;
+        moduleEls.forEach(function (moduleEl) {
+            var moduleKey = moduleEl.getAttribute('data-module');
+            var inputs = moduleInputs(moduleKey);
+            var enabled = 0;
+            Array.prototype.forEach.call(inputs, function (input) { if (input.checked) enabled++; });
+            total += enabled;
+            if (enabled > 0) activeModules++;
+        });
+        if (liveCountEl) liveCountEl.textContent = total;
+        if (liveModulesEl) liveModulesEl.textContent = activeModules;
+    }
+
+    function refreshAllModules() {
+        moduleEls.forEach(function (el) { refreshModule(el.getAttribute('data-module')); });
+        refreshCounters();
+    }
+
+    function setRow(moduleKey, mode) {
+        Array.prototype.forEach.call(moduleInputs(moduleKey), function (input) {
+            if (input.disabled) return;
+            var action = input.name.split('__')[2];
+            if (mode === 'all') input.checked = true;
+            else if (mode === 'view') input.checked = action === 'view';
+            else input.checked = false;
+        });
+        refreshModule(moduleKey);
+        refreshCounters();
+    }
+
+    var PRESETS = {
+        warehouse: { modules: ['medicine','purchase_import','stock_export','inventory_lot','reports'], views: ['reports'] },
+        branch:    { modules: ['dashboard','medicine','order','return_request','purchase_import','stock_export','inventory_lot','promotion','reports','pharmacy'], views: ['dashboard','reports'] },
+        content:   { modules: ['dashboard','home_page','about_page','news'], views: ['dashboard'] }
+    };
+
+    function applyPreset(mode) {
+        if (mode === 'clear') {
+            Array.prototype.forEach.call(form.querySelectorAll('input[type="checkbox"]'), function (input) {
+                if (!input.disabled) input.checked = false;
+            });
+        } else if (mode === 'view') {
+            Array.prototype.forEach.call(form.querySelectorAll('input[type="checkbox"]'), function (input) {
+                if (input.disabled) return;
+                input.checked = input.name.endsWith('__view');
+            });
+        } else if (PRESETS[mode]) {
+            Array.prototype.forEach.call(form.querySelectorAll('input[type="checkbox"]'), function (input) {
+                if (!input.disabled) input.checked = false;
+            });
+            PRESETS[mode].modules.forEach(function (m) { setRow(m, 'all'); });
+            PRESETS[mode].views.forEach(function (m) { setRow(m, 'view'); });
+        }
+        refreshAllModules();
+    }
+
+    Array.prototype.forEach.call(form.querySelectorAll('[data-preset]'), function (btn) {
+        btn.addEventListener('click', function () { applyPreset(btn.getAttribute('data-preset')); });
+    });
+    Array.prototype.forEach.call(form.querySelectorAll('[data-row-module]'), function (btn) {
+        btn.addEventListener('click', function () {
+            setRow(btn.getAttribute('data-row-module'), btn.getAttribute('data-row-mode'));
+        });
+    });
+    Array.prototype.forEach.call(form.querySelectorAll('input[type="checkbox"]'), function (input) {
+        input.addEventListener('change', function () {
+            var key = (input.name || '').split('__')[1];
+            if (key) refreshModule(key);
+            refreshCounters();
+        });
+    });
+
+    if (moduleSearch) {
+        moduleSearch.addEventListener('input', function () {
+            var keyword = moduleSearch.value.trim().toLowerCase();
+            moduleEls.forEach(function (moduleEl) {
+                var hay = String(moduleEl.getAttribute('data-module-search') || '');
+                moduleEl.classList.toggle('is-hidden', keyword && hay.indexOf(keyword) === -1);
+            });
+        });
+    }
+
+    var resetBtn = document.getElementById('perm-reset');
+    if (resetBtn) {
+        resetBtn.addEventListener('click', function () {
+            Array.prototype.forEach.call(form.querySelectorAll('input[type="checkbox"]'), function (input) {
+                if (input.disabled) return;
+                input.checked = !!initialState[input.name];
+            });
+            refreshAllModules();
+        });
+    }
+
+    refreshAllModules();
+})();
+</script>
+{% endblock %}

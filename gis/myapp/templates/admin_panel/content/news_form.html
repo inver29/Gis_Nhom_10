@@ -1,0 +1,234 @@
+{% extends "admin_panel/base.html" %}
+{% load static %}
+
+{% block extra_head %}
+<link rel="stylesheet" href="{% static 'css/admin-rich-editor.css' %}?v=20260421-news1">
+<link rel="stylesheet" href="{% static 'css/admin_panel/content/news_form.css' %}">
+{% endblock %}
+
+{% block admin_content %}
+<div class="news-editor">
+    <section class="news-editor__hero">
+        <div>
+            <h2>{% if is_create %}Tạo bài viết tin tức{% else %}Chỉnh sửa bài viết tin tức{% endif %}</h2>
+            <p>Form này đã tách rõ phần tiêu đề, ảnh bìa, tóm tắt, nội dung và trạng thái xuất bản. Hai ô tóm tắt và nội dung sử dụng trình soạn thảo WYSIWYG giống phần mô tả của quản lý chi nhánh — bạn có thể định dạng đoạn văn, chèn ảnh và xem nguồn HTML ngay tại đây.</p>
+        </div>
+        <div class="news-editor__hero-actions">
+            <a href="{% url 'custom_admin_list' 'news' %}" class="btn-admin btn-admin-light">
+                <i class="fas fa-arrow-left"></i>
+                <span>Quay lại danh sách</span>
+            </a>
+            {% if news_preview_url %}
+            <a href="{{ news_preview_url }}" class="btn-admin btn-admin-primary" target="_blank" rel="noopener">
+                <i class="fas fa-eye"></i>
+                <span>Xem ngoài site</span>
+            </a>
+            {% endif %}
+        </div>
+    </section>
+
+    <form method="post" enctype="multipart/form-data" id="news-editor-form">
+    <div class="news-editor__layout">
+        <div class="news-editor__form">
+            {% csrf_token %}
+            {% for hidden in form.hidden_fields %}{{ hidden }}{% endfor %}
+
+            {% if form.non_field_errors %}
+            <div class="alert alert-danger mb-0">{{ form.non_field_errors }}</div>
+            {% endif %}
+
+            <section class="news-editor__section">
+                <div class="news-editor__section-head">
+                    <div>
+                        <h3>Thông tin cơ bản</h3>
+                        <p>Tiêu đề và slug là phần định danh chính của bài viết trên trang tin tức.</p>
+                    </div>
+                </div>
+                <div class="news-editor__grid">
+                    <div class="news-editor__field news-editor__field--wide">
+                        <label for="{{ form.title.id_for_label }}">{{ form.title.label }}</label>
+                        {{ form.title }}
+                        {% if form.title.errors %}<div class="admin-field-error">{{ form.title.errors }}</div>{% endif %}
+                    </div>
+                    <div class="news-editor__field news-editor__field--wide">
+                        <label for="{{ form.slug.id_for_label }}">{{ form.slug.label }}</label>
+                        {{ form.slug }}
+                        <div class="admin-inline-help">Nếu để trống, hệ thống sẽ tự tạo slug từ tiêu đề.</div>
+                        {% if form.slug.errors %}<div class="admin-field-error">{{ form.slug.errors }}</div>{% endif %}
+                    </div>
+                </div>
+            </section>
+
+            <section class="news-editor__section">
+                <div class="news-editor__section-head">
+                    <div>
+                        <h3>Tóm tắt hiển thị ngoài danh sách</h3>
+                        <p>Phần này xuất hiện ở trang danh sách tin tức và khối nổi bật, nên viết ngắn gọn nhưng đủ ý.</p>
+                    </div>
+                </div>
+                <div class="news-editor__field news-editor__field--wide">
+                    <label for="{{ form.summary.id_for_label }}">{{ form.summary.label }}</label>
+                    {% include "admin_panel/_partials/rich_editor_field.html" with field=form.summary %}
+                    {% if form.summary.errors %}<div class="admin-field-error">{{ form.summary.errors }}</div>{% endif %}
+                </div>
+            </section>
+
+            <section class="news-editor__section">
+                <div class="news-editor__section-head">
+                    <div>
+                        <h3>Nội dung chi tiết</h3>
+                        <p>Dùng rich text để định dạng đoạn văn, tiêu đề phụ và chèn ảnh vào thân bài.</p>
+                    </div>
+                </div>
+                <div class="news-editor__field news-editor__field--wide">
+                    <label for="{{ form.content.id_for_label }}">{{ form.content.label }}</label>
+                    {% include "admin_panel/_partials/rich_editor_field.html" with field=form.content %}
+                    {% if form.content.errors %}<div class="admin-field-error">{{ form.content.errors }}</div>{% endif %}
+                </div>
+            </section>
+        </div>
+
+        <aside class="news-editor__side">
+            <section class="news-editor__side-card">
+                <h3>Ảnh bìa</h3>
+                <p>Ảnh bìa sẽ hiển thị trên danh sách bài viết và khối nổi bật.</p>
+                <div class="news-editor__publish">
+                    <div class="news-editor__field">
+                        <label for="{{ form.cover_image.id_for_label }}">{{ form.cover_image.label }}</label>
+                        {{ form.cover_image }}
+                        {% if form.cover_image.errors %}<div class="admin-field-error">{{ form.cover_image.errors }}</div>{% endif %}
+                    </div>
+                </div>
+                <div class="news-editor__cover" id="id_cover_image-live-preview">
+                    {% if object and object.cover_image %}
+                    <img src="{{ object.cover_image.url }}" alt="{{ object.title }}">
+                    {% else %}
+                    <div class="news-editor__cover-placeholder">
+                        <i class="fas fa-image fa-2x"></i>
+                        <span>Chưa có ảnh bìa</span>
+                    </div>
+                    {% endif %}
+                </div>
+            </section>
+
+            <section class="news-editor__side-card">
+                <h3>Xuất bản</h3>
+                <p>Thiết lập trạng thái hiển thị và thời điểm xuất bản cho bài viết này.</p>
+                <div class="news-editor__publish">
+                    <div class="news-editor__field">
+                        <label for="{{ form.published_at.id_for_label }}">{{ form.published_at.label }}</label>
+                        {{ form.published_at }}
+                        {% if form.published_at.errors %}<div class="admin-field-error">{{ form.published_at.errors }}</div>{% endif %}
+                    </div>
+                    <div class="news-editor__publish-card" data-publish-card>
+                        <div class="news-editor__publish-head">
+                            <div class="news-editor__publish-copy">
+                                <span class="news-editor__publish-badge {% if form.is_published.value %}news-editor__publish-badge--published{% else %}news-editor__publish-badge--draft{% endif %}" data-publish-badge>
+                                    <i class="fas {% if form.is_published.value %}fa-circle-check{% else %}fa-pen-ruler{% endif %}"></i>
+                                    <span>{% if form.is_published.value %}Đang xuất bản{% else %}Đang để nháp{% endif %}</span>
+                                </span>
+                                <strong data-publish-title>{% if form.is_published.value %}Bài viết đang hiển thị ngoài website{% else %}Bài viết chưa hiển thị ngoài website{% endif %}</strong>
+                                <p data-publish-description>{% if form.is_published.value %}Người dùng có thể xem bài viết này trên trang tin tức ngay sau khi lưu.{% else %}Bạn có thể tiếp tục chỉnh sửa an toàn trước khi bật xuất bản.{% endif %}</p>
+                            </div>
+                            <label class="news-editor__switch" for="{{ form.is_published.id_for_label }}">
+                                {{ form.is_published }}
+                                <span class="news-editor__switch-track">
+                                    <span class="news-editor__switch-knob"></span>
+                                </span>
+                            </label>
+                        </div>
+                        <span class="news-editor__switch-label">Gạt sang phải để xuất bản ngay sau khi lưu.</span>
+                    </div>
+                    {% if form.is_published.errors %}<div class="admin-field-error">{{ form.is_published.errors }}</div>{% endif %}
+                </div>
+            </section>
+
+            <section class="news-editor__side-card">
+                <h3>Thông tin nhanh</h3>
+                <p>{% if news_preview_url %}Bài viết này đang có thể xem ngoài website.{% else %}Bài viết này chưa có bản xem ngoài website cho đến khi được xuất bản.{% endif %}</p>
+                <div class="news-editor__meta">
+                    {% if object %}
+                    <div class="news-editor__meta-item">
+                        <i class="fas fa-user-edit"></i>
+                        <div>Tác giả hiển thị: {{ object.author_display_name }}</div>
+                    </div>
+                    <div class="news-editor__meta-item">
+                        <i class="far fa-clock"></i>
+                        <div>Tạo lúc {{ object.created_at|date:"d/m/Y H:i" }}</div>
+                    </div>
+                    <div class="news-editor__meta-item">
+                        <i class="fas fa-history"></i>
+                        <div>Cập nhật lúc {{ object.updated_at|date:"d/m/Y H:i" }}</div>
+                    </div>
+                    {% else %}
+                    <div class="news-editor__meta-item">
+                        <i class="fas fa-info-circle"></i>
+                        <div>Sau khi lưu bài viết lần đầu, khu này sẽ hiển thị thêm thông tin tạo và cập nhật.</div>
+                    </div>
+                    {% endif %}
+                </div>
+
+                <div class="news-editor__actions">
+                    <button type="submit" form="news-editor-form" class="btn-admin btn-admin-primary">
+                        <i class="fas fa-save"></i>
+                        <span>{% if is_create %}Lưu bài viết{% else %}Cập nhật bài viết{% endif %}</span>
+                    </button>
+                    {% if can_delete_current and object %}
+                    <a href="{% url 'custom_admin_delete' 'news' object.pk %}" class="btn-admin btn-admin-danger">
+                        <i class="fas fa-trash"></i>
+                        <span>Xóa bài viết</span>
+                    </a>
+                    {% endif %}
+                </div>
+            </section>
+        </aside>
+    </div>
+    </form>
+</div>
+{% endblock %}
+
+{% block extra_scripts %}
+<script src="{% static 'js/admin-rich-editor.js' %}?v=20260421-news1"></script>
+<script>
+    document.addEventListener('DOMContentLoaded', function () {
+        var coverInput = document.getElementById('{{ form.cover_image.id_for_label }}');
+        var preview = document.getElementById('id_cover_image-live-preview');
+        var publishInput = document.getElementById('{{ form.is_published.id_for_label }}');
+        var publishBadge = document.querySelector('[data-publish-badge]');
+        var publishTitle = document.querySelector('[data-publish-title]');
+        var publishDescription = document.querySelector('[data-publish-description]');
+
+        function syncPublishState() {
+            if (!publishInput || !publishBadge || !publishTitle || !publishDescription) return;
+            var isPublished = !!publishInput.checked;
+            publishBadge.className = 'news-editor__publish-badge ' + (isPublished ? 'news-editor__publish-badge--published' : 'news-editor__publish-badge--draft');
+            publishBadge.innerHTML = isPublished
+                ? '<i class="fas fa-circle-check"></i><span>Đang xuất bản</span>'
+                : '<i class="fas fa-pen-ruler"></i><span>Đang để nháp</span>';
+            publishTitle.textContent = isPublished
+                ? 'Bài viết đang hiển thị ngoài website'
+                : 'Bài viết chưa hiển thị ngoài website';
+            publishDescription.textContent = isPublished
+                ? 'Người dùng có thể xem bài viết này trên trang tin tức ngay sau khi lưu.'
+                : 'Bạn có thể tiếp tục chỉnh sửa an toàn trước khi bật xuất bản.';
+        }
+
+        if (coverInput && preview && window.FileReader) {
+            coverInput.addEventListener('change', function (event) {
+                var file = event.target.files && event.target.files[0];
+                if (!file) return;
+                var reader = new FileReader();
+                reader.onload = function (loadEvent) {
+                    preview.innerHTML = '<img src="' + loadEvent.target.result + '" alt="Xem trước ảnh bìa">';
+                };
+                reader.readAsDataURL(file);
+            });
+        }
+
+        if (publishInput) {
+            publishInput.addEventListener('change', syncPublishState);
+            syncPublishState();
+        }
+    });
+</script>
+{% endblock %}

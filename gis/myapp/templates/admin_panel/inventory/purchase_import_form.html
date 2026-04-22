@@ -1,0 +1,441 @@
+{% extends "admin_panel/base.html" %}
+{% load static %}
+
+{% block extra_head %}
+<link rel="stylesheet" href="{% static 'css/admin_panel/inventory/purchase_import_form.css' %}?v=20260422-import3">
+{% endblock %}
+
+{% block admin_content %}
+<section class="admin-section-head mb-4">
+    <div>
+        <h2 class="admin-section-title">Nhập hàng bằng Excel</h2>
+        <p class="admin-section-muted">Giữ nguyên toàn bộ logic nhập kho hiện có, bổ sung thêm luồng xem trước và popup nhận diện sản phẩm mới trước khi lưu vào hệ thống.</p>
+    </div>
+    <div class="admin-toolbar">
+        <a href="{% url 'custom_admin_list' 'purchase_import' %}" class="btn-admin btn-admin-light">
+            <i class="fas fa-arrow-left"></i>
+            <span>Quay lại danh sách phiếu nhập</span>
+        </a>
+        <a href="{% static 'files/mau_nhap_hang_10_san_pham.xlsx' %}" class="btn-admin btn-admin-primary" download>
+            <i class="fas fa-file-download"></i>
+            <span>Tải file Excel mẫu</span>
+        </a>
+    </div>
+</section>
+
+<section class="import-hero">
+    <article class="import-hero-card">
+        <h2>Nhập kho nhanh nhưng vẫn kiểm soát được dữ liệu</h2>
+        <p>Hệ thống đọc file Excel, đối chiếu với danh mục sản phẩm đang có trong chi nhánh, xem trước dữ liệu và thông báo ngay những mặt hàng chưa tồn tại trong phạm vi nhập đã chọn.</p>
+        <div class="import-step-grid">
+            <div class="import-step">
+                <span>Bước 1</span>
+                <strong>Chọn phạm vi nhập</strong>
+            </div>
+            <div class="import-step">
+                <span>Bước 2</span>
+                <strong>Xem trước và phân tích file</strong>
+            </div>
+            <div class="import-step">
+                <span>Bước 3</span>
+                <strong>Xác nhận nhập kho</strong>
+            </div>
+        </div>
+    </article>
+
+</section>
+
+<section class="import-layout">
+    <section class="import-form-card">
+        <h3>Thông tin phiếu nhập</h3>
+        <p class="import-card-muted">Phần này vẫn giữ nguyên luồng nhập hàng hiện có. Bạn có thêm một nút phân tích để nhìn ngay sản phẩm mới trước khi nhập.</p>
+
+        <form method="post" enctype="multipart/form-data" novalidate id="purchase-import-form">
+            {% csrf_token %}
+            {% if form.non_field_errors %}
+            <div class="alert alert-danger">{{ form.non_field_errors }}</div>
+            {% endif %}
+
+            <div class="import-form-grid">
+                {% for field in form %}
+                <div class="admin-field">
+                    <label for="{{ field.id_for_label }}">{{ field.label }}</label>
+                    {{ field }}
+                    {% if field.help_text %}
+                    <div class="admin-inline-help">{{ field.help_text }}</div>
+                    {% endif %}
+                    {% if field.errors %}
+                    <div class="admin-field-error">{{ field.errors }}</div>
+                    {% endif %}
+                </div>
+                {% endfor %}
+            </div>
+
+            <div class="import-toolbar mt-4">
+                <button type="button" class="btn-admin btn-admin-light" id="excel-preview-trigger">
+                    <i class="fas fa-table"></i>
+                    <span>Xem dữ liệu trong file</span>
+                </button>
+                <button type="button" class="btn-admin btn-admin-light" id="excel-new-products-trigger">
+                    <i class="fas fa-search-plus"></i>
+                    <span>Sản phẩm mới trong file</span>
+                </button>
+                <button type="submit" class="btn-admin btn-admin-primary">
+                    <i class="fas fa-file-import"></i>
+                    <span>Thực hiện nhập hàng</span>
+                </button>
+            </div>
+        </form>
+    </section>
+
+    <section class="import-preview-card is-empty" id="excel-preview-panel">
+        <div>
+            <h3>Xem trước dữ liệu Excel</h3>
+            <p class="import-card-muted mb-0" id="excel-preview-summary">Chọn file rồi bấm xem dữ liệu để kiểm tra nhanh 10 dòng đầu trước khi nhập kho thật.</p>
+        </div>
+
+        <div class="import-preview-empty" id="excel-preview-empty">
+            Khu vực này sẽ hiển thị dữ liệu đọc trực tiếp từ file Excel để bạn đối chiếu lại số lượng, tên thuốc, hạn dùng và giá nhập trước khi lưu vào hệ thống.
+        </div>
+
+        <div class="import-preview-card__body">
+            <div class="table-responsive">
+                <table class="import-preview-table" id="excel-preview-table"></table>
+            </div>
+        </div>
+    </section>
+</section>
+
+<div class="modal fade" id="new-products-modal" tabindex="-1" role="dialog" aria-labelledby="new-products-modal-title" aria-hidden="true">
+    <div class="modal-dialog modal-lg modal-dialog-scrollable" role="document">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="new-products-modal-title">Sản phẩm mới trong file Excel</h5>
+                <button type="button" class="close" data-dismiss="modal" aria-label="Đóng">
+                    <span aria-hidden="true">&times;</span>
+                </button>
+            </div>
+            <div class="modal-body">
+                <p class="import-card-muted" id="new-products-summary">Hệ thống sẽ phân tích file và thông báo ngay các mặt hàng chưa có trong phạm vi đã chọn.</p>
+                <div id="new-products-empty" class="import-preview-empty">
+                    Chưa có dữ liệu để phân tích.
+                </div>
+                <div id="new-products-list" class="import-analysis-list"></div>
+            </div>
+        </div>
+    </div>
+</div>
+
+{{ purchase_import_preview_payload|json_script:"purchase-import-preview-data" }}
+{% endblock %}
+
+{% block extra_scripts %}
+<script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+<script>
+    (function () {
+        var fileInput = document.querySelector('#purchase-import-form input[type="file"]');
+        var pharmacyField = document.getElementById('id_pharmacy');
+        var previewButton = document.getElementById('excel-preview-trigger');
+        var analysisButton = document.getElementById('excel-new-products-trigger');
+        var previewPanel = document.getElementById('excel-preview-panel');
+        var previewTable = document.getElementById('excel-preview-table');
+        var previewSummary = document.getElementById('excel-preview-summary');
+        var previewEmpty = document.getElementById('excel-preview-empty');
+        var modalElement = document.getElementById('new-products-modal');
+        var modalSummary = document.getElementById('new-products-summary');
+        var modalEmpty = document.getElementById('new-products-empty');
+        var modalList = document.getElementById('new-products-list');
+        var purchaseDataElement = document.getElementById('purchase-import-preview-data');
+        var purchaseData = purchaseDataElement ? JSON.parse(purchaseDataElement.textContent) : null;
+
+        if (!fileInput || !previewButton || !analysisButton || !previewPanel || !previewTable || !previewSummary || !previewEmpty) {
+            return;
+        }
+
+        function normalizeText(value) {
+            return String(value || '')
+                .normalize('NFD')
+                .replace(/[\u0300-\u036f]/g, '')
+                .toLowerCase()
+                .replace(/[^a-z0-9]+/g, ' ')
+                .trim();
+        }
+
+        function setPreviewVisible(isVisible) {
+            previewPanel.classList.toggle('is-empty', !isVisible);
+            previewEmpty.style.display = isVisible ? 'none' : 'block';
+        }
+
+        function renderPreview(rows) {
+            previewTable.innerHTML = '';
+            if (!rows.length) {
+                previewSummary.textContent = 'Không đọc được dữ liệu từ file Excel.';
+                setPreviewVisible(false);
+                return;
+            }
+
+            var headers = rows[0];
+            var bodyRows = rows.slice(1, 11);
+            previewSummary.textContent = 'Đang hiển thị tối đa 10 dòng đầu để kiểm tra nhanh trước khi nhập kho.';
+
+            var thead = document.createElement('thead');
+            var headRow = document.createElement('tr');
+            headers.forEach(function (header) {
+                var th = document.createElement('th');
+                th.textContent = String(header || '').trim() || 'Cột trống';
+                headRow.appendChild(th);
+            });
+            thead.appendChild(headRow);
+
+            var tbody = document.createElement('tbody');
+            bodyRows.forEach(function (row) {
+                var tr = document.createElement('tr');
+                headers.forEach(function (_, index) {
+                    var td = document.createElement('td');
+                    td.textContent = row && typeof row[index] !== 'undefined' ? String(row[index]) : '';
+                    tr.appendChild(td);
+                });
+                tbody.appendChild(tr);
+            });
+
+            previewTable.appendChild(thead);
+            previewTable.appendChild(tbody);
+            setPreviewVisible(true);
+        }
+
+        function readWorkbookRows(file) {
+            return new Promise(function (resolve, reject) {
+                var reader = new FileReader();
+                reader.onload = function (event) {
+                    try {
+                        var workbook = XLSX.read(event.target.result, { type: 'array' });
+                        var firstSheet = workbook.Sheets[workbook.SheetNames[0]];
+                        resolve(XLSX.utils.sheet_to_json(firstSheet, { header: 1, defval: '' }));
+                    } catch (error) {
+                        reject(error);
+                    }
+                };
+                reader.onerror = reject;
+                reader.readAsArrayBuffer(file);
+            });
+        }
+
+        function buildHeaderIndex(headers) {
+            var indexMap = {};
+            headers.forEach(function (header, index) {
+                indexMap[normalizeText(header)] = index;
+            });
+            return indexMap;
+        }
+
+        function getCellValue(row, headerIndex, candidates) {
+            for (var i = 0; i < candidates.length; i += 1) {
+                var key = normalizeText(candidates[i]);
+                if (Object.prototype.hasOwnProperty.call(headerIndex, key)) {
+                    return row[headerIndex[key]];
+                }
+            }
+            return '';
+        }
+
+        function buildCatalogKey(name, manufacturer, unit) {
+            return [normalizeText(name), normalizeText(manufacturer), normalizeText(unit)].join('|');
+        }
+
+        function getTargetBranchIds() {
+            if (!purchaseData) {
+                return [];
+            }
+            var selectedValue = pharmacyField ? String(pharmacyField.value || '').trim() : '';
+            if (!selectedValue) {
+                return [];
+            }
+            if (selectedValue === purchaseData.all_branches_value) {
+                return Object.keys(purchaseData.pharmacy_catalog || {});
+            }
+            return [selectedValue];
+        }
+
+        function getBranchLabelMap() {
+            var branchLabelMap = {};
+            if (!pharmacyField) {
+                return branchLabelMap;
+            }
+            Array.prototype.forEach.call(pharmacyField.options || [], function (option) {
+                branchLabelMap[String(option.value)] = option.textContent.trim();
+            });
+            return branchLabelMap;
+        }
+
+        function productExistsInBranch(product, branchCatalog) {
+            return (branchCatalog || []).some(function (catalogItem) {
+                if (product.medicineId && String(catalogItem.id) === String(product.medicineId)) {
+                    return true;
+                }
+                return (
+                    catalogItem.match_name === product.matchName &&
+                    catalogItem.match_manufacturer === product.matchManufacturer &&
+                    catalogItem.match_unit === product.matchUnit
+                );
+            });
+        }
+
+        function analyzeProducts(rows) {
+            if (!purchaseData) {
+                throw new Error('Không tìm thấy dữ liệu đối chiếu danh mục để phân tích.');
+            }
+            if (!rows.length) {
+                throw new Error('Không đọc được dữ liệu từ file Excel.');
+            }
+
+            var targetBranchIds = getTargetBranchIds();
+            if (!targetBranchIds.length) {
+                throw new Error('Hãy chọn chi nhánh trước khi phân tích sản phẩm mới.');
+            }
+
+            var branchLabelMap = getBranchLabelMap();
+            var headerIndex = buildHeaderIndex(rows[0] || []);
+            var distinctProducts = {};
+
+            rows.slice(1).forEach(function (row) {
+                var medicineId = String(getCellValue(row, headerIndex, ['medicine_id', 'id']) || '').trim();
+                var medicineName = String(getCellValue(row, headerIndex, ['medicine_name', 'name', 'ten thuoc']) || '').trim();
+                var manufacturer = String(getCellValue(row, headerIndex, ['manufacturer', 'hang san xuat']) || '').trim();
+                var unit = String(getCellValue(row, headerIndex, ['unit', 'don vi']) || '').trim();
+                var quantity = String(getCellValue(row, headerIndex, ['quantity', 'so luong']) || '').trim();
+
+                if (!medicineId && !medicineName) {
+                    return;
+                }
+                if (!quantity) {
+                    return;
+                }
+
+                var templateItem = medicineId ? (purchaseData.template_catalog || {})[medicineId] : null;
+                var resolvedName = medicineName || (templateItem ? templateItem.display_name : '');
+                var resolvedManufacturer = manufacturer || (templateItem ? templateItem.display_manufacturer : '');
+                var resolvedUnit = unit || (templateItem ? templateItem.display_unit : '');
+                var key = medicineId ? ('id:' + medicineId) : ('key:' + buildCatalogKey(resolvedName, resolvedManufacturer, resolvedUnit));
+
+                if (!distinctProducts[key]) {
+                    distinctProducts[key] = {
+                        medicineId: medicineId,
+                        displayName: resolvedName || 'Sản phẩm chưa đặt tên',
+                        displayManufacturer: resolvedManufacturer || 'Không rõ nhà sản xuất',
+                        displayUnit: resolvedUnit || 'Không rõ đơn vị',
+                        matchName: normalizeText(resolvedName),
+                        matchManufacturer: normalizeText(resolvedManufacturer),
+                        matchUnit: normalizeText(resolvedUnit)
+                    };
+                }
+            });
+
+            var productList = Object.keys(distinctProducts).map(function (key) {
+                return distinctProducts[key];
+            });
+
+            var analysis = {
+                totalDistinctProducts: productList.length,
+                existingCount: 0,
+                newItems: []
+            };
+
+            productList.forEach(function (product) {
+                var missingBranches = targetBranchIds.filter(function (branchId) {
+                    return !productExistsInBranch(product, (purchaseData.pharmacy_catalog || {})[branchId]);
+                });
+
+                if (missingBranches.length) {
+                    analysis.newItems.push({
+                        displayName: product.displayName,
+                        displayManufacturer: product.displayManufacturer,
+                        displayUnit: product.displayUnit,
+                        missingBranches: missingBranches.map(function (branchId) {
+                            return branchLabelMap[branchId] || ('Chi nhánh #' + branchId);
+                        })
+                    });
+                } else {
+                    analysis.existingCount += 1;
+                }
+            });
+
+            return analysis;
+        }
+
+        function renderAnalysis(analysis) {
+            modalList.innerHTML = '';
+
+            if (!analysis.totalDistinctProducts) {
+                modalSummary.textContent = 'File hiện tại chưa có dòng sản phẩm hợp lệ để đối chiếu.';
+                modalEmpty.style.display = 'block';
+                modalEmpty.textContent = 'Hãy kiểm tra lại cột medicine_id, medicine_name và quantity trong file.';
+                return;
+            }
+
+            modalSummary.textContent = 'Có ' + analysis.totalDistinctProducts + ' sản phẩm phân biệt trong file. ' +
+                analysis.existingCount + ' sản phẩm đã có sẵn và ' + analysis.newItems.length + ' sản phẩm cần tạo mới trong phạm vi đã chọn.';
+
+            if (!analysis.newItems.length) {
+                modalEmpty.style.display = 'block';
+                modalEmpty.textContent = 'Tất cả sản phẩm trong file đã tồn tại trong phạm vi nhập hàng đã chọn.';
+                return;
+            }
+
+            modalEmpty.style.display = 'none';
+            analysis.newItems.forEach(function (item) {
+                var card = document.createElement('div');
+                card.className = 'import-analysis-item';
+                var branchText = item.missingBranches.join(', ');
+                card.innerHTML =
+                    '<strong>' + item.displayName + '</strong>' +
+                    '<small>Nhà sản xuất: ' + item.displayManufacturer + ' · Đơn vị: ' + item.displayUnit + '</small>' +
+                    '<small>Chưa có trong: ' + branchText + '</small>';
+                modalList.appendChild(card);
+            });
+        }
+
+        function openAnalysisModal() {
+            var file = fileInput.files && fileInput.files[0];
+            if (!file) {
+                modalSummary.textContent = 'Hãy chọn file Excel trước khi phân tích sản phẩm mới.';
+                modalEmpty.style.display = 'block';
+                modalEmpty.textContent = 'Chưa có file nào được chọn.';
+                modalList.innerHTML = '';
+                window.jQuery(modalElement).modal('show');
+                return;
+            }
+
+            readWorkbookRows(file).then(function (rows) {
+                renderAnalysis(analyzeProducts(rows));
+                window.jQuery(modalElement).modal('show');
+            }).catch(function (error) {
+                modalSummary.textContent = 'Không thể phân tích file Excel này.';
+                modalEmpty.style.display = 'block';
+                modalEmpty.textContent = error && error.message ? error.message : 'Vui lòng kiểm tra lại định dạng file.';
+                modalList.innerHTML = '';
+                window.jQuery(modalElement).modal('show');
+            });
+        }
+
+        previewButton.addEventListener('click', function () {
+            var file = fileInput.files && fileInput.files[0];
+            if (!file) {
+                previewSummary.textContent = 'Hãy chọn file Excel trước khi xem dữ liệu.';
+                previewTable.innerHTML = '';
+                setPreviewVisible(false);
+                return;
+            }
+
+            readWorkbookRows(file).then(function (rows) {
+                renderPreview(rows);
+            }).catch(function () {
+                previewSummary.textContent = 'Không thể đọc file Excel này. Vui lòng kiểm tra lại định dạng.';
+                previewTable.innerHTML = '';
+                setPreviewVisible(false);
+            });
+        });
+
+        analysisButton.addEventListener('click', openAnalysisModal);
+    })();
+</script>
+{% endblock %}

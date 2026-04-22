@@ -1,0 +1,18 @@
+.stock-export-detail-grid{display:grid;grid-template-columns:minmax(300px,.86fr) minmax(0,1.14fr);gap:20px}
+    .stock-export-detail-card{padding:24px;border-radius:28px;background:#fff;border:1px solid rgba(17,70,184,.08);box-shadow:0 18px 42px rgba(17,70,184,.08)}
+    .stock-export-meta{display:grid;gap:14px}
+    .stock-export-meta__item{padding:14px 16px;border-radius:18px;background:#f8fbff;border:1px solid rgba(17,70,184,.08)}
+    .stock-export-meta__item small{display:block;color:#6d7ea0;margin-bottom:6px;font-weight:800}
+    .stock-export-meta__item strong{display:block;color:#17315d;line-height:1.5}
+    .stock-export-lines{display:grid;gap:16px}
+    .stock-export-line{padding:18px;border-radius:22px;background:linear-gradient(180deg,#fff 0%,#f7fbff 100%);border:1px solid rgba(17,70,184,.08)}
+    .stock-export-line__stats{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px;margin-top:14px}
+    .stock-export-line__stats div{padding:12px 14px;border-radius:16px;background:#fff;border:1px solid rgba(17,70,184,.08)}
+    .stock-export-line__stats small{display:block;color:#6d7ea0;margin-bottom:6px;font-weight:800}
+    .stock-export-lots{margin-top:14px;display:grid;gap:10px}
+    .stock-export-lot{padding:13px 14px;border-radius:16px;background:#fff;border:1px solid rgba(17,70,184,.08)}
+    .stock-export-pill{display:inline-flex;align-items:center;padding:7px 12px;border-radius:999px;font-size:.82rem;font-weight:900}
+    .stock-export-pill--success{background:rgba(17,138,82,.12);color:#14824f}
+    .stock-export-pill--info{background:#eef4ff;color:#1146b8}
+    .stock-export-pill--danger{background:rgba(214,59,59,.12);color:#c23030}
+    @media (max-width:991px){.stock-export-detail-grid,.stock-export-line__stats{grid-template-columns:1fr}}

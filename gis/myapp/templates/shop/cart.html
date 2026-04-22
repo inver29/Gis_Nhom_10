@@ -1,0 +1,261 @@
+{% extends "base.html" %}
+{% load static %}
+{% load currency_filters %}
+{% block title %}Giỏ hàng{% endblock %}
+{% block body_class %}site-page cart-page{% endblock %}
+
+{% block extra_css %}
+<link rel="stylesheet" href="{% static 'css/shop/cart.css' %}">
+{% endblock %}
+
+{% block content_wrapper %}
+<div class="cart-layout">
+    <div class="container cart-shell">
+        <div class="cart-hero">
+            <div>
+                <div class="cart-hero__eyebrow"><i class="fas fa-shopping-bag"></i> Giỏ hàng của bạn</div>
+                <h1>Kiểm tra sản phẩm trước khi thanh toán</h1>
+                <p>Xem lại số lượng, giá đang áp dụng và tạm tính hiện tại trước khi chuyển sang bước thanh toán.</p>
+            </div>
+            <a href="{% url 'product_list' %}" class="cart-hero__cta"><i class="fas fa-plus-circle"></i> Tiếp tục mua sắm</a>
+        </div>
+
+        {% if cart.items.exists %}
+        <div class="cart-main-grid" data-cart-root>
+            <section class="cart-panel cart-items-panel">
+                <div class="cart-items-head">
+                    <div>
+                        <h2>Sản phẩm đang có trong giỏ</h2>
+                        <p>{% if cart_pricing.loyalty.show_program_hint %}Khuyến mãi sản phẩm được tính trực tiếp vào giá từng thuốc. Ưu đãi theo hạng khách hàng được gộp ở phần tóm tắt bên phải để tổng đơn dễ theo dõi hơn.{% else %}Xem lại số lượng, đơn giá đang áp dụng và thành tiền của từng sản phẩm trước khi chuyển sang bước thanh toán.{% endif %}</p>
+                    </div>
+                </div>
+
+                <div class="cart-list">
+                    {% for item in cart_items %}
+                    <article class="cart-card" id="cart-item-{{ item.id }}" data-cart-item-row="{{ item.id }}">
+                        <div class="cart-product">
+                            <div class="cart-thumb">
+                                {% if item.medicine.primary_image_url %}
+                                    <img src="{{ item.medicine.primary_image_url }}" alt="{{ item.medicine.name }}">
+                                {% else %}
+                                    <i class="fas fa-pills"></i>
+                                {% endif %}
+                            </div>
+                            <div class="cart-product__body">
+                                <a href="{% url 'medicine_detail' item.medicine.id %}" class="cart-product__title">{{ item.medicine.name }}</a>
+                                <div class="cart-product__meta">
+                                    <span class="cart-product__chip"><i class="fas fa-box-open"></i>{{ item.medicine.unit|default:"Hộp" }}</span>
+                                </div>
+
+                                <div class="cart-price" data-cart-unit-price>
+                                    <span class="cart-price__label">Đơn giá đang áp dụng</span>
+                                    <span class="cart-price__current">{{ item.loyalty_unit_price|vnd }}</span>
+                                    {% if item.has_discount %}
+                                    <span class="cart-price__system">Đã gồm khuyến mãi sản phẩm. Giá gốc: <s>{{ item.original_unit_price|vnd }}</s></span>
+                                    {% else %}
+                                    <span class="cart-price__system">Giá hiện tại của sản phẩm chưa có khuyến mãi riêng.</span>
+                                    {% endif %}
+                                </div>
+
+                                <div class="cart-stock-note {% if item.quantity > item.medicine.quantity %}is-warning{% endif %}" data-cart-stock-note>
+                                    <i class="fas fa-warehouse"></i>
+                                    <span>Còn {{ item.medicine.quantity }} sản phẩm trong kho</span>
+                                </div>
+                                <div class="cart-qty-alert" data-cart-stock-alert {% if item.quantity <= item.medicine.quantity %}hidden{% endif %}>
+                                    Giỏ hàng đang vượt tồn kho. Bạn hãy giảm số lượng để tiếp tục thanh toán.
+                                </div>
+
+                                <a href="{% url 'medicine_detail' item.medicine.id %}" class="cart-product__link"><i class="fas fa-eye"></i>Xem chi tiết sản phẩm</a>
+                            </div>
+                        </div>
+
+                        <div class="cart-side">
+                            <div class="cart-side__section">
+                                <small>Số lượng</small>
+                                <form method="post" action="{% url 'update_cart_item' item.id %}" class="cart-qty-form js-cart-qty-form">
+                                    {% csrf_token %}
+                                    <input type="hidden" name="action" value="">
+                                    <input type="hidden" name="focus_item_id" value="{{ item.id }}">
+                                    <div class="cart-qty-pill">
+                                        <button type="button" class="cart-qty-btn" data-cart-step="decrease" aria-label="Giảm số lượng {{ item.medicine.name }}">
+                                            <i class="fas fa-minus"></i>
+                                        </button>
+                                        <input
+                                            type="number"
+                                            name="quantity"
+                                            min="0"
+                                            value="{{ item.quantity }}"
+                                            class="cart-qty-input js-cart-qty-input"
+                                            data-current-quantity="{{ item.quantity }}"
+                                            aria-label="Số lượng {{ item.medicine.name }}"
+                                        >
+                                        <button type="button" class="cart-qty-btn cart-qty-btn--primary" data-cart-step="increase" aria-label="Tăng số lượng {{ item.medicine.name }}">
+                                            <i class="fas fa-plus"></i>
+                                        </button>
+                                    </div>
+                                </form>
+                            </div>
+
+                            <div class="cart-side__section cart-side__total" data-cart-row-total>
+                                <small>Thành tiền</small>
+                                <strong>{{ item.line_final_total|vnd }}</strong>
+                                <span>{{ item.quantity }} × {{ item.system_unit_price|vnd }}</span>
+                            </div>
+
+                            <a href="{% url 'remove_from_cart' item.id %}" class="cart-remove" aria-label="Xóa {{ item.medicine.name }} khỏi giỏ hàng">
+                                <i class="fas fa-trash-alt"></i>
+                                <span>Xóa sản phẩm</span>
+                            </a>
+                        </div>
+                    </article>
+                    {% endfor %}
+                </div>
+            </section>
+
+            <aside class="cart-panel cart-summary">
+                <div class="cart-summary__title">
+                    <div class="cart-summary__icon"><i class="fas fa-receipt"></i></div>
+                    <div>
+                        <h3>Tóm tắt đơn hàng</h3>
+                        <p>{% if cart_pricing.loyalty.show_program_hint %}Tổng hợp tiền hàng, ưu đãi hạng khách hàng và số tiền cần thanh toán ở bước tiếp theo.{% else %}Tổng hợp nhanh tiền hàng hiện tại và số tiền sẽ được chuyển sang bước thanh toán.{% endif %}</p>
+                    </div>
+                </div>
+
+                <div class="cart-summary__hero">
+                    <small>Tổng tiền hàng hiện tại</small>
+                    <strong data-cart-grand-total>{{ cart_pricing.final_product_total|vnd }}</strong>
+                    <span>Phí giao hàng sẽ được tính ở bước thanh toán theo chi nhánh xử lý và tuyến đường giao thực tế.</span>
+                </div>
+
+                <div class="cart-summary__metrics">
+                    <div class="cart-summary__line">
+                        <div>
+                            <small>Dòng sản phẩm</small>
+                            <span>Số loại thuốc khác nhau đang có trong giỏ.</span>
+                        </div>
+                        <strong>{{ cart_pricing.line_item_count }}</strong>
+                    </div>
+                    <div class="cart-summary__line">
+                        <div>
+                            <small>Tổng số lượng</small>
+                            <span>Tổng số đơn vị sản phẩm bạn đang chọn mua.</span>
+                        </div>
+                        <strong>{{ cart_pricing.total_quantity }}</strong>
+                    </div>
+                    <div class="cart-summary__line">
+                        <div>
+                            <small>Tạm tính tiền hàng</small>
+                            <span>{% if cart_pricing.loyalty.show_program_hint %}Đã gồm khuyến mãi sản phẩm của hệ thống, chưa trừ ưu đãi theo hạng khách hàng.{% else %}Đã gồm khuyến mãi sản phẩm của hệ thống đang áp dụng.{% endif %}</span>
+                        </div>
+                        <strong data-cart-subtotal>{{ cart_pricing.system_subtotal|vnd }}</strong>
+                    </div>
+                    {% if cart_pricing.loyalty.discount_percent > 0 %}
+                    <div class="cart-summary__line cart-summary__line--discount">
+                        <div>
+                            <small>Ưu đãi hạng {{ cart_pricing.loyalty.label }}</small>
+                            <span>Giảm {{ cart_pricing.loyalty.discount_percent }}% trên phần tạm tính tiền hàng của đơn.</span>
+                        </div>
+                        <strong>-{{ cart_pricing.loyalty_discount_total|vnd }}</strong>
+                    </div>
+                    {% endif %}
+                </div>
+
+                {% if cart_pricing.loyalty.show_program_hint %}
+                <div class="cart-summary__tier">
+                    <div class="cart-summary__tier-top">
+                        <div class="cart-summary__tier-badge">
+                            {% if cart_pricing.loyalty.discount_percent > 0 %}
+                            <i class="fas fa-crown"></i>
+                            {% else %}
+                            <i class="fas fa-layer-group"></i>
+                            {% endif %}
+                        </div>
+                        <div>
+                            {% if cart_pricing.loyalty.discount_percent > 0 %}
+                            <h4>Hạng {{ cart_pricing.loyalty.label }} đang giảm {{ cart_pricing.loyalty.discount_percent }}% cho đơn hàng</h4>
+                            <p>Ưu đãi được trừ một lần ở phần tạm tính tiền hàng và sẽ giữ nguyên sang bước thanh toán, hóa đơn và lịch sử đơn.</p>
+                            {% else %}
+                            <h4>Chưa có ưu đãi hạng khách hàng</h4>
+                            <p>Hoàn thành thêm đơn hàng để mở khóa ưu đãi theo hạng ở giỏ hàng và bước thanh toán.</p>
+                            {% endif %}
+                        </div>
+                    </div>
+                    {% if cart_pricing.loyalty.discount_percent > 0 %}
+                    <span class="cart-summary__tier-note"><i class="fas fa-check-circle"></i>Ưu đãi hạng khách hàng đang được tính trực tiếp vào tổng tiền hàng của giỏ.</span>
+                    {% elif cart_pricing.loyalty.next_tier %}
+                    <span class="cart-summary__tier-note"><i class="fas fa-arrow-up"></i>Mua thêm {{ cart_pricing.loyalty.amount_to_next_tier|vnd }} để lên hạng {{ cart_pricing.loyalty.next_tier.label }}.</span>
+                    {% endif %}
+                </div>
+                {% endif %}
+
+                <div class="cart-summary__actions">
+                    <a href="{% url 'checkout' %}" class="pharma-btn">
+                        <i class="fas fa-credit-card"></i>
+                        <span>Tiến hành thanh toán</span>
+                    </a>
+                    <a href="{% url 'product_list' %}" class="pharma-outline-btn">
+                        <i class="fas fa-arrow-left"></i>
+                        <span>Xem thêm sản phẩm</span>
+                    </a>
+                </div>
+            </aside>
+        </div>
+        {% else %}
+        <div class="site-empty">
+            <div class="site-empty__icon"><i class="fas fa-shopping-basket"></i></div>
+            <h3>Giỏ hàng của bạn đang trống</h3>
+            <p>Hãy thêm sản phẩm vào giỏ trước khi tiến hành thanh toán.</p>
+            <a href="{% url 'product_list' %}" class="pharma-btn" style="max-width:260px; margin:0 auto;">Đi tới trang sản phẩm</a>
+        </div>
+        {% endif %}
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+(function () {
+    function submitQuantityForm(form, actionValue) {
+        if (!form || form.dataset.submitting === '1') {
+            return;
+        }
+        var actionInput = form.querySelector('input[name="action"]');
+        if (actionInput) {
+            actionInput.value = actionValue || '';
+        }
+        form.dataset.submitting = '1';
+        form.submit();
+    }
+
+    if (window.location.hash && window.location.hash.indexOf('#cart-item-') === 0) {
+        window.setTimeout(function () {
+            var activeRow = document.querySelector(window.location.hash);
+            if (activeRow && typeof activeRow.scrollIntoView === 'function') {
+                activeRow.scrollIntoView({ block: 'center' });
+            }
+        }, 40);
+    }
+
+    document.querySelectorAll('.js-cart-qty-form').forEach(function (form) {
+        var input = form.querySelector('.js-cart-qty-input');
+        form.querySelectorAll('[data-cart-step]').forEach(function (button) {
+            button.addEventListener('click', function () {
+                submitQuantityForm(form, button.getAttribute('data-cart-step'));
+            });
+        });
+
+        if (input) {
+            input.addEventListener('change', function () {
+                submitQuantityForm(form, '');
+            });
+            input.addEventListener('keydown', function (event) {
+                if (event.key === 'Enter') {
+                    event.preventDefault();
+                    submitQuantityForm(form, '');
+                }
+            });
+        }
+    });
+})();
+</script>
+{% endblock %}

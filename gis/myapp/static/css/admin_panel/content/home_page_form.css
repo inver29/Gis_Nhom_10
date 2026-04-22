@@ -1,0 +1,126 @@
+.home-editor{display:grid;gap:18px}
+    .home-editor__hero,
+    .home-editor__section,
+    .home-editor__item-card,
+    .home-editor__actions{
+        border-radius:28px;
+        background:#fff;
+        border:1px solid rgba(17,70,184,.08);
+        box-shadow:0 18px 42px rgba(17,70,184,.08);
+    }
+    .home-editor__hero{
+        display:grid;
+        grid-template-columns:minmax(0,1fr) auto;
+        gap:18px;
+        align-items:center;
+        padding:28px;
+        background:linear-gradient(145deg,#f7fbff 0%,#ffffff 58%,#eef5ff 100%);
+    }
+    .home-editor__hero h2{margin:0 0 8px;color:#17315d;font-size:1.48rem;font-weight:900}
+    .home-editor__hero p{margin:0;color:#5f7290;line-height:1.72;max-width:820px}
+
+    .home-editor__section{padding:24px}
+    .home-editor__section-head{
+        display:flex;
+        justify-content:space-between;
+        align-items:flex-start;
+        gap:14px;
+        margin-bottom:16px;
+        padding-bottom:14px;
+        border-bottom:1px solid rgba(17,70,184,.08);
+    }
+    .home-editor__section-head h3{margin:0 0 8px;color:#17315d;font-size:1.14rem;font-weight:900}
+    .home-editor__section-head p{margin:0;color:#607392;line-height:1.68;max-width:780px}
+    .home-editor__section-actions{display:flex;flex-wrap:wrap;gap:10px;align-items:center}
+    .home-editor__grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:16px 18px}
+    .home-editor__field,
+    .home-editor__item-field{display:grid;gap:8px}
+    .home-editor__field--wide,
+    .home-editor__item-field--wide{grid-column:1/-1}
+    .home-editor__field label,
+    .home-editor__item-field label{margin:0;color:#27466f;font-weight:800}
+
+    .home-editor__list{display:grid;gap:16px}
+    .home-editor__item-card{
+        display:grid;
+        grid-template-columns:220px minmax(0,1fr);
+        gap:18px;
+        padding:18px;
+        background:linear-gradient(180deg,#fff 0%,#f8fbff 100%);
+        transition:opacity .2s ease, transform .2s ease, box-shadow .2s ease;
+    }
+    .home-editor__item-card.is-marked-delete{
+        opacity:.62;
+        box-shadow:none;
+        border-style:dashed;
+    }
+    .home-editor__preview{
+        min-height:180px;
+        border-radius:22px;
+        overflow:hidden;
+        background:#eef4ff;
+        display:flex;
+        align-items:center;
+        justify-content:center;
+    }
+    .home-editor__preview img{display:block;width:100%;height:100%;object-fit:cover}
+    .home-editor__placeholder{
+        display:grid;
+        gap:8px;
+        justify-items:center;
+        padding:18px;
+        text-align:center;
+        color:#1b57c8;
+    }
+    .home-editor__item-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px 14px}
+    .home-editor__delete{
+        grid-column:1/-1;
+        display:flex;
+        align-items:center;
+        gap:10px;
+        padding:12px 14px;
+        border-radius:18px;
+        background:#fff6f6;
+        border:1px solid rgba(217,57,57,.14);
+        color:#8a2d34;
+        font-weight:700;
+    }
+    .home-editor__delete input{width:18px;height:18px}
+    .home-editor__hint{
+        padding:12px 14px;
+        border-radius:18px;
+        background:#f8fbff;
+        border:1px solid rgba(17,70,184,.08);
+        color:#607392;
+        line-height:1.66;
+        font-size:.95rem;
+    }
+    .home-editor__item-field.is-hidden{display:none}
+
+    .home-editor__actions{
+        position:sticky;
+        bottom:16px;
+        z-index:4;
+        display:flex;
+        flex-wrap:wrap;
+        justify-content:space-between;
+        gap:12px;
+        padding:14px 16px;
+        background:rgba(255,255,255,.95);
+        backdrop-filter:blur(10px);
+    }
+    .home-editor__actions-group{display:flex;flex-wrap:wrap;gap:10px}
+
+    @media (max-width:991px){
+        .home-editor__hero,
+        .home-editor__item-card{grid-template-columns:1fr}
+        .home-editor__preview{min-height:220px}
+    }
+    @media (max-width:767px){
+        .home-editor__grid,
+        .home-editor__item-grid{grid-template-columns:1fr}
+        .home-editor__actions,
+        .home-editor__actions-group{justify-content:stretch}
+        .home-editor__actions .btn-admin,
+        .home-editor__section-actions .btn-admin{width:100%;justify-content:center}
+    }
