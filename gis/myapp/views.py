@@ -77,7 +77,9 @@ from .emails import (
     send_order_confirmation_email,
     send_order_invoice_email,
     send_order_status_update_email,
+    send_return_request_received_email,
     send_return_request_status_update_email,
+    send_account_profile_updated_email,
     send_password_changed_email,
     send_registration_confirmation_email,
 )
@@ -472,6 +474,17 @@ def get_excel_workbook_loader():
     except ImportError as exc:  # pragma: no cover
         raise RuntimeError(
             "Máy đang thiếu thư viện openpyxl nên chưa thể đọc file Excel .xlsx. "
+            "Hãy cài openpyxl hoặc dùng đúng bản môi trường đã có thư viện này."
+        ) from exc
+
+
+def get_excel_workbook_builder():
+    try:
+        from openpyxl import Workbook as _Workbook
+        return _Workbook
+    except ImportError as exc:  # pragma: no cover
+        raise RuntimeError(
+            "Máy đang thiếu thư viện openpyxl nên chưa thể xuất file Excel .xlsx. "
             "Hãy cài openpyxl hoặc dùng đúng bản môi trường đã có thư viện này."
         ) from exc
 
@@ -5234,18 +5247,35 @@ def account_view(request):
             )
             if account_form.is_valid():
                 full_name = (account_form.cleaned_data.get('full_name') or '').strip()
-                request.user.email = account_form.cleaned_data.get('email') or ''
+                new_email = (account_form.cleaned_data.get('email') or '').strip()
+                new_phone = (account_form.cleaned_data.get('phone') or '').strip()
+                previous_email = (request.user.email or '').strip()
+                previous_full_name = (profile.full_name or request.user.get_full_name() or '').strip()
+                previous_phone = (profile.phone or '').strip()
+                previous_address_text = (profile.address_text or '').strip()
+                changed_fields = []
+
+                if full_name != previous_full_name:
+                    changed_fields.append('Họ tên')
+                if new_email != previous_email:
+                    changed_fields.append('Email')
+                if new_phone != previous_phone:
+                    changed_fields.append('Số điện thoại')
+
+                request.user.email = new_email
                 request.user.first_name = full_name
                 request.user.last_name = ''
                 request.user.save(update_fields=['email', 'first_name', 'last_name'])
 
                 profile.full_name = full_name
-                profile.phone = (account_form.cleaned_data.get('phone') or '').strip()
+                profile.phone = new_phone
 
                 if is_customer:
                     profile.address_text = (account_form.cleaned_data.get('address_text') or '').strip()
                     profile.address_lat = account_form.cleaned_data.get('address_lat')
                     profile.address_lng = account_form.cleaned_data.get('address_lng')
+                    if profile.address_text != previous_address_text:
+                        changed_fields.append('Địa chỉ giao hàng mặc định')
 
                     if profile.address_text and (profile.address_lat is None or profile.address_lng is None):
                         try:
@@ -5261,6 +5291,13 @@ def account_view(request):
                         profile.address_lng = None
 
                 profile.save()
+                if changed_fields:
+                    send_account_profile_updated_email(
+                        request.user,
+                        previous_email=previous_email,
+                        changed_fields=changed_fields,
+                        request=request,
+                    )
                 messages.success(request, 'Đã cập nhật thông tin tài khoản.')
                 return redirect('account')
             messages.error(request, 'Biểu mẫu thông tin tài khoản chưa hợp lệ. Vui lòng kiểm tra lại.')
@@ -5425,6 +5462,7 @@ def create_or_update_return_request(request, order_id):
         return redirect('order_history_detail', order_id=order.pk)
 
     if request.method == 'POST':
+        is_existing_request = existing_request is not None
         form = ReturnRefundRequestForm(request.POST, request.FILES, instance=existing_request, order=order)
         if form.is_valid():
             with transaction.atomic():
@@ -5446,6 +5484,13 @@ def create_or_update_return_request(request, order_id):
 
                 for uploaded_image in form.cleaned_data.get('proof_images') or []:
                     ReturnRefundEvidence.objects.create(request=return_request, image=uploaded_image)
+                transaction.on_commit(
+                    lambda saved_request=return_request, current_request=request, was_update=is_existing_request: send_return_request_received_email(
+                        saved_request,
+                        request=current_request,
+                        is_update=was_update,
+                    )
+                )
             messages.success(request, 'Đã lưu yêu cầu trả hàng / hoàn tiền. Bộ phận xử lý sẽ kiểm tra và phản hồi sớm.')
             return redirect('order_history_detail', order_id=order.pk)
     else:
@@ -6124,7 +6169,7 @@ def build_review_insight_context(request):
     }
 
 
-def build_admin_reports_context(request):
+def build_admin_reports_context(request, *, paginate=True):
     reports_page_size = 6
     managed_pharmacy = get_admin_scope_pharmacy(request.user)
     orders_base = filter_queryset_by_admin_scope(Order.objects.select_related('pharmacy'), request.user, 'order')
@@ -6152,7 +6197,36 @@ def build_admin_reports_context(request):
         first_day_previous_month = last_day_previous_month.replace(day=1)
         return first_day_previous_month, last_day_previous_month
 
-    def resolve_range(range_key, start_raw=None, end_raw=None):
+    def get_month_bounds(anchor_date):
+        month_start = anchor_date.replace(day=1)
+        month_end = (month_start.replace(day=28) + timedelta(days=4)).replace(day=1) - timedelta(days=1)
+        return month_start, month_end
+
+    def parse_month_value(raw_value):
+        raw_value = (raw_value or '').strip()
+        if not raw_value:
+            return None
+        try:
+            month_value = datetime.strptime(raw_value, '%Y-%m').date().replace(day=1)
+        except ValueError:
+            return None
+        if month_value > today.replace(day=1):
+            return None
+        return month_value
+
+    def parse_year_value(raw_value):
+        raw_value = (raw_value or '').strip()
+        if not raw_value:
+            return None
+        try:
+            year_value = int(raw_value)
+        except (TypeError, ValueError):
+            return None
+        if year_value < 2000 or year_value > today.year:
+            return None
+        return year_value
+
+    def resolve_range(range_key, start_raw=None, end_raw=None, month_raw=None, year_raw=None):
         if range_key == '7d':
             return today - timedelta(days=6), today
         if range_key == '30d':
@@ -6161,8 +6235,13 @@ def build_admin_reports_context(request):
             return today - timedelta(days=89), today
         if range_key == 'last_month':
             return get_previous_month_bounds(today)
+        if range_key == 'month':
+            return get_month_bounds(parse_month_value(month_raw) or today.replace(day=1))
         if range_key == 'this_year':
             return today.replace(month=1, day=1), today
+        if range_key == 'year':
+            year_value = parse_year_value(year_raw) or today.year
+            return date(year_value, 1, 1), date(year_value, 12, 31)
         if range_key == 'custom':
             custom_start = parse_date_value(start_raw) or today.replace(day=1)
             custom_end = parse_date_value(end_raw) or today
@@ -6170,13 +6249,22 @@ def build_admin_reports_context(request):
         return today.replace(day=1), today
 
     range_key = (request.GET.get('range') or 'this_month').strip()
-    if range_key not in {'7d', '30d', '90d', 'this_month', 'last_month', 'this_year', 'custom'}:
+    if range_key not in {'7d', '30d', '90d', 'this_month', 'last_month', 'month', 'this_year', 'year', 'custom'}:
         range_key = 'this_month'
+
+    selected_month_value = (request.GET.get('month') or today.strftime('%Y-%m')).strip()
+    if parse_month_value(selected_month_value) is None:
+        selected_month_value = today.strftime('%Y-%m')
+    selected_year_value = (request.GET.get('year') or str(today.year)).strip()
+    if parse_year_value(selected_year_value) is None:
+        selected_year_value = str(today.year)
 
     start_date, end_date = resolve_range(
         range_key,
         request.GET.get('start_date'),
         request.GET.get('end_date'),
+        request.GET.get('month'),
+        request.GET.get('year'),
     )
     if end_date > today:
         end_date = today
@@ -6505,7 +6593,8 @@ def build_admin_reports_context(request):
         item['bar_percent'] = max(12, round(item['revenue'] * 100 / max_branch_revenue)) if item['revenue'] and max_branch_revenue else 0
 
     low_stock_queryset = medicines_base.filter(quantity__gt=0, quantity__lte=LOW_STOCK_THRESHOLD).order_by('quantity', 'name')
-    out_of_stock_count = medicines_base.filter(quantity__lte=0).count()
+    out_of_stock_queryset = medicines_base.filter(quantity__lte=0).order_by('name', 'id')
+    out_of_stock_count = out_of_stock_queryset.count()
     expiring_soon_qs = get_expiring_soon_medicines_queryset(medicines_base)
     expiring_soon_queryset = expiring_soon_qs.order_by('expiry_date', 'name')
     low_stock_count = low_stock_queryset.count()
@@ -6656,15 +6745,28 @@ def build_admin_reports_context(request):
         },
     ]
 
-    top_products_page_obj, top_products_query_string = paginate_report_items(top_products, 'top_page')
-    branch_performance_page_obj, branch_performance_query_string = paginate_report_items(branch_performance, 'branch_page')
-    low_stock_page_obj, low_stock_query_string = paginate_report_items(low_stock_queryset, 'stock_page')
-    expiring_soon_page_obj, expiring_soon_query_string = paginate_report_items(expiring_soon_queryset, 'expiry_page')
+    if paginate:
+        top_products_page_obj, top_products_query_string = paginate_report_items(top_products, 'top_page')
+        branch_performance_page_obj, branch_performance_query_string = paginate_report_items(branch_performance, 'branch_page')
+        low_stock_page_obj, low_stock_query_string = paginate_report_items(low_stock_queryset, 'stock_page')
+        expiring_soon_page_obj, expiring_soon_query_string = paginate_report_items(expiring_soon_queryset, 'expiry_page')
 
-    top_products = list(top_products_page_obj.object_list)
-    branch_performance = list(branch_performance_page_obj.object_list)
-    low_stock_medicines = list(low_stock_page_obj.object_list)
-    expiring_soon_medicines = list(expiring_soon_page_obj.object_list)
+        top_products = list(top_products_page_obj.object_list)
+        branch_performance = list(branch_performance_page_obj.object_list)
+        low_stock_medicines = list(low_stock_page_obj.object_list)
+        expiring_soon_medicines = list(expiring_soon_page_obj.object_list)
+    else:
+        top_products_page_obj = None
+        branch_performance_page_obj = None
+        low_stock_page_obj = None
+        expiring_soon_page_obj = None
+        top_products_query_string = ''
+        branch_performance_query_string = ''
+        low_stock_query_string = ''
+        expiring_soon_query_string = ''
+        low_stock_medicines = list(low_stock_queryset)
+        expiring_soon_medicines = list(expiring_soon_queryset)
+    out_of_stock_medicines = list(out_of_stock_queryset) if not paginate else []
 
     filter_chips = [
         {'icon': 'fas fa-calendar-alt', 'label': f"{start_date.strftime('%d/%m/%Y')} - {end_date.strftime('%d/%m/%Y')}"},
@@ -6679,7 +6781,9 @@ def build_admin_reports_context(request):
         '90d': '90 ngày gần nhất',
         'this_month': 'Tháng hiện tại',
         'last_month': 'Tháng trước',
+        'month': 'Theo tháng',
         'this_year': 'Năm hiện tại',
+        'year': 'Theo năm',
         'custom': 'Tự chọn',
     }
 
@@ -6687,6 +6791,8 @@ def build_admin_reports_context(request):
         'range_key': range_key,
         'start_date': start_date.strftime('%Y-%m-%d'),
         'end_date': end_date.strftime('%Y-%m-%d'),
+        'selected_month': selected_month_value,
+        'selected_year': selected_year_value,
         'selected_pharmacy_id': selected_pharmacy_id,
         'selected_payment_method': selected_payment_method,
         'group_by': group_by_param,
@@ -6696,7 +6802,9 @@ def build_admin_reports_context(request):
             ('90d', '90 ngày gần nhất'),
             ('this_month', 'Tháng hiện tại'),
             ('last_month', 'Tháng trước'),
+            ('month', 'Theo tháng'),
             ('this_year', 'Năm hiện tại'),
+            ('year', 'Theo năm'),
             ('custom', 'Tự chọn'),
         ],
         'group_by_options': [
@@ -6733,6 +6841,7 @@ def build_admin_reports_context(request):
         'expiring_soon_medicines': expiring_soon_medicines,
         'expiring_soon_page_obj': expiring_soon_page_obj,
         'expiring_soon_query_string': expiring_soon_query_string,
+        'out_of_stock_medicines': out_of_stock_medicines,
         'low_stock_count': low_stock_count,
         'expiring_soon_count': expiring_soon_count,
         'out_of_stock_count': out_of_stock_count,
@@ -6755,7 +6864,1038 @@ def build_admin_reports_context(request):
         'average_order_value': average_order_value,
         'completion_rate': completion_rate,
         'insight_cards': insight_cards,
+        'filtered_orders': filtered_orders,
+        'filtered_completed_orders': filtered_completed_orders,
+        'filtered_return_requests': filtered_return_requests,
+        'report_start_date': start_date,
+        'report_end_date': end_date,
+        'group_by': group_by,
     }
+
+
+ADMIN_REPORT_EXCEL_CONTENT_TYPE = 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+
+
+def _build_admin_reports_workbook_legacy(report_context):
+    Workbook = get_excel_workbook_builder()
+    try:
+        from openpyxl.styles import Alignment, Border, Font, PatternFill, Side
+        from openpyxl.utils import get_column_letter
+    except ImportError as exc:  # pragma: no cover
+        raise RuntimeError(
+            "Máy đang thiếu thư viện openpyxl nên chưa thể định dạng file Excel .xlsx."
+        ) from exc
+
+    workbook = Workbook()
+    title_fill = PatternFill('solid', fgColor='1F64E0')
+    title_font = Font(color='FFFFFF', bold=True, size=14)
+    header_fill = PatternFill('solid', fgColor='EAF2FF')
+    header_font = Font(color='163057', bold=True)
+    thin_side = Side(style='thin', color='D7E2F0')
+    cell_border = Border(left=thin_side, right=thin_side, top=thin_side, bottom=thin_side)
+    currency_keywords = ('doanh thu', 'tiền', 'phí', 'tổng', 'giảm', 'giá', 'thanh toán')
+
+    def to_excel_datetime(value):
+        if value is None:
+            return ''
+        if isinstance(value, datetime):
+            if timezone.is_aware(value):
+                return timezone.localtime(value).replace(tzinfo=None)
+            return value
+        return value
+
+    def display_date(value):
+        value = to_excel_datetime(value)
+        return value
+
+    def bool_label(value):
+        return 'Có' if value else 'Không'
+
+    def prepare_cell_value(value):
+        if isinstance(value, Decimal):
+            return float(value)
+        return to_excel_datetime(value)
+
+    def autosize_columns(worksheet):
+        for column_cells in worksheet.columns:
+            column_letter = get_column_letter(column_cells[0].column)
+            max_length = 0
+            for cell in column_cells:
+                value = cell.value
+                if value is None:
+                    continue
+                max_length = max(max_length, len(str(value)))
+            worksheet.column_dimensions[column_letter].width = min(max(max_length + 2, 12), 42)
+
+    def style_table(worksheet, header_row, headers):
+        worksheet.freeze_panes = worksheet.cell(row=header_row + 1, column=1)
+        last_column = max(len(headers), 1)
+        last_row = max(worksheet.max_row, header_row)
+        worksheet.auto_filter.ref = f"A{header_row}:{get_column_letter(last_column)}{last_row}"
+
+        for cell in worksheet[header_row]:
+            cell.fill = header_fill
+            cell.font = header_font
+            cell.alignment = Alignment(horizontal='center', vertical='center', wrap_text=True)
+            cell.border = cell_border
+
+        for row in worksheet.iter_rows(min_row=header_row + 1, max_row=worksheet.max_row, max_col=last_column):
+            for cell in row:
+                cell.border = cell_border
+                cell.alignment = Alignment(vertical='top', wrap_text=True)
+                if isinstance(cell.value, datetime):
+                    cell.number_format = 'dd/mm/yyyy hh:mm'
+                elif isinstance(cell.value, date):
+                    cell.number_format = 'dd/mm/yyyy'
+                else:
+                    header = str(headers[cell.column - 1]).casefold() if cell.column <= len(headers) else ''
+                    if isinstance(cell.value, (int, float)) and any(keyword in header for keyword in currency_keywords):
+                        cell.number_format = '#,##0" đ"'
+
+        autosize_columns(worksheet)
+
+    def write_table(title, headers, rows, *, worksheet=None):
+        worksheet = worksheet or workbook.create_sheet(title=title[:31])
+        worksheet.append([title])
+        worksheet.merge_cells(start_row=1, start_column=1, end_row=1, end_column=max(len(headers), 1))
+        title_cell = worksheet.cell(row=1, column=1)
+        title_cell.fill = title_fill
+        title_cell.font = title_font
+        title_cell.alignment = Alignment(horizontal='left', vertical='center')
+        worksheet.row_dimensions[1].height = 24
+        worksheet.append(headers)
+        for row in rows:
+            worksheet.append([prepare_cell_value(value) for value in row])
+        style_table(worksheet, 2, headers)
+        return worksheet
+
+    summary_sheet = workbook.active
+    summary_sheet.title = 'Tong quan'
+
+    summary_rows = [
+        ('Kỳ báo cáo', report_context['range_label']),
+        ('Thời gian', report_context['report_period_label']),
+        ('Phạm vi', report_context['scope_label']),
+        ('So sánh kỳ trước', report_context['previous_period_label']),
+    ]
+    for card in report_context['summary_cards']:
+        summary_rows.append((card['label'], card['value'], card.get('helper', ''), card.get('delta', {}).get('text', '')))
+    write_table('Tổng quan báo cáo', ['Chỉ tiêu', 'Giá trị', 'Ghi chú', 'So sánh'], summary_rows, worksheet=summary_sheet)
+
+    orders = report_context.get('filtered_orders') or []
+    order_rows = []
+    for order in orders:
+        order_rows.append([
+            order.order_code,
+            display_date(order.created_at),
+            getattr(order, '_report_date', ''),
+            order.full_name,
+            order.phone,
+            order.pharmacy.name if order.pharmacy else '',
+            order.get_status_display(),
+            order.get_payment_method_display(),
+            order.get_payment_status_display(),
+            int(order.total_product_price or 0),
+            int(order.customer_tier_discount_total or 0),
+            int(order.shipping_fee or 0),
+            int(order.final_total_price or 0),
+            bool_label(order.invoice_requested),
+            order.resolved_invoice_code,
+            order.resolved_payment_reference,
+        ])
+    write_table(
+        'Don hang',
+        ['Mã đơn', 'Ngày tạo', 'Ngày báo cáo', 'Khách hàng', 'SĐT', 'Chi nhánh', 'Trạng thái', 'Phương thức', 'Thanh toán', 'Tiền hàng', 'Giảm hạng KH', 'Phí giao', 'Tổng thanh toán', 'Yêu cầu hóa đơn', 'Mã hóa đơn', 'Mã tham chiếu'],
+        order_rows,
+    )
+
+    order_ids = [order.pk for order in orders if order.pk]
+    order_item_rows = []
+    if order_ids:
+        order_items = (
+            OrderItem.objects
+            .filter(order_id__in=order_ids)
+            .select_related('order__pharmacy', 'medicine')
+            .order_by('-order__created_at', '-order_id', 'id')
+        )
+        for item in order_items:
+            order_item_rows.append([
+                item.order.order_code,
+                item.order.pharmacy.name if item.order.pharmacy else '',
+                item.medicine_name,
+                item.quantity,
+                int(item.price or 0),
+                int(item.line_total or 0),
+                item.medicine.unit if item.medicine else '',
+                item.medicine.quantity if item.medicine else '',
+            ])
+    write_table(
+        'Chi tiet san pham',
+        ['Mã đơn', 'Chi nhánh', 'Sản phẩm', 'Số lượng', 'Đơn giá', 'Thành tiền', 'Đơn vị hiện tại', 'Tồn hiện tại'],
+        order_item_rows,
+    )
+
+    write_table(
+        'Doanh thu theo ky',
+        ['Mốc thời gian', 'Khoảng thời gian', 'Doanh thu hoàn thành', 'Số đơn hoàn thành'],
+        [
+            [item['label'], item['range_label'], item['value'], item['order_count']]
+            for item in report_context.get('timeline_chart', [])
+        ],
+    )
+
+    write_table(
+        'Top san pham',
+        ['Sản phẩm', 'Số lượng bán', 'Doanh thu', 'Số dòng đơn', 'Đơn vị', 'Tồn hiện tại'],
+        [
+            [item['name'], item['quantity'], item['revenue'], item['order_count'], item.get('unit', ''), item.get('current_stock', '')]
+            for item in report_context.get('top_products', [])
+        ],
+    )
+
+    write_table(
+        'Chi nhanh',
+        ['Chi nhánh', 'Số đơn hoàn thành', 'Doanh thu', 'Tiền hàng', 'Giá trị đơn TB', 'Tỷ trọng doanh thu (%)'],
+        [
+            [item['label'], item['order_count'], item['revenue'], item.get('product_revenue', 0), item['average_order_value'], item['share_percent']]
+            for item in report_context.get('branch_performance', [])
+        ],
+    )
+
+    return_rows = []
+    for item in report_context.get('filtered_return_requests', []):
+        order = item.order
+        return_rows.append([
+            order.order_code,
+            display_date(item.created_at),
+            item.get_status_display(),
+            order.full_name,
+            item.contact_email,
+            item.contact_phone,
+            item.reason,
+            item.admin_note,
+            item.processed_by_display_name,
+            display_date(item.processed_at),
+        ])
+    write_table(
+        'Tra hang hoan tien',
+        ['Mã đơn', 'Ngày tạo yêu cầu', 'Trạng thái', 'Khách hàng', 'Email liên hệ', 'SĐT liên hệ', 'Lý do', 'Ghi chú xử lý', 'Người xử lý', 'Ngày xử lý'],
+        return_rows,
+    )
+
+    stock_rows = []
+    for medicine in report_context.get('low_stock_medicines', []):
+        stock_rows.append(['Sắp hết hàng', medicine.name, medicine.pharmacy.name if medicine.pharmacy else '', medicine.quantity, medicine.unit, display_date(medicine.expiry_date)])
+    for medicine in report_context.get('out_of_stock_medicines', []):
+        stock_rows.append(['Hết hàng', medicine.name, medicine.pharmacy.name if medicine.pharmacy else '', medicine.quantity, medicine.unit, display_date(medicine.expiry_date)])
+    for medicine in report_context.get('expiring_soon_medicines', []):
+        stock_rows.append(['Sắp hết hạn', medicine.name, medicine.pharmacy.name if medicine.pharmacy else '', medicine.quantity, medicine.unit, display_date(medicine.expiry_date)])
+    write_table(
+        'Canh bao kho',
+        ['Loại cảnh báo', 'Sản phẩm', 'Chi nhánh', 'Tồn kho', 'Đơn vị', 'Hạn sử dụng'],
+        stock_rows,
+    )
+
+    workbook.properties.title = 'Báo cáo GIS Pharma'
+    workbook.properties.subject = report_context['report_period_label']
+    workbook.properties.creator = 'GIS Pharma Admin'
+    workbook.active = 0
+    return workbook
+
+
+def _load_excel_builder_tools():
+    Workbook = get_excel_workbook_builder()
+    try:
+        from openpyxl.chart import BarChart, LineChart, PieChart, Reference
+        from openpyxl.chart.label import DataLabelList
+        from openpyxl.formatting.rule import CellIsRule
+        from openpyxl.styles import Alignment, Border, Font, PatternFill, Side
+        from openpyxl.utils import get_column_letter
+        from openpyxl.worksheet.table import Table as ExcelTable
+        from openpyxl.worksheet.table import TableStyleInfo
+    except ImportError as exc:  # pragma: no cover
+        raise RuntimeError(
+            "Máy đang thiếu thư viện openpyxl nên chưa thể định dạng file Excel .xlsx."
+        ) from exc
+
+    return {
+        "Workbook": Workbook,
+        "BarChart": BarChart,
+        "LineChart": LineChart,
+        "PieChart": PieChart,
+        "Reference": Reference,
+        "DataLabelList": DataLabelList,
+        "CellIsRule": CellIsRule,
+        "Alignment": Alignment,
+        "Border": Border,
+        "Font": Font,
+        "PatternFill": PatternFill,
+        "Side": Side,
+        "get_column_letter": get_column_letter,
+        "ExcelTable": ExcelTable,
+        "TableStyleInfo": TableStyleInfo,
+    }
+
+
+def _excel_local_value(value):
+    if value is None:
+        return ""
+    if isinstance(value, Decimal):
+        return float(value)
+    if isinstance(value, datetime):
+        if timezone.is_aware(value):
+            return timezone.localtime(value).replace(tzinfo=None)
+        return value
+    return value
+
+
+def _excel_unique_sheet_title(workbook, raw_title):
+    cleaned = re.sub(r"[\[\]\*:/\\?]+", " ", str(raw_title or "Sheet")).strip() or "Sheet"
+    base = cleaned[:31]
+    existing = {name.casefold() for name in workbook.sheetnames}
+    if base.casefold() not in existing:
+        return base
+    for index in range(2, 100):
+        suffix = f" {index}"
+        candidate = f"{base[:31 - len(suffix)]}{suffix}"
+        if candidate.casefold() not in existing:
+            return candidate
+    return base[:27] + " 99"
+
+
+def _excel_table_name(raw_name, used_names):
+    base = re.sub(r"[^A-Za-z0-9_]+", "_", str(raw_name or "Table")).strip("_") or "Table"
+    if base[0].isdigit():
+        base = f"T_{base}"
+    candidate = base[:240]
+    index = 1
+    while candidate in used_names:
+        suffix = f"_{index}"
+        candidate = f"{base[:240 - len(suffix)]}{suffix}"
+        index += 1
+    used_names.add(candidate)
+    return candidate
+
+
+def _excel_style_title(worksheet, title, tools, *, last_column=8, subtitle=""):
+    Alignment = tools["Alignment"]
+    Font = tools["Font"]
+    PatternFill = tools["PatternFill"]
+
+    worksheet.sheet_view.showGridLines = False
+    worksheet.merge_cells(start_row=1, start_column=1, end_row=1, end_column=max(last_column, 1))
+    title_cell = worksheet.cell(row=1, column=1, value=title)
+    title_cell.fill = PatternFill("solid", fgColor="17315D")
+    title_cell.font = Font(color="FFFFFF", bold=True, size=15)
+    title_cell.alignment = Alignment(horizontal="left", vertical="center")
+    worksheet.row_dimensions[1].height = 28
+    if subtitle:
+        worksheet.merge_cells(start_row=2, start_column=1, end_row=2, end_column=max(last_column, 1))
+        subtitle_cell = worksheet.cell(row=2, column=1, value=subtitle)
+        subtitle_cell.fill = PatternFill("solid", fgColor="F4F8FF")
+        subtitle_cell.font = Font(color="5F7290", italic=True)
+        subtitle_cell.alignment = Alignment(horizontal="left", vertical="center", wrap_text=True)
+        worksheet.row_dimensions[2].height = 24
+
+
+def _excel_autosize_columns(worksheet, tools, *, min_width=10, max_width=48):
+    get_column_letter = tools["get_column_letter"]
+    for column_cells in worksheet.columns:
+        column_letter = get_column_letter(column_cells[0].column)
+        max_length = 0
+        for cell in column_cells:
+            if cell.value is None:
+                continue
+            max_length = max(max_length, len(str(cell.value)))
+        worksheet.column_dimensions[column_letter].width = min(max(max_length + 2, min_width), max_width)
+
+
+def _excel_apply_table_style(worksheet, headers, header_row, tools, table_name, used_table_names):
+    Alignment = tools["Alignment"]
+    Border = tools["Border"]
+    CellIsRule = tools["CellIsRule"]
+    ExcelTable = tools["ExcelTable"]
+    Font = tools["Font"]
+    PatternFill = tools["PatternFill"]
+    Side = tools["Side"]
+    TableStyleInfo = tools["TableStyleInfo"]
+    get_column_letter = tools["get_column_letter"]
+
+    thin_side = Side(style="thin", color="D7E2F0")
+    cell_border = Border(left=thin_side, right=thin_side, top=thin_side, bottom=thin_side)
+    header_fill = PatternFill("solid", fgColor="DDEBFF")
+    header_font = Font(color="17315D", bold=True)
+    currency_keywords = (
+        "doanh thu", "tiền", "tien", "phí", "phi", "tổng", "tong",
+        "giá", "gia", "thanh toán", "thanh toan", "ưu đãi", "uu dai",
+    )
+    percent_keywords = ("%", "tỷ lệ", "ty le", "tỷ trọng", "ty trong")
+
+    last_column = max(len(headers), 1)
+    last_row = max(worksheet.max_row, header_row)
+    ref = f"A{header_row}:{get_column_letter(last_column)}{last_row}"
+    has_data_rows = last_row > header_row
+    worksheet.freeze_panes = f"A{header_row + 1}"
+
+    for cell in worksheet[header_row]:
+        cell.fill = header_fill
+        cell.font = header_font
+        cell.alignment = Alignment(horizontal="center", vertical="center", wrap_text=True)
+        cell.border = cell_border
+
+    if has_data_rows:
+        for row in worksheet.iter_rows(min_row=header_row + 1, max_row=last_row, max_col=last_column):
+            for cell in row:
+                cell.border = cell_border
+                cell.alignment = Alignment(vertical="top", wrap_text=True)
+                header_text = str(headers[cell.column - 1]).casefold() if cell.column <= len(headers) else ""
+                if isinstance(cell.value, datetime):
+                    cell.number_format = "dd/mm/yyyy hh:mm"
+                elif isinstance(cell.value, date):
+                    cell.number_format = "dd/mm/yyyy"
+                elif isinstance(cell.value, (int, float)) and any(keyword in header_text for keyword in currency_keywords):
+                    cell.number_format = '#,##0" đ";[Red]-#,##0" đ"'
+                elif isinstance(cell.value, (int, float)) and any(keyword in header_text for keyword in percent_keywords):
+                    cell.number_format = '0.0"%"'
+                elif isinstance(cell.value, (int, float)):
+                    cell.number_format = "#,##0;[Red]-#,##0"
+
+        display_name = _excel_table_name(table_name, used_table_names)
+        table = ExcelTable(displayName=display_name, ref=ref)
+        table.tableStyleInfo = TableStyleInfo(
+            name="TableStyleMedium2",
+            showFirstColumn=False,
+            showLastColumn=False,
+            showRowStripes=True,
+            showColumnStripes=False,
+        )
+        worksheet.add_table(table)
+    else:
+        worksheet.auto_filter.ref = ref
+
+    _excel_autosize_columns(worksheet, tools)
+    if has_data_rows:
+        quantity_column = None
+        for index, header in enumerate(headers, start=1):
+            header_text = str(header).casefold()
+            if "tồn" in header_text or "ton" in header_text:
+                quantity_column = index
+                break
+        if quantity_column:
+            col_letter = get_column_letter(quantity_column)
+            data_ref = f"{col_letter}{header_row + 1}:{col_letter}{worksheet.max_row}"
+            worksheet.conditional_formatting.add(
+                data_ref,
+                CellIsRule(operator="lessThanOrEqual", formula=[str(LOW_STOCK_THRESHOLD)], fill=PatternFill("solid", fgColor="FFF2CC")),
+            )
+
+
+def _excel_write_table_sheet(workbook, title, headers, rows, tools, used_table_names, *, table_name, note=""):
+    worksheet = workbook.create_sheet(_excel_unique_sheet_title(workbook, title))
+    last_column = max(len(headers), 1)
+    _excel_style_title(worksheet, title, tools, last_column=last_column, subtitle=note)
+    header_row = 4
+    for column, header in enumerate(headers, start=1):
+        worksheet.cell(row=header_row, column=column, value=str(header))
+    for raw_row in rows:
+        row_values = [_excel_local_value(value) for value in raw_row]
+        if len(row_values) < len(headers):
+            row_values.extend([""] * (len(headers) - len(row_values)))
+        worksheet.append(row_values[:len(headers)])
+    _excel_apply_table_style(worksheet, headers, header_row, tools, table_name, used_table_names)
+    return worksheet, header_row, worksheet.max_row
+
+
+def _excel_value_for_display(value, value_format):
+    if value_format == "percent":
+        return f"{value}%"
+    return value
+
+
+def _excel_add_report_chart(workbook, dashboard, source_sheet, header_row, last_row, tools, *, chart_type, title, data_col, label_col, anchor, height=7, width=13):
+    if last_row <= header_row:
+        return
+    Reference = tools["Reference"]
+    if chart_type == "line":
+        chart = tools["LineChart"]()
+        chart.style = 13
+    elif chart_type == "pie":
+        chart = tools["PieChart"]()
+        chart.dataLabels = tools["DataLabelList"]()
+        chart.dataLabels.showPercent = True
+    else:
+        chart = tools["BarChart"]()
+        chart.style = 10
+    chart.title = title
+    chart.height = height
+    chart.width = width
+    data = Reference(source_sheet, min_col=data_col, min_row=header_row, max_row=last_row)
+    labels = Reference(source_sheet, min_col=label_col, min_row=header_row + 1, max_row=last_row)
+    chart.add_data(data, titles_from_data=True)
+    chart.set_categories(labels)
+    if hasattr(chart, "legend"):
+        chart.legend = None
+    if hasattr(chart, "y_axis"):
+        chart.y_axis.numFmt = '#,##0'
+    dashboard.add_chart(chart, anchor)
+
+
+def sanitize_excel_filename(value, prefix):
+    raw_value = re.sub(r"[^A-Za-z0-9._-]+", "-", str(value or "").strip()).strip("-") or prefix
+    if raw_value.lower().endswith(".xlsx"):
+        return raw_value
+    return f"{raw_value}.xlsx"
+
+
+def build_admin_reports_workbook(report_context):
+    tools = _load_excel_builder_tools()
+    Workbook = tools["Workbook"]
+    Alignment = tools["Alignment"]
+    Font = tools["Font"]
+    PatternFill = tools["PatternFill"]
+    Border = tools["Border"]
+    Side = tools["Side"]
+    get_column_letter = tools["get_column_letter"]
+    workbook = Workbook()
+    used_table_names = set()
+
+    dashboard = workbook.active
+    dashboard.title = _excel_unique_sheet_title(workbook, "Dashboard")
+    dashboard.sheet_view.showGridLines = False
+    _excel_style_title(
+        dashboard,
+        "Báo cáo doanh thu GIS Pharma",
+        tools,
+        last_column=13,
+        subtitle="File gồm sheet tổng quan, dữ liệu chi tiết, biểu đồ và sheet đối soát để kiểm tra số liệu sau khi mở bằng Excel.",
+    )
+    dashboard.column_dimensions["A"].width = 26
+    dashboard.column_dimensions["B"].width = 18
+    dashboard.column_dimensions["C"].width = 24
+    dashboard.column_dimensions["D"].width = 42
+    dashboard.column_dimensions["E"].width = 20
+
+    label_font = Font(color="5F7290", bold=True)
+    value_font = Font(color="17315D", bold=True)
+    info_fill = PatternFill("solid", fgColor="F4F8FF")
+    thin_side = Side(style="thin", color="D7E2F0")
+    cell_border = Border(left=thin_side, right=thin_side, top=thin_side, bottom=thin_side)
+    meta_rows = [
+        ("Kỳ báo cáo", report_context["range_label"]),
+        ("Thời gian", report_context["report_period_label"]),
+        ("Phạm vi", report_context["scope_label"]),
+        ("So sánh kỳ trước", report_context["previous_period_label"]),
+        ("Kiểu nhóm thời gian", report_context.get("timeline_group_label", "")),
+    ]
+    for row_index, (label, value) in enumerate(meta_rows, start=4):
+        dashboard.cell(row=row_index, column=1, value=label).font = label_font
+        dashboard.cell(row=row_index, column=2, value=_excel_local_value(value)).font = value_font
+        for column in range(1, 5):
+            cell = dashboard.cell(row=row_index, column=column)
+            cell.fill = info_fill
+            cell.border = cell_border
+            cell.alignment = Alignment(vertical="center", wrap_text=True)
+
+    summary_headers = ["Chỉ tiêu", "Giá trị", "So sánh", "Ghi chú"]
+    summary_start = 10
+    for col, header in enumerate(summary_headers, start=1):
+        cell = dashboard.cell(row=summary_start, column=col, value=header)
+        cell.fill = PatternFill("solid", fgColor="DDEBFF")
+        cell.font = Font(color="17315D", bold=True)
+        cell.border = cell_border
+        cell.alignment = Alignment(horizontal="center", vertical="center", wrap_text=True)
+
+    for row_offset, card in enumerate(report_context.get("summary_cards", []), start=1):
+        row_index = summary_start + row_offset
+        dashboard.cell(row=row_index, column=1, value=card["label"])
+        dashboard.cell(row=row_index, column=2, value=_excel_value_for_display(card["value"], card.get("format")))
+        dashboard.cell(row=row_index, column=3, value=card.get("delta", {}).get("text", ""))
+        dashboard.cell(row=row_index, column=4, value=card.get("helper", ""))
+        for column in range(1, 5):
+            cell = dashboard.cell(row=row_index, column=column)
+            cell.border = cell_border
+            cell.alignment = Alignment(vertical="top", wrap_text=True)
+            if column == 1:
+                cell.font = value_font
+            if column == 2 and isinstance(cell.value, (int, float)) and card.get("format") == "currency":
+                cell.number_format = '#,##0" đ";[Red]-#,##0" đ"'
+            elif column == 2 and isinstance(cell.value, (int, float)):
+                cell.number_format = "#,##0;[Red]-#,##0"
+
+    insight_start = summary_start + len(report_context.get("summary_cards", [])) + 3
+    dashboard.cell(row=insight_start, column=1, value="Điểm cần chú ý").font = Font(color="17315D", bold=True, size=12)
+    dashboard.merge_cells(start_row=insight_start, start_column=1, end_row=insight_start, end_column=4)
+    for row_offset, card in enumerate(report_context.get("insight_cards", []), start=1):
+        row_index = insight_start + row_offset
+        dashboard.cell(row=row_index, column=1, value=card["label"]).font = value_font
+        dashboard.cell(row=row_index, column=2, value=_excel_value_for_display(card["value"], card.get("format")))
+        dashboard.cell(row=row_index, column=3, value=card.get("note", ""))
+        dashboard.merge_cells(start_row=row_index, start_column=3, end_row=row_index, end_column=4)
+        for column in range(1, 5):
+            cell = dashboard.cell(row=row_index, column=column)
+            cell.fill = info_fill
+            cell.border = cell_border
+            cell.alignment = Alignment(vertical="top", wrap_text=True)
+            if column == 2 and isinstance(cell.value, (int, float)) and card.get("format") == "currency":
+                cell.number_format = '#,##0" đ";[Red]-#,##0" đ"'
+            elif column == 2 and isinstance(cell.value, (int, float)):
+                cell.number_format = "#,##0;[Red]-#,##0"
+
+    dashboard.freeze_panes = "A10"
+
+    orders = report_context.get("filtered_orders") or []
+    order_rows = []
+    for order in orders:
+        order_rows.append([
+            order.order_code,
+            order.created_at,
+            getattr(order, "_report_date", ""),
+            order.full_name,
+            order.phone,
+            order.pharmacy.name if order.pharmacy else "",
+            order.get_status_display(),
+            order.status,
+            order.get_payment_method_display(),
+            order.get_payment_status_display(),
+            int(order.total_product_price or 0),
+            int(order.customer_tier_discount_total or 0),
+            int(order.shipping_fee or 0),
+            int(order.final_total_price or 0),
+            "Có" if order.invoice_requested else "Không",
+            order.resolved_invoice_code,
+            order.resolved_payment_reference,
+        ])
+    orders_sheet, orders_header_row, orders_last_row = _excel_write_table_sheet(
+        workbook,
+        "Don hang",
+        [
+            "Mã đơn", "Ngày tạo", "Ngày báo cáo", "Khách hàng", "SĐT", "Chi nhánh",
+            "Trạng thái", "Mã trạng thái", "Phương thức", "Thanh toán", "Tiền hàng",
+            "Giảm hạng KH", "Phí giao", "Tổng thanh toán", "Yêu cầu hóa đơn",
+            "Mã hóa đơn", "Mã tham chiếu",
+        ],
+        order_rows,
+        tools,
+        used_table_names,
+        table_name="tblOrders",
+        note="Chi tiết đơn hàng trong phạm vi lọc. Doanh thu chính chỉ tính các đơn có mã trạng thái completed.",
+    )
+
+    order_ids = [order.pk for order in orders if getattr(order, "pk", None)]
+    order_item_rows = []
+    if order_ids:
+        order_items = (
+            OrderItem.objects
+            .filter(order_id__in=order_ids)
+            .select_related("order__pharmacy", "medicine")
+            .order_by("-order__created_at", "-order_id", "id")
+        )
+        for item in order_items:
+            order_item_rows.append([
+                item.order.order_code,
+                item.order.pharmacy.name if item.order.pharmacy else "",
+                item.medicine_name,
+                item.quantity,
+                int(item.price or 0),
+                int(item.line_total or 0),
+                item.medicine.unit if item.medicine else "",
+                item.medicine.quantity if item.medicine else "",
+            ])
+    _excel_write_table_sheet(
+        workbook,
+        "Chi tiet san pham",
+        ["Mã đơn", "Chi nhánh", "Sản phẩm", "Số lượng", "Đơn giá", "Thành tiền", "Đơn vị hiện tại", "Tồn hiện tại"],
+        order_item_rows,
+        tools,
+        used_table_names,
+        table_name="tblOrderItems",
+        note="Dòng sản phẩm của các đơn trong phạm vi báo cáo, dùng để kiểm tra doanh thu theo sản phẩm.",
+    )
+
+    timeline_sheet, timeline_header_row, timeline_last_row = _excel_write_table_sheet(
+        workbook,
+        "Doanh thu theo ky",
+        ["Mốc thời gian", "Khoảng thời gian", "Doanh thu hoàn thành", "Số đơn hoàn thành"],
+        [
+            [item["label"], item["range_label"], item["value"], item["order_count"]]
+            for item in report_context.get("timeline_chart", [])
+        ],
+        tools,
+        used_table_names,
+        table_name="tblRevenueTimeline",
+        note="Chuỗi thời gian được nhóm theo ngày, tuần hoặc tháng tùy khoảng lọc.",
+    )
+
+    payment_sheet, payment_header_row, payment_last_row = _excel_write_table_sheet(
+        workbook,
+        "Thanh toan",
+        ["Phương thức", "Số đơn hoàn thành", "Doanh thu", "Tỷ trọng doanh thu (%)"],
+        [
+            [item["label"], item["order_count"], item["revenue"], item["share_percent"]]
+            for item in report_context.get("payment_method_breakdown", [])
+        ],
+        tools,
+        used_table_names,
+        table_name="tblPaymentBreakdown",
+        note="Cơ cấu doanh thu theo phương thức thanh toán, chỉ lấy đơn đã hoàn thành.",
+    )
+
+    _excel_write_table_sheet(
+        workbook,
+        "Trang thai don",
+        ["Trạng thái", "Số đơn", "Tỷ trọng (%)"],
+        [
+            [item["label"], item["count"], item["share_percent"]]
+            for item in report_context.get("status_breakdown", [])
+        ],
+        tools,
+        used_table_names,
+        table_name="tblOrderStatus",
+        note="Cơ cấu trạng thái của toàn bộ đơn phát sinh trong kỳ.",
+    )
+
+    branch_sheet, branch_header_row, branch_last_row = _excel_write_table_sheet(
+        workbook,
+        "Chi nhanh",
+        ["Chi nhánh", "Số đơn hoàn thành", "Doanh thu", "Tiền hàng", "Giá trị đơn TB", "Tỷ trọng doanh thu (%)"],
+        [
+            [item["label"], item["order_count"], item["revenue"], item.get("product_revenue", 0), item["average_order_value"], item["share_percent"]]
+            for item in report_context.get("branch_performance", [])
+        ],
+        tools,
+        used_table_names,
+        table_name="tblBranchRevenue",
+        note="Xếp hạng doanh thu theo chi nhánh trong phạm vi lọc.",
+    )
+
+    _excel_write_table_sheet(
+        workbook,
+        "Top san pham",
+        ["Sản phẩm", "Số lượng bán", "Doanh thu", "Số dòng đơn", "Đơn vị", "Tồn hiện tại"],
+        [
+            [item["name"], item["quantity"], item["revenue"], item["order_count"], item.get("unit", ""), item.get("current_stock", "")]
+            for item in report_context.get("top_products", [])
+        ],
+        tools,
+        used_table_names,
+        table_name="tblTopProducts",
+        note="Sản phẩm bán chạy theo số lượng trong các đơn đã hoàn thành.",
+    )
+
+    return_rows = []
+    for item in report_context.get("filtered_return_requests", []):
+        order = item.order
+        return_rows.append([
+            order.order_code,
+            item.created_at,
+            item.get_status_display(),
+            order.full_name,
+            item.contact_email,
+            item.contact_phone,
+            item.reason,
+            item.admin_note,
+            item.processed_by_display_name,
+            item.processed_at,
+        ])
+    _excel_write_table_sheet(
+        workbook,
+        "Tra hang hoan tien",
+        ["Mã đơn", "Ngày tạo yêu cầu", "Trạng thái", "Khách hàng", "Email liên hệ", "SĐT liên hệ", "Lý do", "Ghi chú xử lý", "Người xử lý", "Ngày xử lý"],
+        return_rows,
+        tools,
+        used_table_names,
+        table_name="tblReturns",
+        note="Yêu cầu trả hàng/hoàn tiền phát sinh trong kỳ báo cáo.",
+    )
+
+    stock_rows = []
+    for medicine in report_context.get("low_stock_medicines", []):
+        stock_rows.append(["Sắp hết hàng", medicine.name, medicine.pharmacy.name if medicine.pharmacy else "", medicine.quantity, medicine.unit, medicine.expiry_date])
+    for medicine in report_context.get("out_of_stock_medicines", []):
+        stock_rows.append(["Hết hàng", medicine.name, medicine.pharmacy.name if medicine.pharmacy else "", medicine.quantity, medicine.unit, medicine.expiry_date])
+    for medicine in report_context.get("expiring_soon_medicines", []):
+        stock_rows.append(["Sắp hết hạn", medicine.name, medicine.pharmacy.name if medicine.pharmacy else "", medicine.quantity, medicine.unit, medicine.expiry_date])
+    _excel_write_table_sheet(
+        workbook,
+        "Canh bao kho",
+        ["Loại cảnh báo", "Sản phẩm", "Chi nhánh", "Tồn kho", "Đơn vị", "Hạn sử dụng"],
+        stock_rows,
+        tools,
+        used_table_names,
+        table_name="tblStockAlerts",
+        note="Các cảnh báo tồn kho liên quan đến kỳ báo cáo hiện tại.",
+    )
+
+    audit_sheet = workbook.create_sheet(_excel_unique_sheet_title(workbook, "Doi soat"))
+    audit_sheet.sheet_view.showGridLines = False
+    _excel_style_title(audit_sheet, "Đối soát số liệu", tools, last_column=5, subtitle="Mở file bằng Excel để công thức SUMIFS/COUNTIF tự tính lại nếu cần.")
+    audit_sheet.append([])
+    orders_sheet_ref = f"'{orders_sheet.title.replace(chr(39), chr(39) * 2)}'"
+    audit_rows = [
+        ["Chỉ tiêu", "Giá trị từ hệ thống", "Công thức kiểm tra trong file", "Chênh lệch", "Ghi chú"],
+        [
+            "Doanh thu đơn hoàn thành",
+            int(report_context.get("total_completed_revenue") or 0),
+            f'=SUMIFS({orders_sheet_ref}!N:N,{orders_sheet_ref}!H:H,"{Order.STATUS_COMPLETED}")',
+            "=B5-C5",
+            f"Phải bằng 0 nếu dữ liệu đơn hàng trong sheet {orders_sheet.title} khớp context.",
+        ],
+        [
+            "Số đơn hoàn thành",
+            int(report_context.get("completed_order_count") or 0),
+            f'=COUNTIF({orders_sheet_ref}!H:H,"{Order.STATUS_COMPLETED}")',
+            "=B6-C6",
+            "Dùng mã trạng thái để tránh sai lệch do ngôn ngữ hiển thị.",
+        ],
+        [
+            "Tổng số đơn phát sinh",
+            int(report_context.get("total_orders") or 0),
+            f"=COUNTA({orders_sheet_ref}!A5:A1048576)",
+            "=B7-C7",
+            f"Tổng dòng đơn trong sheet {orders_sheet.title}.",
+        ],
+    ]
+    for row in audit_rows:
+        audit_sheet.append(row)
+    _excel_apply_table_style(audit_sheet, audit_rows[0], 4, tools, "tblAuditChecks", used_table_names)
+    for row_index in range(5, audit_sheet.max_row + 1):
+        audit_sheet.cell(row=row_index, column=2).number_format = '#,##0'
+        audit_sheet.cell(row=row_index, column=3).number_format = '#,##0'
+        audit_sheet.cell(row=row_index, column=4).number_format = '#,##0'
+
+    info_sheet = workbook.create_sheet(_excel_unique_sheet_title(workbook, "Thong tin"))
+    info_sheet.sheet_view.showGridLines = False
+    _excel_style_title(info_sheet, "Thông tin file", tools, last_column=4, subtitle="Mô tả bộ lọc và phạm vi dữ liệu được dùng để tạo file.")
+    info_sheet.append([])
+    info_rows = [
+        ["Thuộc tính", "Giá trị"],
+        ["Thời điểm xuất", timezone.localtime().replace(tzinfo=None)],
+        ["Kỳ báo cáo", report_context["range_label"]],
+        ["Thời gian", report_context["report_period_label"]],
+        ["Phạm vi", report_context["scope_label"]],
+        ["Phương thức thanh toán", next((chip["label"] for chip in report_context.get("filter_chips", []) if chip.get("icon") == "fas fa-wallet"), "")],
+    ]
+    for row in info_rows:
+        info_sheet.append(row)
+    _excel_apply_table_style(info_sheet, info_rows[0], 4, tools, "tblReportInfo", used_table_names)
+
+    _excel_add_report_chart(
+        workbook,
+        dashboard,
+        timeline_sheet,
+        timeline_header_row,
+        timeline_last_row,
+        tools,
+        chart_type="line",
+        title="Doanh thu theo kỳ",
+        data_col=3,
+        label_col=1,
+        anchor="G4",
+        height=7,
+        width=14,
+    )
+    _excel_add_report_chart(
+        workbook,
+        dashboard,
+        branch_sheet,
+        branch_header_row,
+        branch_last_row,
+        tools,
+        chart_type="bar",
+        title="Doanh thu theo chi nhánh",
+        data_col=3,
+        label_col=1,
+        anchor="G21",
+        height=7,
+        width=14,
+    )
+    _excel_add_report_chart(
+        workbook,
+        dashboard,
+        payment_sheet,
+        payment_header_row,
+        payment_last_row,
+        tools,
+        chart_type="pie",
+        title="Cơ cấu thanh toán",
+        data_col=3,
+        label_col=1,
+        anchor="A31",
+        height=7,
+        width=10,
+    )
+
+    for worksheet in workbook.worksheets:
+        worksheet.sheet_properties.pageSetUpPr.fitToPage = True
+        worksheet.page_setup.fitToWidth = 1
+        worksheet.page_setup.fitToHeight = 0
+        worksheet.page_setup.orientation = worksheet.ORIENTATION_LANDSCAPE
+        worksheet.page_margins.left = 0.25
+        worksheet.page_margins.right = 0.25
+        worksheet.page_margins.top = 0.5
+        worksheet.page_margins.bottom = 0.5
+        worksheet.print_options.horizontalCentered = True
+        for row in worksheet.iter_rows():
+            for cell in row:
+                if cell.alignment is None:
+                    cell.alignment = Alignment(vertical="top", wrap_text=True)
+
+    try:
+        workbook.calculation.fullCalcOnLoad = True
+        workbook.calculation.forceFullCalc = True
+    except AttributeError:
+        pass
+    workbook.properties.title = "Báo cáo doanh thu GIS Pharma"
+    workbook.properties.subject = report_context["report_period_label"]
+    workbook.properties.creator = "GIS Pharma Admin"
+    workbook.active = 0
+    return workbook
+
+
+def _related_items(value):
+    if value is None:
+        return []
+    if hasattr(value, "all"):
+        return list(value.all())
+    return list(value)
+
+
+def build_stock_export_workbook(export_batch, export_items=None):
+    tools = _load_excel_builder_tools()
+    Workbook = tools["Workbook"]
+    Alignment = tools["Alignment"]
+    Font = tools["Font"]
+    PatternFill = tools["PatternFill"]
+    Border = tools["Border"]
+    Side = tools["Side"]
+    workbook = Workbook()
+    used_table_names = set()
+    export_items = list(export_items if export_items is not None else export_batch.items.all())
+
+    scope_labels = dict(StockExportBatch.EXPORT_SCOPE_CHOICES)
+    export_scope_label = (
+        export_batch.get_export_scope_display()
+        if hasattr(export_batch, "get_export_scope_display")
+        else scope_labels.get(getattr(export_batch, "export_scope", ""), getattr(export_batch, "export_scope", ""))
+    )
+    export_code = getattr(export_batch, "resolved_export_code", "") or getattr(export_batch, "export_code", "") or "PX-TAM"
+    created_at = getattr(export_batch, "created_at", None)
+
+    summary_sheet = workbook.active
+    summary_sheet.title = _excel_unique_sheet_title(workbook, "Phieu xuat")
+    summary_sheet.sheet_view.showGridLines = False
+    summary_sheet_ref = f"'{summary_sheet.title.replace(chr(39), chr(39) * 2)}'"
+    _excel_style_title(summary_sheet, "Phiếu xuất kho", tools, last_column=8, subtitle="Bản Excel chỉ đọc, tạo khi tải xuống và không lưu thêm dữ liệu vào database.")
+
+    label_font = Font(color="5F7290", bold=True)
+    value_font = Font(color="17315D", bold=True)
+    info_fill = PatternFill("solid", fgColor="F4F8FF")
+    thin_side = Side(style="thin", color="D7E2F0")
+    cell_border = Border(left=thin_side, right=thin_side, top=thin_side, bottom=thin_side)
+    pharmacy = getattr(export_batch, "pharmacy", None)
+    meta_rows = [
+        ("Mã phiếu", export_code),
+        ("Chi nhánh", getattr(pharmacy, "name", "")),
+        ("Loại phiếu", export_scope_label),
+        ("Ngày lập", created_at),
+        ("Người lập", getattr(export_batch, "resolved_exported_by_name", "") or getattr(export_batch, "exported_by_name", "")),
+        ("Email", getattr(export_batch, "exported_by_email", "")),
+        ("Chức vụ", getattr(export_batch, "exported_by_role", "")),
+        ("Nơi nhận / mục đích", getattr(export_batch, "destination_name", "")),
+        ("Ghi chú", getattr(export_batch, "note", "")),
+    ]
+    for row_index, (label, value) in enumerate(meta_rows, start=4):
+        summary_sheet.cell(row=row_index, column=1, value=label).font = label_font
+        summary_sheet.cell(row=row_index, column=2, value=_excel_local_value(value)).font = value_font
+        summary_sheet.merge_cells(start_row=row_index, start_column=2, end_row=row_index, end_column=4)
+        for column in range(1, 5):
+            cell = summary_sheet.cell(row=row_index, column=column)
+            cell.fill = info_fill
+            cell.border = cell_border
+            cell.alignment = Alignment(vertical="center", wrap_text=True)
+            if isinstance(cell.value, datetime):
+                cell.number_format = "dd/mm/yyyy hh:mm"
+
+    item_headers = ["STT", "Sản phẩm", "Nhà sản xuất", "Đơn vị", "Tồn trước", "Số lượng xuất", "Tồn sau", "Ghi chú"]
+    item_rows = []
+    for index, item in enumerate(export_items, start=1):
+        item_rows.append([
+            index,
+            getattr(item, "medicine_name", ""),
+            getattr(item, "manufacturer", ""),
+            getattr(item, "unit", ""),
+            int(getattr(item, "previous_quantity", 0) or 0),
+            int(getattr(item, "exported_quantity", 0) or 0),
+            int(getattr(item, "remaining_quantity", 0) or 0),
+            getattr(item, "note", ""),
+        ])
+    item_header_row = 16
+    for column, header in enumerate(item_headers, start=1):
+        summary_sheet.cell(row=item_header_row, column=column, value=header)
+    for row in item_rows:
+        summary_sheet.append([_excel_local_value(value) for value in row])
+    _excel_apply_table_style(summary_sheet, item_headers, item_header_row, tools, "tblStockExportItems", used_table_names)
+
+    allocation_rows = []
+    for item in export_items:
+        for allocation in _related_items(getattr(item, "lot_allocations", [])):
+            allocation_rows.append([
+                getattr(item, "medicine_name", ""),
+                getattr(item, "unit", ""),
+                getattr(allocation, "lot_source_label", "") or (str(getattr(allocation, "lot", "")) if getattr(allocation, "lot", None) else ""),
+                getattr(allocation, "lot_expiry_date", None),
+                int(getattr(allocation, "lot_import_price", 0) or 0),
+                int(getattr(allocation, "quantity", 0) or 0),
+            ])
+    lots_sheet, _, _ = _excel_write_table_sheet(
+        workbook,
+        "Lo xuat",
+        ["Sản phẩm", "Đơn vị", "Lô xuất", "Hạn sử dụng", "Giá nhập snapshot", "Số lượng phân bổ"],
+        allocation_rows,
+        tools,
+        used_table_names,
+        table_name="tblStockExportLots",
+        note="Chi tiết lô FEFO thực tế đã được trừ khỏi kho khi lập phiếu.",
+    )
+    lots_sheet_ref = f"'{lots_sheet.title.replace(chr(39), chr(39) * 2)}'"
+
+    audit_sheet = workbook.create_sheet(_excel_unique_sheet_title(workbook, "Doi soat"))
+    audit_sheet.sheet_view.showGridLines = False
+    _excel_style_title(audit_sheet, "Đối soát phiếu xuất", tools, last_column=5, subtitle="Các công thức giúp đối chiếu tổng dòng và tổng số lượng sau khi mở file bằng Excel.")
+    audit_sheet.append([])
+    expected_lines = int(getattr(export_batch, "total_lines", 0) or len(export_items))
+    expected_quantity = int(getattr(export_batch, "total_quantity", 0) or sum(int(getattr(item, "exported_quantity", 0) or 0) for item in export_items))
+    audit_rows = [
+        ["Chỉ tiêu", "Giá trị lưu trên phiếu", "Công thức kiểm tra trong file", "Chênh lệch", "Ghi chú"],
+        ["Tổng dòng hàng", expected_lines, f"=COUNTA({summary_sheet_ref}!B17:B1048576)", "=B5-C5", "Chênh lệch cần bằng 0."],
+        ["Tổng số lượng xuất", expected_quantity, f"=SUM({summary_sheet_ref}!F:F)", "=B6-C6", "Đối chiếu với total_quantity của phiếu."],
+        ["Tổng phân bổ theo lô", expected_quantity, f"=SUM({lots_sheet_ref}!F:F)", "=B7-C7", "Nếu có lô xuất, tổng phân bổ phải bằng tổng số lượng xuất."],
+    ]
+    for row in audit_rows:
+        audit_sheet.append(row)
+    _excel_apply_table_style(audit_sheet, audit_rows[0], 4, tools, "tblStockExportAudit", used_table_names)
+
+    for worksheet in workbook.worksheets:
+        worksheet.sheet_properties.pageSetUpPr.fitToPage = True
+        worksheet.page_setup.fitToWidth = 1
+        worksheet.page_setup.fitToHeight = 0
+        worksheet.page_setup.orientation = worksheet.ORIENTATION_PORTRAIT
+        worksheet.page_margins.left = 0.25
+        worksheet.page_margins.right = 0.25
+        worksheet.page_margins.top = 0.5
+        worksheet.page_margins.bottom = 0.5
+        worksheet.print_options.horizontalCentered = True
+
+    try:
+        workbook.calculation.fullCalcOnLoad = True
+        workbook.calculation.forceFullCalc = True
+    except AttributeError:
+        pass
+    workbook.properties.title = f"Phiếu xuất kho {export_code}"
+    workbook.properties.subject = export_scope_label
+    workbook.properties.creator = "GIS Pharma Admin"
+    workbook.active = 0
+    return workbook
 
 
 ADMIN_MODELS = {
@@ -9121,6 +10261,40 @@ def custom_admin_stock_export_receipt(request, pk):
     return response
 
 
+@admin_panel_required
+def custom_admin_stock_export_excel(request, pk):
+    denied_response = require_admin_model_access(request, 'stock_export')
+    if denied_response:
+        return denied_response
+
+    export_batch = get_object_or_404(
+        StockExportBatch.objects.select_related('pharmacy', 'exported_by').prefetch_related('items__medicine', 'items__lot_allocations__lot'),
+        pk=pk,
+    )
+    ensure_object_is_within_admin_scope(request.user, 'stock_export', export_batch)
+    try:
+        workbook = build_stock_export_workbook(export_batch, list(export_batch.items.all()))
+    except RuntimeError as exc:
+        messages.error(request, str(exc))
+        return redirect('custom_admin_stock_export_detail', pk=export_batch.pk)
+
+    output = BytesIO()
+    workbook.save(output)
+    output.seek(0)
+    filename = sanitize_excel_filename(export_batch.resolved_export_code, "phieu-xuat-kho")
+    response = FileResponse(
+        output,
+        as_attachment=True,
+        filename=filename,
+        content_type=ADMIN_REPORT_EXCEL_CONTENT_TYPE,
+    )
+    response['Content-Length'] = str(output.getbuffer().nbytes)
+    response['Cache-Control'] = 'no-store, no-cache, must-revalidate, max-age=0'
+    response['Pragma'] = 'no-cache'
+    response['X-Content-Type-Options'] = 'nosniff'
+    return response
+
+
 
 def rollback_purchase_import_batch_inventory(batch):
     lots = list(
@@ -9261,6 +10435,40 @@ def custom_admin_reports(request):
     if denied_response:
         return denied_response
     return render(request, 'admin_panel/analytics/reports.html', build_admin_reports_context(request))
+
+
+@admin_panel_required
+def custom_admin_reports_export_excel(request):
+    denied_response = require_admin_model_access(request, 'reports')
+    if denied_response:
+        return denied_response
+
+    report_context = build_admin_reports_context(request, paginate=False)
+    try:
+        workbook = build_admin_reports_workbook(report_context)
+    except RuntimeError as exc:
+        messages.error(request, str(exc))
+        return redirect('custom_admin_reports')
+
+    output = BytesIO()
+    workbook.save(output)
+    output.seek(0)
+    filename = (
+        f"bao-cao-gis-pharma-"
+        f"{report_context['report_start_date'].strftime('%Y%m%d')}-"
+        f"{report_context['report_end_date'].strftime('%Y%m%d')}.xlsx"
+    )
+    response = FileResponse(
+        output,
+        as_attachment=True,
+        filename=filename,
+        content_type=ADMIN_REPORT_EXCEL_CONTENT_TYPE,
+    )
+    response['Content-Length'] = str(output.getbuffer().nbytes)
+    response['Cache-Control'] = 'no-store, no-cache, must-revalidate, max-age=0'
+    response['Pragma'] = 'no-cache'
+    response['X-Content-Type-Options'] = 'nosniff'
+    return response
 
 
 @admin_panel_required

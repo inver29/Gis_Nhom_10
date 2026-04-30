@@ -1,0 +1,1 @@
+[{{ site_name }}] Đã {{ action_label }} yêu cầu trả hàng/hoàn tiền {{ order.order_code }}

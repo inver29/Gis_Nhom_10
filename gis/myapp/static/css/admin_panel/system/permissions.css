@@ -9,12 +9,7 @@
         --perm-shadow-lg:0 26px 58px rgba(17,70,184,.14);
         display:grid;gap:22px;position:relative;
     }
-    .perm-page::before{
-        content:"";position:absolute;
-        inset:-40px -40px auto auto;width:340px;height:340px;
-        border-radius:50%;pointer-events:none;z-index:0;
-        background:radial-gradient(circle,rgba(17,70,184,.14) 0%,rgba(17,70,184,0) 66%);
-    }
+    .perm-page::before{display:none}
     .perm-page > *{position:relative;z-index:1}
 
     /* ================= Hero ================= */
@@ -99,6 +94,9 @@
     .perm-summary__card.is-primary::before{background:#ffd86e}
     .perm-summary__card.is-primary .perm-summary__label,
     .perm-summary__card.is-primary .perm-summary__value{color:#fff}
+    .perm-summary__card:nth-child(2)::before{background:#16a34a}
+    .perm-summary__card:nth-child(3)::before{background:#d97706}
+    .perm-summary__card:nth-child(4)::before{background:#0891b2}
 
     /* ================= Spotlight ================= */
     .perm-spotlight{
@@ -185,6 +183,7 @@
 
     /* ================= Search & Chips ================= */
     .perm-search{
+        position:relative;
         display:flex;align-items:center;gap:10px;padding:0 14px;
         border-radius:14px;border:1px solid var(--perm-line);
         background:#fcfdff;transition:border-color .2s ease,box-shadow .2s ease;
@@ -198,12 +197,33 @@
         flex:1;min-height:44px;border:none;background:transparent;outline:none;
         color:var(--perm-ink);font-weight:700;
     }
+    .perm-search__clear{
+        display:none;align-items:center;justify-content:center;
+        width:28px;height:28px;border:0;border-radius:50%;
+        background:#eef4ff;color:var(--perm-blue);
+        cursor:pointer;transition:background .18s ease,color .18s ease,transform .18s ease;
+    }
+    .perm-search.has-value .perm-search__clear{display:inline-flex}
+    .perm-search__clear:hover{
+        background:var(--perm-blue);color:#fff;transform:scale(1.04);
+    }
+    .perm-search-status{
+        margin-top:8px;color:#6a7d9d;font-size:.78rem;font-weight:800;
+        min-height:16px;
+    }
     .perm-chips{display:flex;flex-wrap:wrap;gap:8px}
     .perm-chip{
         border:1px solid transparent;padding:8px 14px;border-radius:999px;
         background:#eef4ff;color:var(--perm-blue);
         font-weight:800;font-size:.84rem;cursor:pointer;
         transition:all .18s ease;
+    }
+    .perm-chip:focus-visible,
+    .perm-user-card:focus-visible,
+    .perm-search input:focus-visible,
+    .perm-switch input:focus-visible + span{
+        outline:3px solid rgba(31,100,224,.24);
+        outline-offset:2px;
     }
     .perm-chip:hover{
         background:#fff;border-color:rgba(17,70,184,.22);
@@ -214,6 +234,10 @@
         background:linear-gradient(135deg,var(--perm-blue-2) 0%,var(--perm-blue) 100%);
         color:#fff;border-color:transparent;
         box-shadow:0 10px 22px rgba(17,70,184,.28);
+    }
+    .perm-chip i{margin-right:5px}
+    .perm-chip.is-flashing{
+        animation:perm-chip-flash .52s ease;
     }
     .perm-chip[data-preset="warehouse"]{background:#fff4e1;color:#9a5a00}
     .perm-chip[data-preset="warehouse"]:hover{background:#fff7eb}
@@ -321,6 +345,9 @@
     .perm-module.is-enabled::before{
         background:linear-gradient(180deg,var(--perm-blue),var(--perm-blue-2));
     }
+    .perm-module.is-updated{
+        animation:perm-module-pulse .52s ease;
+    }
     .perm-module.is-hidden{display:none}
     .perm-module__head{display:flex;justify-content:space-between;gap:10px;align-items:flex-start;margin-bottom:12px}
     .perm-module__head h4{margin:0;color:var(--perm-ink);font-size:1rem;font-weight:900;letter-spacing:-.01em}
@@ -342,6 +369,9 @@
         transition:background .18s ease;
     }
     .perm-toggle:hover{background:#eef4ff}
+    .perm-toggle.is-updated{
+        animation:perm-toggle-pulse .52s ease;
+    }
     .perm-toggle.is-disabled{opacity:.45;background:#f0f2f6}
     .perm-toggle.is-disabled:hover{background:#f0f2f6}
     .perm-toggle__label{color:#27446f;font-weight:800}
@@ -366,6 +396,9 @@
         padding-top:12px;border-top:1px dashed rgba(17,70,184,.1);
     }
     .perm-module__quick .perm-chip{padding:5px 11px;font-size:.76rem}
+    .perm-module__quick .perm-chip[data-row-mode="all"]{background:#e7f6ec;color:#177a3a}
+    .perm-module__quick .perm-chip[data-row-mode="view"]{background:#e3f3ff;color:#0b5a9a}
+    .perm-module__quick .perm-chip[data-row-mode="clear"]{background:#ffeaea;color:#a31818}
 
     /* ================= Action bar ================= */
     .perm-actionbar{
@@ -381,10 +414,35 @@
         color:var(--perm-ink);font-weight:900;
         padding:2px 8px;border-radius:8px;background:#eef4ff;margin:0 2px;
     }
+    .perm-actionbar.is-dirty{
+        border-color:rgba(217,119,6,.32);
+        box-shadow:0 22px 50px rgba(217,119,6,.18);
+    }
+    .perm-actionbar.is-dirty .perm-actionbar__counter::after{
+        content:"Có thay đổi chưa lưu";
+        display:inline-flex;margin-left:10px;padding:3px 9px;border-radius:999px;
+        background:#fff4e1;color:#9a5a00;font-weight:900;font-size:.78rem;
+    }
 
     .perm-note{
         padding:20px 22px;border-radius:20px;background:#f8fbff;
         border:1px solid var(--perm-line);color:var(--perm-mute);line-height:1.7;
+    }
+
+    @keyframes perm-chip-flash{
+        0%{transform:translateY(0) scale(1)}
+        45%{transform:translateY(-2px) scale(1.03);box-shadow:0 12px 24px rgba(17,70,184,.22)}
+        100%{transform:translateY(0) scale(1)}
+    }
+    @keyframes perm-module-pulse{
+        0%{box-shadow:0 0 0 0 rgba(31,100,224,.22)}
+        55%{box-shadow:0 0 0 5px rgba(31,100,224,.12)}
+        100%{box-shadow:0 14px 30px rgba(17,70,184,.1)}
+    }
+    @keyframes perm-toggle-pulse{
+        0%{background:#f6f9ff}
+        50%{background:#e7f6ec}
+        100%{background:#f6f9ff}
     }
 
     @media (max-width:1199px){
@@ -396,4 +454,5 @@
         .perm-hero__steps,.perm-summary,.perm-modules,.perm-spotlight__stats{grid-template-columns:1fr}
         .perm-actions{grid-template-columns:1fr}
         .perm-hero__intro{padding:22px}
+        .perm-actionbar{position:static}
     }

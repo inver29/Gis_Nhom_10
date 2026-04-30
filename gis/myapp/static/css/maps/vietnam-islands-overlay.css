@@ -1,0 +1,96 @@
+/*
+ * Styles for the Vietnam Islands overlay markers shown over Leaflet maps.
+ * Markers are non-interactive and intentionally bold so the Vietnamese
+ * archipelago names dominate any underlying tile labels.
+ */
+
+.leaflet-marker-icon.vn-island-label,
+.leaflet-marker-icon.vn-island-marker {
+    background: transparent;
+    border: 0;
+    pointer-events: none;
+    width: auto !important;
+    height: auto !important;
+}
+
+.vn-island-label {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    transform: translate(-50%, -50%);
+    pointer-events: none;
+}
+
+.vn-island-label__title {
+    font-family: "Be Vietnam Pro", "Segoe UI", sans-serif;
+    font-weight: 800;
+    font-size: 13px;
+    line-height: 1.15;
+    color: #DA251D;
+    background: rgba(255, 255, 255, 0.94);
+    padding: 4px 10px;
+    border-radius: 6px;
+    border: 1.5px solid #DA251D;
+    white-space: nowrap;
+    box-shadow: 0 2px 6px rgba(23, 49, 93, 0.18);
+    letter-spacing: 0.2px;
+}
+
+.vn-island-label__subtitle {
+    margin-top: 3px;
+    font-family: "Be Vietnam Pro", "Segoe UI", sans-serif;
+    font-weight: 600;
+    font-size: 10px;
+    line-height: 1.2;
+    color: #17315D;
+    background: rgba(255, 255, 255, 0.88);
+    padding: 1px 6px;
+    border-radius: 4px;
+    white-space: nowrap;
+    border: 1px solid rgba(23, 49, 93, 0.18);
+}
+
+.vn-island-marker {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    transform: translate(-50%, -50%);
+    pointer-events: none;
+}
+
+.vn-island-marker__dot {
+    width: 9px;
+    height: 9px;
+    background: #DA251D;
+    border: 1.5px solid #FFFFFF;
+    border-radius: 50%;
+    box-shadow: 0 0 0 1px rgba(23, 49, 93, 0.25);
+    flex-shrink: 0;
+}
+
+.vn-island-marker__name {
+    font-family: "Be Vietnam Pro", "Segoe UI", sans-serif;
+    font-weight: 700;
+    font-size: 10px;
+    line-height: 1.2;
+    color: #17315D;
+    background: rgba(255, 255, 255, 0.94);
+    padding: 1px 5px;
+    border-radius: 4px;
+    white-space: nowrap;
+    border: 1px solid rgba(218, 37, 29, 0.32);
+    box-shadow: 0 1px 2px rgba(23, 49, 93, 0.12);
+}
+
+@media (max-width: 768px) {
+    .vn-island-label__title {
+        font-size: 12px;
+        padding: 3px 8px;
+    }
+    .vn-island-label__subtitle {
+        font-size: 9px;
+    }
+    .vn-island-marker__name {
+        font-size: 9px;
+    }
+}

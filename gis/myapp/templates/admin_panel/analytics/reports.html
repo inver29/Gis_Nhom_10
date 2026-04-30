@@ -46,12 +46,22 @@
                 </select>
             </div>
 
-            <div class="admin-field mb-0">
+            <div class="admin-field mb-0 report-period-control" data-period-control="month">
+                <label>Tháng</label>
+                <input type="month" name="month" max="{% now 'Y-m' %}" value="{{ filter_form.selected_month }}">
+            </div>
+
+            <div class="admin-field mb-0 report-period-control" data-period-control="year">
+                <label>Năm</label>
+                <input type="number" name="year" min="2000" max="{% now 'Y' %}" value="{{ filter_form.selected_year }}">
+            </div>
+
+            <div class="admin-field mb-0 report-period-control" data-period-control="custom">
                 <label>Từ ngày</label>
                 <input type="date" name="start_date" value="{{ filter_form.start_date }}">
             </div>
 
-            <div class="admin-field mb-0">
+            <div class="admin-field mb-0 report-period-control" data-period-control="custom">
                 <label>Đến ngày</label>
                 <input type="date" name="end_date" value="{{ filter_form.end_date }}">
             </div>
@@ -89,6 +99,10 @@
                 <button type="submit" class="btn-admin btn-admin-primary">
                     <i class="fas fa-filter"></i>
                     <span>Áp dụng</span>
+                </button>
+                <button type="submit" class="btn-admin btn-admin-success" formaction="{% url 'custom_admin_reports_export_excel' %}">
+                    <i class="fas fa-file-excel"></i>
+                    <span>Xuất Excel</span>
                 </button>
                 <a href="{% url 'custom_admin_reports' %}" class="btn-admin btn-admin-light">
                     <i class="fas fa-undo-alt"></i>
@@ -403,6 +417,25 @@
 {% block extra_scripts %}
 <script>
 (function () {
+    var rangeSelect = document.querySelector('.report-filter-grid select[name="range"]');
+    var periodControls = Array.prototype.slice.call(document.querySelectorAll('[data-period-control]'));
+
+    function syncPeriodControls() {
+        var rangeValue = rangeSelect ? rangeSelect.value : '';
+        periodControls.forEach(function (control) {
+            var controlType = control.getAttribute('data-period-control');
+            var shouldShow = (controlType === 'month' && rangeValue === 'month') ||
+                (controlType === 'year' && rangeValue === 'year') ||
+                (controlType === 'custom' && rangeValue === 'custom');
+            control.classList.toggle('is-hidden', !shouldShow);
+        });
+    }
+
+    if (rangeSelect) {
+        rangeSelect.addEventListener('change', syncPeriodControls);
+        syncPeriodControls();
+    }
+
     document.querySelectorAll('[data-report-chart-columns]').forEach(function (chart) {
         var columns = parseInt(chart.dataset.reportChartColumns || '', 10);
         var minWidth = parseInt(chart.dataset.reportChartMinWidth || '', 10);

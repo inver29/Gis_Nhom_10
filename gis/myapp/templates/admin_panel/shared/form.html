@@ -6,6 +6,8 @@
 {% if model_key == 'pharmacy' %}
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.css">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.js"></script>
+<link rel="stylesheet" href="{% static 'css/maps/vietnam-islands-overlay.css' %}?v=20260430-vn1">
+<script src="{% static 'js/maps/vietnam-islands-overlay.js' %}?v=20260430-vn1"></script>
 {% endif %}
 <link rel="stylesheet" href="{% static 'css/admin_panel/shared/form.css' %}">
 {% endblock %}
@@ -571,10 +573,13 @@ function initPharmacyLocationSync() {
     const defaultLng = 106.700806;
     const map = L.map(mapElement, { scrollWheelZoom: true }).setView([defaultLat, defaultLng], 13);
     L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png', {
-        attribution: '&copy; OpenStreetMap contributors &copy; CARTO',
+        attribution: '&copy; OpenStreetMap contributors &copy; CARTO | Tên đảo Việt Nam: GIS Pharma',
         subdomains: 'abcd',
         maxZoom: 20
     }).addTo(map);
+    if (typeof window.attachVietnamIslandsOverlay === 'function') {
+        window.attachVietnamIslandsOverlay(map);
+    }
 
     let marker = null;
     let reverseRequestId = 0;

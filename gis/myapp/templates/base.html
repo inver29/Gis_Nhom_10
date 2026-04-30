@@ -19,22 +19,28 @@
     <link rel="stylesheet" href="{% static 'css/support-widget.css' %}?v=20260401-support1">
 
     <link rel="stylesheet" href="{% static 'css/layout/base.css' %}">
+    <link rel="stylesheet" href="{% static 'css/maps/vietnam-islands-overlay.css' %}?v=20260430-vn1">
+    <script src="{% static 'js/maps/vietnam-islands-overlay.js' %}?v=20260430-vn1"></script>
 
     <script>
         window.leafletBaseLayerConfig = {
             url: "https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png",
             options: {
-                attribution: "&copy; OpenStreetMap contributors &copy; CARTO",
+                attribution: "&copy; OpenStreetMap contributors &copy; CARTO | Tên đảo Việt Nam: GIS Pharma",
                 subdomains: "abcd",
                 maxZoom: 20
             }
         };
 
         window.attachLeafletBaseLayer = function (leafletMap) {
-            return L.tileLayer(
+            var tileLayer = L.tileLayer(
                 window.leafletBaseLayerConfig.url,
                 window.leafletBaseLayerConfig.options
             ).addTo(leafletMap);
+            if (typeof window.attachVietnamIslandsOverlay === "function") {
+                window.attachVietnamIslandsOverlay(leafletMap);
+            }
+            return tileLayer;
         };
 
         window.attachAddressSearchControl = function (leafletMap, options) {
