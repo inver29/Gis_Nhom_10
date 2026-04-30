@@ -19,28 +19,26 @@
     <link rel="stylesheet" href="{% static 'css/support-widget.css' %}?v=20260401-support1">
 
     <link rel="stylesheet" href="{% static 'css/layout/base.css' %}">
-    <link rel="stylesheet" href="{% static 'css/maps/vietnam-islands-overlay.css' %}?v=20260430-vn1">
-    <script src="{% static 'js/maps/vietnam-islands-overlay.js' %}?v=20260430-vn1"></script>
 
     <script>
+        // Sử dụng tile Google Maps với locale Việt Nam (hl=vi, gl=vn) để
+        // tên các đảo, biển, địa danh được hiển thị bằng tiếng Việt theo
+        // chuẩn chủ quyền Việt Nam (Quần đảo Hoàng Sa, Quần đảo Trường Sa,
+        // Biển Đông, ...).
         window.leafletBaseLayerConfig = {
-            url: "https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png",
+            url: "https://mt{s}.google.com/vt/lyrs=m&hl=vi&gl=vn&x={x}&y={y}&z={z}",
             options: {
-                attribution: "&copy; OpenStreetMap contributors &copy; CARTO | Tên đảo Việt Nam: GIS Pharma",
-                subdomains: "abcd",
+                attribution: "&copy; Google Maps",
+                subdomains: ["0", "1", "2", "3"],
                 maxZoom: 20
             }
         };
 
         window.attachLeafletBaseLayer = function (leafletMap) {
-            var tileLayer = L.tileLayer(
+            return L.tileLayer(
                 window.leafletBaseLayerConfig.url,
                 window.leafletBaseLayerConfig.options
             ).addTo(leafletMap);
-            if (typeof window.attachVietnamIslandsOverlay === "function") {
-                window.attachVietnamIslandsOverlay(leafletMap);
-            }
-            return tileLayer;
         };
 
         window.attachAddressSearchControl = function (leafletMap, options) {
