@@ -188,7 +188,17 @@
                     setStatus("Đang tìm địa chỉ...");
 
                     try {
-                        var response = await fetch(`/api/search-address/?q=${encodeURIComponent(keyword)}`);
+                        var params = new URLSearchParams({ q: keyword });
+                        try {
+                            var center = leafletMap.getCenter();
+                            if (center && Number.isFinite(center.lat) && Number.isFinite(center.lng)) {
+                                params.set("lat", center.lat.toFixed(6));
+                                params.set("lng", center.lng.toFixed(6));
+                            }
+                        } catch (e) {
+                            /* Map chưa sẵn sàng, tìm không dùng bias. */
+                        }
+                        var response = await fetch(`/api/search-address/?${params.toString()}`);
                         var data = await response.json();
 
                         if (!response.ok) {

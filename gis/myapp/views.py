@@ -5844,14 +5844,21 @@ def nearby_pharmacies_api(request):
 def search_address_api(request):
     """
     API tìm kiếm địa chỉ cho các trang bản đồ.
+
+    Nhận thêm `lat`, `lng` (tuỳ chọn) — tâm bản đồ user đang xem — để
+    geocoder ưu tiên kết quả gần khu vực đó, tránh trả về địa chỉ trùng
+    tên ở thành phố khác.
     """
     keyword = request.GET.get('q', '').strip()
 
     if not keyword:
         return JsonResponse({'error': 'Vui lòng nhập địa chỉ cần tìm.'}, status=400)
 
+    bias_lat = request.GET.get('lat')
+    bias_lng = request.GET.get('lng')
+
     try:
-        results = search_address_candidates(keyword)
+        results = search_address_candidates(keyword, bias_lat=bias_lat, bias_lng=bias_lng)
     except Exception:
         return JsonResponse({'error': 'Không kết nối được dịch vụ tìm địa chỉ.'}, status=502)
 

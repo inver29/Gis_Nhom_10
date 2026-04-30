@@ -735,6 +735,32 @@ function initPharmacyLocationSync() {
         }
     }
 
+    function buildForwardLookupUrl(keyword) {
+        const params = new URLSearchParams({ q: keyword });
+        let bias = null;
+        if (marker) {
+            const point = marker.getLatLng();
+            if (point && Number.isFinite(point.lat) && Number.isFinite(point.lng)) {
+                bias = point;
+            }
+        }
+        try {
+            if (!bias) {
+                const center = map.getCenter();
+                if (center && Number.isFinite(center.lat) && Number.isFinite(center.lng)) {
+                    bias = center;
+                }
+            }
+        } catch (e) {
+            /* map chưa sẵn sàng — bỏ qua bias */
+        }
+        if (bias) {
+            params.set('lat', Number(bias.lat).toFixed(6));
+            params.set('lng', Number(bias.lng).toFixed(6));
+        }
+        return `/api/search-address/?${params.toString()}`;
+    }
+
     async function forwardLookup(addressText, options) {
         const keyword = String(addressText || '').trim();
         if (!keyword) {
@@ -746,7 +772,7 @@ function initPharmacyLocationSync() {
         setStatus('Đang tìm vị trí theo địa chỉ...');
 
         try {
-            const response = await fetch(`/api/search-address/?q=${encodeURIComponent(keyword)}`);
+            const response = await fetch(buildForwardLookupUrl(keyword));
             const data = await response.json();
             if (requestId !== forwardRequestId) {
                 return;
