@@ -81,7 +81,7 @@
                                 <label class="font-weight-bold">{{ form.prescription_proof_image.label }}</label>
                                 {{ form.prescription_proof_image }}
                                 <div class="text-muted small mt-2">Có thể chọn tối đa 3 ảnh. Nếu chọn sai ảnh, bấm dấu x trên ảnh để xóa ảnh đó trước khi đặt hàng.</div>
-                                <div id="checkout-prescription-preview" class="checkout-prescription-preview" style="display:none;"></div>
+                                <div id="checkout-prescription-preview" class="checkout-prescription-preview upload-preview-grid mt-3" hidden></div>
                                 {% if form.prescription_proof_image.errors %}<div class="text-danger mt-2">{{ form.prescription_proof_image.errors }}</div>{% endif %}
                             </div>
                             <div class="form-group mb-0">
@@ -296,10 +296,15 @@ const checkoutMapSearchResultAddress = document.getElementById("checkout-map-sea
 const checkoutMapSearchResultMeta = document.getElementById("checkout-map-search-result-meta");
 const checkoutMapSearchUseButton = document.getElementById("checkout-map-search-use");
 const checkoutMapSearchClearButton = document.getElementById("checkout-map-search-clear");
+const prescriptionInput = document.querySelector('input[name="prescription_proof_image"]');
+const prescriptionPreview = document.getElementById("checkout-prescription-preview");
 
 let deliveryMarker = null, deliveryRouteLayer = null, addressLookupRequestId = 0, bestPharmacyRequestId = 0, checkoutSearchPreviewMarker = null, checkoutSearchPreview = null;
 let checkoutGrandTotalValue = cartTotalValue;
 let routeInfoVisible = true;
+let selectedPrescriptionFiles = [];
+let prescriptionPreviewUrls = [];
+const prescriptionMaxFiles = 3;
 const pharmacyIcon = new L.Icon({ iconUrl:"https://cdn-icons-png.flaticon.com/512/169/169869.png", iconSize:[30,30], popupAnchor:[0,-15] });
 const checkoutSearchPreviewIcon = L.divIcon({ className:"checkout-map-search-preview-icon", html:'<span class="checkout-map-search-preview-pin"></span>', iconSize:[18,18], iconAnchor:[9,9] });
 const pharmacyMarkers = {};
@@ -339,6 +344,59 @@ pharmacyList.forEach(function(pharmacy){
 function showCheckoutLoading(){ document.getElementById("checkout-loading-overlay").style.display = "flex"; }
 function hideCheckoutLoading(){ document.getElementById("checkout-loading-overlay").style.display = "none"; }
 function showSiteNotice(message, tone){ if(window.siteUtils && typeof window.siteUtils.showToast === "function"){ window.siteUtils.showToast(message, tone || "info"); return; } window.alert(message); }
+function revokePrescriptionPreviewUrls(){ prescriptionPreviewUrls.forEach(function(url){ URL.revokeObjectURL(url); }); prescriptionPreviewUrls = []; }
+function syncPrescriptionInputFiles(){
+    if(!prescriptionInput || typeof DataTransfer === "undefined"){ return; }
+    const transfer = new DataTransfer();
+    selectedPrescriptionFiles.forEach(function(file){ transfer.items.add(file); });
+    prescriptionInput.files = transfer.files;
+}
+function renderPrescriptionPreviews(){
+    if(!prescriptionPreview){ return; }
+    revokePrescriptionPreviewUrls();
+    if(!selectedPrescriptionFiles.length){
+        prescriptionPreview.hidden = true;
+        prescriptionPreview.innerHTML = "";
+        return;
+    }
+    const cards = selectedPrescriptionFiles.map(function(file, index){
+        const objectUrl = URL.createObjectURL(file);
+        prescriptionPreviewUrls.push(objectUrl);
+        const fileName = escapeCheckoutHtml(file.name || `Ảnh đơn thuốc ${index + 1}`);
+        return `<figure class="upload-preview-card checkout-prescription-preview__item"><button type="button" class="checkout-prescription-preview__remove" data-prescription-remove="${index}" aria-label="Xóa ảnh đơn thuốc ${index + 1}"><i class="fas fa-times"></i></button><img src="${objectUrl}" alt="${fileName}"><figcaption><span>Ảnh đơn thuốc ${index + 1}</span><small>${fileName}</small></figcaption></figure>`;
+    });
+    prescriptionPreview.innerHTML = cards.join("");
+    prescriptionPreview.hidden = false;
+}
+function handlePrescriptionFileChange(){
+    if(!prescriptionInput){ return; }
+    const incomingFiles = Array.from(prescriptionInput.files || []);
+    if(!incomingFiles.length){
+        syncPrescriptionInputFiles();
+        renderPrescriptionPreviews();
+        return;
+    }
+    const availableSlots = prescriptionMaxFiles - selectedPrescriptionFiles.length;
+    if(availableSlots <= 0){
+        showSiteNotice(`Chỉ được tải tối đa ${prescriptionMaxFiles} ảnh đơn thuốc.`, "error");
+        syncPrescriptionInputFiles();
+        renderPrescriptionPreviews();
+        return;
+    }
+    if(incomingFiles.length > availableSlots){
+        showSiteNotice(`Chỉ nhận thêm ${availableSlots} ảnh. Tối đa ${prescriptionMaxFiles} ảnh đơn thuốc cho mỗi đơn.`, "error");
+    }
+    selectedPrescriptionFiles = selectedPrescriptionFiles.concat(incomingFiles.slice(0, availableSlots));
+    syncPrescriptionInputFiles();
+    renderPrescriptionPreviews();
+    updateSubmitButtonState();
+}
+function removePrescriptionFile(index){
+    selectedPrescriptionFiles.splice(index, 1);
+    syncPrescriptionInputFiles();
+    renderPrescriptionPreviews();
+    updateSubmitButtonState();
+}
 function getGeoErrorMessage(error){ if(!error || typeof error.code === "undefined"){ return "Không thể lấy vị trí hiện tại."; } if(error.code === 1){ return "Bạn đã từ chối cấp quyền truy cập vị trí."; } if(error.code === 2){ return "Không thể xác định vị trí hiện tại."; } if(error.code === 3){ return "Yêu cầu lấy vị trí đã hết thời gian chờ."; } return "Không thể lấy vị trí hiện tại."; }
 function refreshCheckoutMap(){ window.setTimeout(function(){ checkoutMap.invalidateSize(); }, 0); window.setTimeout(function(){ checkoutMap.invalidateSize(); }, 180); }
 function hasValue(value){ return value && value.trim() !== ""; }
@@ -388,6 +446,14 @@ function findMyLocation(){ if(!navigator.geolocation){ showSiteNotice("Trình du
 function useSavedAddress(){ if(!savedAddress || savedAddress.lat === null || savedAddress.lng === null){ return; } setDeliveryLocation(savedAddress.lat, savedAddress.lng, { addressText: savedAddress.address_text || "", lookupAddress:false, recenter:true, zoom:16 }); }
 
 fullNameInput.addEventListener("input", updateSubmitButtonState); phoneInput.addEventListener("input", updateSubmitButtonState); addressInput.addEventListener("input", function(){ updateSubmitButtonState(); if(hasValue(deliveryLatInput.value) && hasValue(deliveryLngInput.value)){ updateCheckoutSelectedAddress(addressInput.value || "Địa chỉ giao hàng đã chọn"); } }); if(noteInput){ noteInput.addEventListener("input", updateSubmitButtonState); } paymentMethodInputs.forEach(function(input){ input.addEventListener("change", function(){ refreshPaymentPreview(); updateSubmitButtonState(); }); });
+if(prescriptionInput){ prescriptionInput.addEventListener("change", handlePrescriptionFileChange); }
+if(prescriptionPreview){
+    prescriptionPreview.addEventListener("click", function(event){
+        const button = event.target.closest("[data-prescription-remove]");
+        if(!button){ return; }
+        removePrescriptionFile(Number(button.dataset.prescriptionRemove || 0));
+    });
+}
 if(routeInfoCollapsedButton){ routeInfoCollapsedButton.addEventListener("click", function(){ setRouteInfoVisibility(true); }); }
 if(departureTimeHiddenInput){ departureTimeHiddenInput.value = getClientDepartureTime(); }
 checkoutMap.on("click", function(event){ setDeliveryLocation(event.latlng.lat, event.latlng.lng, { recenter:false }); });

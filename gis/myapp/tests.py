@@ -9,7 +9,7 @@ from django.urls import reverse
 from django.utils import timezone
 
 from .forms import AccountProfileForm, AboutPageContentForm, CheckoutForm, MedicineAdminForm, OrderStatusUpdateForm, PaymentProofUploadForm, PharmacyAdminForm, ProfilePasswordChangeForm, ReturnRefundRequestForm
-from .models import AccountOtpChallenge, AboutPageContent, Cart, CartItem, Medicine, MedicineLot, MedicineReview, NewsArticle, Order, OrderItem, Pharmacy, ReturnRefundRequest, UserProfile, fold_text_for_match
+from .models import AccountOtpChallenge, AboutPageContent, Cart, CartItem, Medicine, MedicineLot, MedicineReview, NewsArticle, Order, OrderItem, OrderPrescriptionProof, Pharmacy, ReturnRefundRequest, UserProfile, fold_text_for_match
 from .tools.calculations import estimate_road_distance_km
 from .tools.geocode import _build_search_variants, _clean_reverse_display_name, _format_nominatim_reverse_display_name
 from .tools.routing import DeliveryRoutingService
@@ -356,6 +356,8 @@ class InventoryWorkflowTest(TestCase):
         )
 
         self.assertEqual(response.status_code, 200)
+        self.assertContains(response, 'checkout-prescription-preview upload-preview-grid')
+        self.assertContains(response, 'upload-preview-card checkout-prescription-preview__item')
         self.assertFalse(Order.objects.exists())
 
     def test_checkout_stores_prescription_image_and_marks_pending_review(self):
@@ -389,7 +391,27 @@ class InventoryWorkflowTest(TestCase):
         self.assertEqual(response.status_code, 302)
         order = Order.objects.get()
         self.assertEqual(order.prescription_status, Order.PRESCRIPTION_STATUS_PENDING)
-        self.assertTrue(order.prescription_proof_image)
+        self.assertEqual(order.prescription_proof_images.count(), 1)
+        self.assertFalse(order.prescription_proof_image)
+
+    def test_checkout_form_rejects_more_than_three_prescription_images(self):
+        uploads = [
+            SimpleUploadedFile(f'toa-{index}.png', __import__('base64').b64decode(self.TINY_PNG), content_type='image/png')
+            for index in range(4)
+        ]
+        form = CheckoutForm(
+            data={
+                'full_name': 'Khách Test',
+                'phone': '0900000002',
+                'address_text': '1 Nguyễn Huệ, Quận 1',
+                'note': '',
+                'payment_method': Order.PAYMENT_COD,
+            },
+            files={'prescription_proof_image': uploads},
+        )
+
+        self.assertFalse(form.is_valid())
+        self.assertIn('prescription_proof_image', form.errors)
 
     def test_checkout_rechecks_prescription_requirement_on_allocated_branch_medicine(self):
         other_pharmacy = Pharmacy.objects.create(
@@ -684,6 +706,31 @@ class PaymentExperienceTest(TestCase):
             self.assertEqual(response.status_code, 302)
             order.refresh_from_db()
             self.assertEqual(order.status, next_status)
+
+    def test_admin_order_detail_shows_prescription_images_and_payment_preview_hook(self):
+        admin_user = User.objects.create_user(username='proof_admin', password='Test@123456', is_staff=True)
+        order = Order.objects.create(
+            user=self.customer,
+            full_name='Khách Toa',
+            phone='0900000010',
+            address_text='789 Đường Toa',
+            pharmacy=self.pharmacy,
+            status=Order.STATUS_PENDING,
+            payment_method=Order.PAYMENT_BANK,
+            payment_status=Order.PAYMENT_STATUS_AWAITING_TRANSFER,
+            prescription_status=Order.PRESCRIPTION_STATUS_PENDING,
+        )
+        proof = OrderPrescriptionProof.objects.create(
+            order=order,
+            image=SimpleUploadedFile('toa-admin.png', __import__('base64').b64decode(self.TINY_PNG), content_type='image/png'),
+        )
+
+        self.client.force_login(admin_user)
+        response = self.client.get(reverse('custom_admin_order_detail', args=[order.pk]))
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, 'admin-payment-proof-preview')
+        self.assertContains(response, proof.image.url)
 
 
 class OrderPostPurchaseWorkflowTest(TestCase):

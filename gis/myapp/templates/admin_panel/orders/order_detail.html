@@ -222,7 +222,7 @@
             </div>
         </div>
 
-        {% if order.requires_prescription_review or order.prescription_proof_image %}
+        {% if order.requires_prescription_review or prescription_proof_cards %}
         <div class="admin-surface admin-section mb-4">
             <div class="admin-section-head">
                 <div>
@@ -241,15 +241,17 @@
                     <div class="admin-meta-item__value">{{ order.prescription_reviewed_by.username|default:"-" }} · {{ order.prescription_reviewed_at|date:"d/m/Y H:i" }}</div>
                 </div>
                 {% endif %}
-                {% if order.prescription_proof_image %}
-                <div class="admin-meta-item">
-                    <div class="admin-meta-item__label">Ảnh đơn thuốc</div>
+                {% if prescription_proof_cards %}
+                <div class="admin-meta-item" style="grid-column:1/-1;">
+                    <div class="admin-meta-item__label">Ảnh đơn thuốc khách gửi</div>
                     <div class="admin-meta-item__value">
-                        <a href="{{ order.prescription_proof_image.url }}" target="_blank" rel="noopener">Mở ảnh đơn thuốc</a>
-                        <div style="margin-top:10px;">
-                            <a href="{{ order.prescription_proof_image.url }}" target="_blank" rel="noopener">
-                                <img src="{{ order.prescription_proof_image.url }}" alt="Ảnh đơn thuốc {{ order.order_code }}" style="display:block;max-width:100%;max-height:260px;border-radius:16px;border:1px solid #d7deea;background:#f8fbff;object-fit:contain;">
+                        <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:12px;margin-top:10px;">
+                            {% for proof in prescription_proof_cards %}
+                            <a href="{{ proof.url }}" target="_blank" rel="noopener" style="display:block;">
+                                <img src="{{ proof.url }}" alt="{{ proof.label }} {{ order.order_code }}" style="display:block;width:100%;height:170px;border-radius:16px;border:1px solid #d7deea;background:#f8fbff;object-fit:contain;">
+                                <span style="display:block;margin-top:6px;color:#60708f;font-size:.85rem;">{{ proof.label }}</span>
                             </a>
+                            {% endfor %}
                         </div>
                     </div>
                 </div>
@@ -309,6 +311,12 @@
                 <div class="admin-field">
                     <label>{{ field.label }}</label>
                     {{ field }}
+                    {% if field.name == 'payment_proof_image' %}
+                    <div id="admin-payment-proof-preview" style="display:none;margin-top:12px;">
+                        <div class="admin-field-help">Ảnh vừa chọn để lưu:</div>
+                        <img alt="Xem trước chứng từ thanh toán" style="display:block;max-width:100%;max-height:260px;border-radius:16px;border:1px solid #d7deea;background:#f8fbff;object-fit:contain;">
+                    </div>
+                    {% endif %}
                     {% if field.help_text %}
                     <div class="admin-field-help">{{ field.help_text }}</div>
                     {% endif %}
@@ -326,4 +334,22 @@
         </div>
     </div>
 </section>
+<script>
+document.addEventListener('DOMContentLoaded', function () {
+    const adminPaymentProofInput = document.querySelector('input[name="payment_proof_image"]');
+    const adminPaymentProofPreview = document.getElementById('admin-payment-proof-preview');
+    if (!adminPaymentProofInput || !adminPaymentProofPreview) { return; }
+    const previewImage = adminPaymentProofPreview.querySelector('img');
+    adminPaymentProofInput.addEventListener('change', function () {
+        const file = adminPaymentProofInput.files && adminPaymentProofInput.files[0];
+        if (!file) {
+            adminPaymentProofPreview.style.display = 'none';
+            previewImage.removeAttribute('src');
+            return;
+        }
+        previewImage.src = URL.createObjectURL(file);
+        adminPaymentProofPreview.style.display = 'block';
+    });
+});
+</script>
 {% endblock %}

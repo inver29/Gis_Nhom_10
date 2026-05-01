@@ -40,7 +40,7 @@
                 {% endif %}
             </div>
 
-            {% if order.payment_proof_image or order.prescription_proof_image or order.prescription_admin_note %}
+            {% if order.payment_proof_image or prescription_proof_cards or order.prescription_admin_note %}
             <div class="history-meta-grid mt-4">
                 {% if order.payment_proof_image %}
                 <div class="history-meta-box">
@@ -52,10 +52,17 @@
                     {% if order.payment_note %}<p class="mb-0 mt-2">{{ order.payment_note }}</p>{% endif %}
                 </div>
                 {% endif %}
-                {% if order.prescription_proof_image %}
+                {% if prescription_proof_cards %}
                 <div class="history-meta-box">
-                    <small>Ảnh đơn thuốc</small>
-                    <strong><a href="{{ order.prescription_proof_image.url }}" target="_blank" rel="noopener">Mở ảnh đơn thuốc</a></strong>
+                    <small>Ảnh đơn thuốc khách gửi</small>
+                    <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:10px;margin-top:8px;">
+                        {% for proof in prescription_proof_cards %}
+                        <a href="{{ proof.url }}" target="_blank" rel="noopener" style="display:block;">
+                            <img src="{{ proof.url }}" alt="{{ proof.label }} {{ order.order_code }}" style="display:block;width:100%;height:150px;border-radius:16px;border:1px solid #d7deea;background:#f8fbff;object-fit:contain;">
+                            <strong style="display:block;margin-top:6px;">{{ proof.label }}</strong>
+                        </a>
+                        {% endfor %}
+                    </div>
                     {% if order.prescription_note %}<p class="mb-0 mt-2">{{ order.prescription_note }}</p>{% endif %}
                 </div>
                 {% endif %}
