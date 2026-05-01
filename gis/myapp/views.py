@@ -71,6 +71,7 @@ from .forms import (
     StockExportBatchForm,
     StockExportItemFormSet,
     UsernameRecoveryOtpVerificationForm,
+    RegistrationOtpVerificationForm,
 )
 from .emails import (
     send_account_recovery_otp_email,
@@ -84,6 +85,7 @@ from .emails import (
     send_account_profile_updated_email,
     send_password_changed_email,
     send_registration_confirmation_email,
+    send_registration_otp_email,
 )
 from .models import (
     AboutPageContent,
@@ -5160,9 +5162,9 @@ def checkout(request):
                 cart.items.all().delete()
 
                 transaction.on_commit(
-                    lambda confirmed_order=order, current_request=request: (
-                        send_order_confirmation_email(confirmed_order, request=current_request),
-                        send_order_invoice_email(confirmed_order, request=current_request),
+                    lambda confirmed_order=order, current_request=request: send_order_confirmation_email(
+                        confirmed_order,
+                        request=current_request,
                     )
                 )
         except ValueError as exc:
@@ -5198,7 +5200,8 @@ def checkout_page(request):
 
 def register_view(request):
     """
-    Xử lý đăng ký tài khoản.
+    Xử lý đăng ký tài khoản. Tài khoản tạo ra inactive, gửi mã OTP về email
+    để khách nhập tại trang xác thực rồi mới kích hoạt.
     """
     if request.method == 'POST':
         form = RegisterForm(request.POST)
@@ -5211,27 +5214,96 @@ def register_view(request):
             user.save()
             get_or_create_user_profile(user)
 
-            uid = urlsafe_base64_encode(force_bytes(user.pk))
-            token = email_activation_token.make_token(user)
-            email_sent = send_registration_confirmation_email(
+            challenge, otp_code = create_account_otp_challenge(
                 user=user,
-                uid=uid,
-                token=token,
+                purpose=AccountOtpChallenge.PURPOSE_REGISTRATION,
+            )
+            email_sent = send_registration_otp_email(
+                user=user,
+                challenge=challenge,
+                otp_code=otp_code,
                 request=request,
             )
             if not email_sent:
                 user.delete()
-                form.add_error(None, "Không thể gửi email xác nhận lúc này. Vui lòng thử lại sau ít phút.")
+                form.add_error(None, "Không thể gửi email OTP lúc này. Vui lòng thử lại sau ít phút.")
             else:
                 messages.success(
                     request,
-                    "Hệ thống đã gửi email xác nhận đăng ký. Vui lòng mở Mailtrap/hộp thư và bấm link xác nhận trước khi đăng nhập.",
+                    "Hệ thống đã gửi mã OTP vào email của bạn. Vui lòng nhập mã để hoàn tất đăng ký.",
                 )
-                return redirect('login')
+                return redirect('register_verify_otp', token=challenge.public_token)
     else:
         form = RegisterForm()
 
     return render(request, 'account/register.html', {'form': form})
+
+
+def register_verify_otp_view(request, token):
+    """
+    Xác thực OTP để kích hoạt tài khoản vừa đăng ký.
+    """
+    challenge = get_object_or_404(
+        AccountOtpChallenge.objects.select_related("user"),
+        public_token=token,
+        purpose=AccountOtpChallenge.PURPOSE_REGISTRATION,
+    )
+    challenge_locked = challenge.attempts >= ACCOUNT_OTP_MAX_ATTEMPTS
+    challenge_available = bool(
+        getattr(challenge, "user", None)
+        and not challenge.user.is_active
+        and challenge.is_active
+        and not challenge_locked
+    )
+
+    form = RegistrationOtpVerificationForm(request.POST or None)
+
+    if request.method == "POST" and challenge_available and form.is_valid():
+        otp_code = form.cleaned_data["otp_code"]
+        if not check_password(otp_code, challenge.otp_hash):
+            challenge.attempts += 1
+            if challenge.attempts >= ACCOUNT_OTP_MAX_ATTEMPTS:
+                challenge.consumed_at = timezone.now()
+            challenge.save(update_fields=["attempts", "consumed_at", "updated_at"])
+            remaining_attempts = max(ACCOUNT_OTP_MAX_ATTEMPTS - challenge.attempts, 0)
+            if remaining_attempts:
+                form.add_error("otp_code", f"Mã OTP không đúng. Bạn còn {remaining_attempts} lần thử.")
+            else:
+                form.add_error("otp_code", "Mã OTP đã bị khóa do nhập sai quá nhiều lần. Vui lòng đăng ký lại.")
+        else:
+            challenge.consumed_at = timezone.now()
+            challenge.save(update_fields=["consumed_at", "updated_at"])
+            challenge.user.is_active = True
+            challenge.user.save(update_fields=["is_active"])
+            login(request, challenge.user)
+            messages.success(request, "Kích hoạt tài khoản thành công. Chào mừng bạn đến với GIS Pharma!")
+            return redirect("home")
+
+    if request.method == "POST" and not challenge_available:
+        messages.error(request, "Mã OTP này đã hết hạn hoặc không còn hiệu lực. Vui lòng đăng ký lại.")
+
+    challenge_state = "active"
+    if challenge_locked:
+        challenge_state = "locked"
+    elif challenge.is_consumed:
+        challenge_state = "used"
+    elif challenge.is_expired:
+        challenge_state = "expired"
+    elif not getattr(challenge, "user", None) or challenge.user.is_active:
+        challenge_state = "invalid"
+
+    return render(
+        request,
+        "account/register_verify_otp.html",
+        {
+            "form": form,
+            "challenge": challenge,
+            "challenge_state": challenge_state,
+            "challenge_available": challenge_available,
+            "masked_email": mask_email_address(challenge.email),
+            "otp_expires_minutes": ACCOUNT_OTP_EXPIRE_MINUTES,
+        },
+    )
 
 
 def activate_account_view(request, uidb64, token):
@@ -5277,7 +5349,7 @@ def login_view(request):
 
             inactive_user = User.objects.filter(username__iexact=username, is_active=False).first()
             if inactive_user and inactive_user.check_password(password):
-                message = 'Tài khoản này chưa xác nhận email. Vui lòng mở email xác nhận trong Mailtrap/hộp thư trước khi đăng nhập.'
+                message = 'Tài khoản này chưa xác nhận email. Vui lòng kiểm tra hộp thư và nhập mã OTP để kích hoạt tài khoản.'
             else:
                 message = 'Tên đăng nhập hoặc mật khẩu không đúng.'
             form.add_error(None, message)
@@ -10201,6 +10273,13 @@ def custom_admin_order_detail(request, pk):
                             lambda changed_order=updated_order, old_status=previous_status, current_request=request: send_order_status_update_email(
                                 changed_order,
                                 old_status,
+                                request=current_request,
+                            )
+                        )
+                    if status_changed and previous_status == Order.STATUS_PENDING and updated_order.status == Order.STATUS_CONFIRMED:
+                        transaction.on_commit(
+                            lambda invoiced_order=updated_order, current_request=request: send_order_invoice_email(
+                                invoiced_order,
                                 request=current_request,
                             )
                         )

@@ -147,6 +147,25 @@ def build_account_recovery_otp_context(*, user, challenge, otp_code, request=Non
     }
 
 
+def build_registration_otp_context(*, user, challenge, otp_code, request=None):
+    verify_url = build_absolute_url(
+        "register_verify_otp",
+        request=request,
+        args=[challenge.public_token],
+    )
+    return {
+        "site_name": getattr(settings, "SITE_NAME", "GIS Pharma"),
+        "support_email": getattr(settings, "SITE_SUPPORT_EMAIL", settings.DEFAULT_FROM_EMAIL),
+        "user": user,
+        "challenge": challenge,
+        "otp_code": otp_code,
+        "verify_url": verify_url,
+        "expires_at": challenge.expires_at,
+        "otp_valid_minutes": max(int((challenge.expires_at - challenge.created_at).total_seconds() // 60), 1),
+        "recipient_name": user.get_full_name().strip() or user.get_username(),
+    }
+
+
 def build_registration_confirmation_context(*, user, uid, token, request=None):
     activation_url = build_absolute_url("activate_account", request=request, args=[uid, token])
     return {
@@ -318,6 +337,22 @@ def send_account_recovery_otp_email(*, user, challenge, otp_code, request=None):
         "registration/recovery_otp_subject.txt",
         "registration/recovery_otp_email.txt",
         "registration/recovery_otp_email.html",
+        context,
+        [challenge.email],
+    )
+
+
+def send_registration_otp_email(*, user, challenge, otp_code, request=None):
+    context = build_registration_otp_context(
+        user=user,
+        challenge=challenge,
+        otp_code=otp_code,
+        request=request,
+    )
+    return send_templated_email(
+        "registration/register_otp_subject.txt",
+        "registration/register_otp_email.txt",
+        "registration/register_otp_email.html",
         context,
         [challenge.email],
     )

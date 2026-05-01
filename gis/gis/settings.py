@@ -118,23 +118,23 @@ SITE_NAME = os.getenv('SITE_NAME', 'GIS Pharma')
 SITE_SUPPORT_EMAIL = os.getenv('SITE_SUPPORT_EMAIL', 'support@gispharma.local')
 SITE_BASE_URL = os.getenv('SITE_BASE_URL', 'http://127.0.0.1:8000')
 
-MAILTRAP_HOST = os.getenv('MAILTRAP_HOST', 'sandbox.smtp.mailtrap.io')
-MAILTRAP_PORT = int(os.getenv('MAILTRAP_PORT', '587'))
-MAILTRAP_USERNAME = os.getenv('MAILTRAP_USERNAME', os.getenv('EMAIL_HOST_USER', 'fe43f21885cccd'))
-MAILTRAP_PASSWORD = os.getenv('MAILTRAP_PASSWORD', os.getenv('EMAIL_HOST_PASSWORD', 'f003d051485341'))
-MAILTRAP_USE_TLS = os.getenv('MAILTRAP_USE_TLS', 'true').lower() in {'1', 'true', 'yes'}
+# Cau hinh Gmail SMTP. Set credentials qua bien moi truong (dung Gmail App Password).
+EMAIL_HOST = os.getenv('EMAIL_HOST', 'smtp.gmail.com')
+EMAIL_PORT = int(os.getenv('EMAIL_PORT', '587'))
+EMAIL_HOST_USER = os.getenv('EMAIL_HOST_USER', '')
+EMAIL_HOST_PASSWORD = os.getenv('EMAIL_HOST_PASSWORD', '')
+EMAIL_USE_TLS = os.getenv('EMAIL_USE_TLS', 'true').lower() in {'1', 'true', 'yes'}
+EMAIL_USE_SSL = os.getenv('EMAIL_USE_SSL', 'false').lower() in {'1', 'true', 'yes'}
 
-if MAILTRAP_USERNAME and MAILTRAP_PASSWORD:
+if EMAIL_HOST_USER and EMAIL_HOST_PASSWORD:
     EMAIL_BACKEND = 'django.core.mail.backends.smtp.EmailBackend'
 else:
     EMAIL_BACKEND = os.getenv('EMAIL_BACKEND', 'django.core.mail.backends.console.EmailBackend')
 
-EMAIL_HOST = MAILTRAP_HOST
-EMAIL_PORT = MAILTRAP_PORT
-EMAIL_HOST_USER = MAILTRAP_USERNAME
-EMAIL_HOST_PASSWORD = MAILTRAP_PASSWORD
-EMAIL_USE_TLS = MAILTRAP_USE_TLS
-DEFAULT_FROM_EMAIL = os.getenv('DEFAULT_FROM_EMAIL', 'GIS Pharma <no-reply@gispharma.local>')
+DEFAULT_FROM_EMAIL = os.getenv(
+    'DEFAULT_FROM_EMAIL',
+    f'GIS Pharma <{EMAIL_HOST_USER}>' if EMAIL_HOST_USER else 'GIS Pharma <no-reply@gispharma.local>',
+)
 SERVER_EMAIL = DEFAULT_FROM_EMAIL
 PASSWORD_RESET_TIMEOUT = 60 * 60
 

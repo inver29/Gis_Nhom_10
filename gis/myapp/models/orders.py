@@ -207,7 +207,7 @@ class Order(models.Model):
 
     @property
     def can_customer_cancel(self):
-        return self.status in {self.STATUS_PENDING, self.STATUS_CONFIRMED, self.STATUS_PACKING}
+        return self.status == self.STATUS_PENDING
 
     @property
     def can_customer_confirm_received(self):

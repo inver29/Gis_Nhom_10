@@ -2282,12 +2282,12 @@ class PromotionAdminForm(BootstrapModelForm):
 class OrderStatusUpdateForm(BootstrapModelForm):
     STATUS_TRANSITIONS = {
         Order.STATUS_PENDING: {Order.STATUS_PENDING, Order.STATUS_CONFIRMED, Order.STATUS_CANCELLED},
-        Order.STATUS_CONFIRMED: {Order.STATUS_CONFIRMED, Order.STATUS_PACKING, Order.STATUS_CANCELLED},
-        Order.STATUS_PACKING: {Order.STATUS_PACKING, Order.STATUS_SHIPPING, Order.STATUS_CANCELLED},
-        Order.STATUS_SHIPPING: {Order.STATUS_SHIPPING, Order.STATUS_COMPLETED, Order.STATUS_FAILED_DELIVERY},
+        Order.STATUS_CONFIRMED: {Order.STATUS_PENDING, Order.STATUS_CONFIRMED, Order.STATUS_PACKING, Order.STATUS_SHIPPING, Order.STATUS_CANCELLED},
+        Order.STATUS_PACKING: {Order.STATUS_CONFIRMED, Order.STATUS_PACKING, Order.STATUS_SHIPPING, Order.STATUS_CANCELLED},
+        Order.STATUS_SHIPPING: {Order.STATUS_PACKING, Order.STATUS_SHIPPING, Order.STATUS_COMPLETED, Order.STATUS_FAILED_DELIVERY, Order.STATUS_CANCELLED},
         Order.STATUS_COMPLETED: {Order.STATUS_COMPLETED},
         Order.STATUS_CANCELLED: {Order.STATUS_CANCELLED},
-        Order.STATUS_FAILED_DELIVERY: {Order.STATUS_FAILED_DELIVERY},
+        Order.STATUS_FAILED_DELIVERY: {Order.STATUS_PACKING, Order.STATUS_SHIPPING, Order.STATUS_FAILED_DELIVERY, Order.STATUS_CANCELLED},
     }
 
     class Meta:
@@ -2846,6 +2846,29 @@ class PasswordResetOtpVerificationForm(VietnameseValidationMixin, PasswordReuseV
 
 
 class UsernameRecoveryOtpVerificationForm(VietnameseValidationMixin, forms.Form):
+    otp_code = forms.CharField(
+        label="Mã OTP",
+        min_length=6,
+        max_length=6,
+        widget=forms.TextInput(
+            attrs={
+                "class": "form-control",
+                "inputmode": "numeric",
+                "autocomplete": "one-time-code",
+                "placeholder": "Nhập 6 số OTP",
+                "maxlength": "6",
+            }
+        ),
+    )
+
+    def clean_otp_code(self):
+        otp_code = re.sub(r"\D+", "", (self.cleaned_data.get("otp_code") or "").strip())
+        if len(otp_code) != 6:
+            raise ValidationError("Mã OTP phải gồm đúng 6 chữ số.")
+        return otp_code
+
+
+class RegistrationOtpVerificationForm(VietnameseValidationMixin, forms.Form):
     otp_code = forms.CharField(
         label="Mã OTP",
         min_length=6,

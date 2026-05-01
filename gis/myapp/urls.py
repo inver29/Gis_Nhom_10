@@ -23,6 +23,7 @@ urlpatterns = [
     path('order/', views.checkout, name='order_create'),
 
     path('register/', views.register_view, name='register'),
+    path('register/verify/<uuid:token>/', views.register_verify_otp_view, name='register_verify_otp'),
     path('register/activate/<uidb64>/<token>/', views.activate_account_view, name='activate_account'),
     path('login/', views.login_view, name='login'),
     path('logout/', views.logout_view, name='logout'),

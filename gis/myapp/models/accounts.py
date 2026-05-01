@@ -37,9 +37,11 @@ class UserProfile(models.Model):
 class AccountOtpChallenge(models.Model):
     PURPOSE_PASSWORD_RESET = "password_reset"
     PURPOSE_USERNAME_RECOVERY = "username_recovery"
+    PURPOSE_REGISTRATION = "registration"
     PURPOSE_CHOICES = (
         (PURPOSE_PASSWORD_RESET, "Đặt lại mật khẩu"),
         (PURPOSE_USERNAME_RECOVERY, "Khôi phục tên đăng nhập"),
+        (PURPOSE_REGISTRATION, "Kích hoạt tài khoản đăng ký"),
     )
 
     user = models.ForeignKey(
