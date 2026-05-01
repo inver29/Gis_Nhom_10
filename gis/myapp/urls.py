@@ -38,6 +38,7 @@ urlpatterns = [
     path('history/<int:order_id>/items/<int:item_id>/review/', views.order_item_review_redirect, name='order_item_review_redirect'),
     path('history/<int:order_id>/cancel/', views.cancel_order, name='cancel_order'),
     path('history/<int:order_id>/confirm-received/', views.confirm_order_received, name='confirm_order_received'),
+    path('history/<int:order_id>/payment-proof/', views.upload_payment_proof, name='upload_payment_proof'),
     path('history/<int:order_id>/return-request/', views.create_or_update_return_request, name='return_request'),
     path('history/invoice/<int:order_id>/', views.order_invoice_view, name='order_invoice_view'),
 

@@ -2199,6 +2199,12 @@ button[disabled] {
     }
 }
 
+@media (max-width: 767px) {
+    .history-payment-proof {
+        grid-template-columns: 1fr;
+    }
+}
+
 .field-help {
     display: block;
     margin-top: 8px;
@@ -2290,6 +2296,16 @@ button[disabled] {
     color: #b7791f;
 }
 
+.history-status--confirmed {
+    background: #eef4ff;
+    color: #1f64e0;
+}
+
+.history-status--packing {
+    background: #f2ecff;
+    color: #6d46c5;
+}
+
 .history-status--shipping {
     background: #e8f1ff;
     color: #1956c8;
@@ -2303,6 +2319,49 @@ button[disabled] {
 .history-status--cancelled {
     background: #fdeaea;
     color: #c63d3d;
+}
+
+.history-status--failed-delivery {
+    background: #fff1f2;
+    color: #be123c;
+}
+
+.history-payment-proof {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) 220px;
+    gap: 18px;
+    align-items: center;
+    padding: 18px;
+    border-radius: 20px;
+    border: 1px solid rgba(17, 70, 184, 0.1);
+    background: linear-gradient(180deg, #ffffff 0%, #f6faff 100%);
+}
+
+.history-payment-proof h3 {
+    margin: 0 0 8px;
+    color: #163057;
+    font-weight: 900;
+}
+
+.history-payment-proof p {
+    margin: 5px 0;
+    color: #60708f;
+    line-height: 1.55;
+}
+
+.history-payment-proof__qr {
+    display: flex;
+    justify-content: center;
+    padding: 14px;
+    border-radius: 18px;
+    background: #fff;
+    border: 1px solid rgba(17, 70, 184, 0.08);
+}
+
+.history-payment-proof__qr img {
+    width: 180px;
+    height: 180px;
+    object-fit: contain;
 }
 
 .account-layout {

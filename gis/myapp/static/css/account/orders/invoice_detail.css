@@ -23,6 +23,11 @@
         .invoice-meta-item{padding:12px 14px;border-radius:14px;background:#fff;border:1px solid var(--line)}
         .invoice-meta-item small{display:block;color:var(--muted);font-size:.79rem;text-transform:uppercase;letter-spacing:.04em;margin-bottom:6px}
         .invoice-meta-item strong{display:block;line-height:1.45}
+        .invoice-payment-box{display:grid;grid-template-columns:minmax(0,1fr) 180px;gap:16px;align-items:center;margin-top:16px;padding:16px;border-radius:16px;background:#f7faff;border:1px solid var(--line)}
+        .invoice-payment-box h3{margin:0 0 8px;color:#173153;font-size:1rem}
+        .invoice-payment-box p{margin:4px 0;line-height:1.5}
+        .invoice-payment-box__qr{display:flex;justify-content:center;padding:12px;border-radius:14px;background:#fff;border:1px solid var(--line)}
+        .invoice-payment-box__qr img{width:150px;height:150px;object-fit:contain}
         .invoice-table-wrap{margin-top:16px;overflow-x:auto}
         table{width:100%;min-width:560px;border-collapse:collapse}
         th,td{padding:10px 10px;border-bottom:1px solid #e8effb;text-align:left;vertical-align:top}
@@ -40,4 +45,4 @@
         .invoice-sign h4{margin:0 0 54px;font-size:.96rem;color:#173153}
         .invoice-sign p{margin:0;font-weight:700}
         @media print{body{background:#fff}.invoice-shell{max-width:none;padding:0}.invoice-toolbar{display:none}.invoice-paper{border:none;box-shadow:none;border-radius:0;padding:0}}
-        @media (max-width:720px){.invoice-head,.invoice-grid,.invoice-meta-grid,.invoice-foot{grid-template-columns:1fr}.invoice-paper{padding:18px}.invoice-brand h1{font-size:24px}.invoice-summary{justify-content:stretch}.invoice-summary-box{width:100%}}
+        @media (max-width:720px){.invoice-head,.invoice-grid,.invoice-meta-grid,.invoice-foot,.invoice-payment-box{grid-template-columns:1fr}.invoice-paper{padding:18px}.invoice-brand h1{font-size:24px}.invoice-summary{justify-content:stretch}.invoice-summary-box{width:100%}}

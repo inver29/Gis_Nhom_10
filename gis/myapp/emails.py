@@ -12,9 +12,12 @@ logger = logging.getLogger(__name__)
 
 ORDER_STATUS_LABELS = {
     "pending": "Chờ xử lý",
+    "confirmed": "Đã xác nhận",
+    "packing": "Đang chuẩn bị",
     "shipping": "Đang giao hàng",
     "completed": "Hoàn thành",
     "cancelled": "Đã hủy",
+    "failed_delivery": "Giao không thành công",
 }
 
 RETURN_REQUEST_STATUS_LABELS = {
@@ -255,6 +258,19 @@ def send_order_status_update_email(order, previous_status, request=None):
         "emails/order_status_updated_subject.txt",
         "emails/order_status_updated.txt",
         "emails/order_status_updated.html",
+        context,
+        [recipient_email],
+    )
+
+
+def send_order_payment_confirmed_email(order, request=None):
+    recipient_email = get_order_recipient_email(order)
+    context = build_order_email_context(order, request=request)
+    context["payment_status_label"] = getattr(order, "get_payment_status_display", lambda: "")()
+    return send_templated_email(
+        "emails/order_payment_confirmed_subject.txt",
+        "emails/order_payment_confirmed.txt",
+        "emails/order_payment_confirmed.html",
         context,
         [recipient_email],
     )

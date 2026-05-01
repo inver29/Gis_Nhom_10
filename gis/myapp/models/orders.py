@@ -58,16 +58,23 @@ class CartItem(models.Model):
 
 class Order(models.Model):
     STATUS_PENDING = "pending"
+    STATUS_CONFIRMED = "confirmed"
+    STATUS_PACKING = "packing"
     STATUS_SHIPPING = "shipping"
     STATUS_COMPLETED = "completed"
     STATUS_CANCELLED = "cancelled"
+    STATUS_FAILED_DELIVERY = "failed_delivery"
 
     STATUS_CHOICES = (
         (STATUS_PENDING, "Chờ xử lý"),
+        (STATUS_CONFIRMED, "Đã xác nhận"),
+        (STATUS_PACKING, "Đang chuẩn bị"),
         (STATUS_SHIPPING, "Đang giao hàng"),
         (STATUS_COMPLETED, "Hoàn thành"),
         (STATUS_CANCELLED, "Đã hủy"),
+        (STATUS_FAILED_DELIVERY, "Giao không thành công"),
     )
+    INVENTORY_RELEASED_STATUSES = (STATUS_CANCELLED, STATUS_FAILED_DELIVERY)
 
     PAYMENT_COD = "cod"
     PAYMENT_MOMO = "momo"
@@ -85,6 +92,17 @@ class Order(models.Model):
         (PAYMENT_STATUS_COD_WAITING, "Thu tiền khi giao hàng"),
         (PAYMENT_STATUS_AWAITING_TRANSFER, "Chờ xác nhận thanh toán"),
         (PAYMENT_STATUS_PAID, "Đã thanh toán"),
+    )
+
+    PRESCRIPTION_STATUS_NOT_REQUIRED = "not_required"
+    PRESCRIPTION_STATUS_PENDING = "pending"
+    PRESCRIPTION_STATUS_APPROVED = "approved"
+    PRESCRIPTION_STATUS_REJECTED = "rejected"
+    PRESCRIPTION_STATUS_CHOICES = (
+        (PRESCRIPTION_STATUS_NOT_REQUIRED, "Không yêu cầu đơn thuốc"),
+        (PRESCRIPTION_STATUS_PENDING, "Chờ duyệt đơn thuốc"),
+        (PRESCRIPTION_STATUS_APPROVED, "Đơn thuốc hợp lệ"),
+        (PRESCRIPTION_STATUS_REJECTED, "Từ chối đơn thuốc"),
     )
 
     user = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, blank=True, verbose_name="Tai khoan khach")
@@ -119,6 +137,37 @@ class Order(models.Model):
         verbose_name="Trang thai thanh toan",
     )
     payment_reference = models.CharField(max_length=120, blank=True, default="", verbose_name="Ma tham chieu thanh toan")
+    payment_proof_image = models.ImageField(upload_to="payments/proofs/", blank=True, null=True, verbose_name="Anh chung tu thanh toan")
+    payment_note = models.TextField(blank=True, default="", verbose_name="Ghi chu thanh toan")
+    payment_confirmed_by = models.ForeignKey(
+        User,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="payment_confirmed_orders",
+        verbose_name="Nhan vien xac nhan thanh toan",
+    )
+    payment_confirmed_at = models.DateTimeField(null=True, blank=True, verbose_name="Thoi gian xac nhan thanh toan")
+
+    prescription_status = models.CharField(
+        max_length=20,
+        choices=PRESCRIPTION_STATUS_CHOICES,
+        default=PRESCRIPTION_STATUS_NOT_REQUIRED,
+        verbose_name="Trang thai don thuoc",
+    )
+    prescription_proof_image = models.ImageField(upload_to="prescriptions/proofs/", blank=True, null=True, verbose_name="Anh don thuoc")
+    prescription_note = models.TextField(blank=True, default="", verbose_name="Ghi chu don thuoc cua khach")
+    prescription_admin_note = models.TextField(blank=True, default="", verbose_name="Ghi chu duyet don thuoc")
+    prescription_reviewed_by = models.ForeignKey(
+        User,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="prescription_reviewed_orders",
+        verbose_name="Nhan vien duyet don thuoc",
+    )
+    prescription_reviewed_at = models.DateTimeField(null=True, blank=True, verbose_name="Thoi gian duyet don thuoc")
+
     invoice_requested = models.BooleanField(default=False, verbose_name="Khach yeu cau xuat hoa don")
     invoice_code = models.CharField(max_length=40, blank=True, default="", db_index=True, verbose_name="Ma hoa don")
     invoice_staff_name = models.CharField(max_length=150, blank=True, default="", verbose_name="Nhan vien lap hoa don")
@@ -158,7 +207,7 @@ class Order(models.Model):
 
     @property
     def can_customer_cancel(self):
-        return self.status == self.STATUS_PENDING
+        return self.status in {self.STATUS_PENDING, self.STATUS_CONFIRMED, self.STATUS_PACKING}
 
     @property
     def can_customer_confirm_received(self):
@@ -167,6 +216,29 @@ class Order(models.Model):
     @property
     def can_request_return_refund(self):
         return self.status == self.STATUS_COMPLETED
+
+    @property
+    def requires_payment_confirmation(self):
+        return self.payment_method in {self.PAYMENT_BANK, self.PAYMENT_MOMO}
+
+    @property
+    def can_upload_payment_proof(self):
+        return (
+            self.requires_payment_confirmation
+            and self.payment_status == self.PAYMENT_STATUS_AWAITING_TRANSFER
+            and self.status not in set(self.INVENTORY_RELEASED_STATUSES)
+        )
+
+    @property
+    def requires_prescription_review(self):
+        return self.prescription_status != self.PRESCRIPTION_STATUS_NOT_REQUIRED
+
+    @property
+    def prescription_is_approved(self):
+        return self.prescription_status in {
+            self.PRESCRIPTION_STATUS_NOT_REQUIRED,
+            self.PRESCRIPTION_STATUS_APPROVED,
+        }
 
     @property
     def has_customer_tier_discount(self):
@@ -287,6 +359,20 @@ class ReturnRefundRequest(models.Model):
         verbose_name = "Yeu cau tra hang / hoan tien"
         verbose_name_plural = "Yeu cau tra hang / hoan tien"
         ordering = ["-created_at", "-id"]
+
+
+class OrderPrescriptionProof(models.Model):
+    order = models.ForeignKey(Order, on_delete=models.CASCADE, related_name="prescription_proof_images")
+    image = models.ImageField(upload_to="prescriptions/proofs/", verbose_name="Anh don thuoc")
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    def __str__(self):
+        return f"Anh don thuoc #{self.pk} - Don #{self.order_id}"
+
+    class Meta:
+        verbose_name = "Anh don thuoc cua don hang"
+        verbose_name_plural = "Anh don thuoc cua don hang"
+        ordering = ["id"]
 
 
 class ReturnRefundEvidence(models.Model):

@@ -4,15 +4,74 @@ from django.contrib.auth.hashers import make_password
 from django.contrib.auth.models import User
 from django.core import mail
 from django.core.files.uploadedfile import SimpleUploadedFile
-from django.test import TestCase, override_settings
+from django.test import SimpleTestCase, TestCase, override_settings
 from django.urls import reverse
 from django.utils import timezone
 
-from .forms import AccountProfileForm, AboutPageContentForm, CheckoutForm, MedicineAdminForm, PharmacyAdminForm, ProfilePasswordChangeForm, ReturnRefundRequestForm
+from .forms import AccountProfileForm, AboutPageContentForm, CheckoutForm, MedicineAdminForm, OrderStatusUpdateForm, PaymentProofUploadForm, PharmacyAdminForm, ProfilePasswordChangeForm, ReturnRefundRequestForm
 from .models import AccountOtpChallenge, AboutPageContent, Cart, CartItem, Medicine, MedicineLot, MedicineReview, NewsArticle, Order, OrderItem, Pharmacy, ReturnRefundRequest, UserProfile, fold_text_for_match
 from .tools.calculations import estimate_road_distance_km
+from .tools.geocode import _build_search_variants, _clean_reverse_display_name, _format_nominatim_reverse_display_name
 from .tools.routing import DeliveryRoutingService
 from .views import get_or_create_medicine_for_import
+
+
+class GeocodeAddressFormattingTest(SimpleTestCase):
+    def test_reverse_geocode_removes_intermediate_admin_but_keeps_parent_city(self):
+        payload = {
+            'lat': '10.8050',
+            'lon': '106.6250',
+            'display_name': 'Hẻm 163 Nguyễn Phúc Chu, Phường Tân Sơn, Thành phố Thủ Đức, Thành phố Hồ Chí Minh, 71509, Việt Nam',
+            'address': {
+                'road': 'Hẻm 163 Nguyễn Phúc Chu',
+                'suburb': 'Phường Tân Sơn',
+                'city_district': 'Thành phố Thủ Đức',
+                'state': 'Thành phố Hồ Chí Minh',
+                'postcode': '71509',
+                'country': 'Việt Nam',
+            },
+        }
+
+        self.assertEqual(
+            _format_nominatim_reverse_display_name(payload, 'fallback'),
+            'Hẻm 163 Nguyễn Phúc Chu, Phường Tân Sơn, Thành phố Hồ Chí Minh, 71509, Việt Nam',
+        )
+
+    def test_reverse_geocode_keeps_non_central_city_hierarchy(self):
+        payload = {
+            'lat': '10.9500',
+            'lon': '106.8200',
+            'display_name': 'Đường Đồng Khởi, Thành phố Biên Hòa, Đồng Nai, Việt Nam',
+            'address': {
+                'road': 'Đường Đồng Khởi',
+                'city': 'Thành phố Biên Hòa',
+                'state': 'Đồng Nai',
+                'country': 'Việt Nam',
+            },
+        }
+
+        self.assertEqual(
+            _format_nominatim_reverse_display_name(payload, 'fallback'),
+            'Đường Đồng Khởi, Thành phố Biên Hòa, Đồng Nai, Việt Nam',
+        )
+
+    def test_raw_reverse_display_name_uses_generic_central_city_cleanup(self):
+        self.assertEqual(
+            _clean_reverse_display_name(
+                'Hẻm 163 Nguyễn Phúc Chu, Phường Tân Sơn, Thành phố Thủ Đức, Thành phố Hồ Chí Minh, 71509, Việt Nam',
+                'fallback',
+                lat=10.8050,
+                lng=106.6250,
+            ),
+            'Hẻm 163 Nguyễn Phúc Chu, Phường Tân Sơn, Thành phố Hồ Chí Minh, 71509, Việt Nam',
+        )
+
+    def test_search_variants_follow_map_bias_instead_of_hard_coding_hcm(self):
+        hanoi_variants = _build_search_variants('Lê Lợi', bias_lat=21.0285, bias_lng=105.8542)
+        no_bias_variants = _build_search_variants('Lê Lợi')
+
+        self.assertTrue(hanoi_variants[0].endswith('Hà Nội, Việt Nam'))
+        self.assertFalse(any('Hồ Chí Minh' in item for item in no_bias_variants))
 
 
 class DeliveryRoutingServiceTest(TestCase):
@@ -54,6 +113,10 @@ class PharmacyAvailabilityTest(TestCase):
 
 
 class InventoryWorkflowTest(TestCase):
+    TINY_PNG = (
+        b'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAIAAACQd1PeAAAADElEQVR4nGP4//8/AAX+Av4N70a4AAAAAElFTkSuQmCC'
+    )
+
     def setUp(self):
         self.pharmacy = Pharmacy.objects.create(
             name='Nhà thuốc Test',
@@ -179,8 +242,212 @@ class InventoryWorkflowTest(TestCase):
         self.assertEqual(order.status, Order.STATUS_CANCELLED)
         self.assertEqual(medicine.quantity, 7)
 
+    def test_admin_cannot_change_order_branch_after_items_are_allocated(self):
+        other_pharmacy = Pharmacy.objects.create(
+            name='Nhà thuốc khác',
+            address='456 Đường Khác',
+            phone='0900000098',
+            opening_hours='08:00 - 22:00',
+            lat=10.78,
+            lng=106.7,
+        )
+        admin_user = User.objects.create_superuser(
+            username='branch_admin',
+            password='Test@123456',
+            email='branch_admin@example.com',
+        )
+        medicine = Medicine.objects.create(
+            pharmacy=self.pharmacy,
+            name='Kẽm bổ sung',
+            price=50000,
+            quantity=8,
+            unit='Hộp',
+        )
+        order = Order.objects.create(
+            user=self.customer,
+            full_name='Khách Test',
+            phone='0900000002',
+            address_text='1 Nguyễn Huệ, Quận 1',
+            pharmacy=self.pharmacy,
+            total_product_price=100000,
+            final_total_price=115000,
+            status=Order.STATUS_PENDING,
+        )
+        OrderItem.objects.create(
+            order=order,
+            medicine=medicine,
+            medicine_name=medicine.name,
+            price=medicine.price,
+            quantity=2,
+        )
 
+        self.client.force_login(admin_user)
+        response = self.client.post(
+            reverse('custom_admin_order_detail', args=[order.pk]),
+            {
+                'pharmacy': str(other_pharmacy.pk),
+                'status': Order.STATUS_PENDING,
+                'payment_status': Order.PAYMENT_STATUS_COD_WAITING,
+                'prescription_status': Order.PRESCRIPTION_STATUS_NOT_REQUIRED,
+            },
+        )
+
+        self.assertEqual(response.status_code, 200)
+        order.refresh_from_db()
+        self.assertEqual(order.pharmacy, self.pharmacy)
+
+    def test_failed_delivery_restores_stock(self):
+        medicine = Medicine.objects.create(
+            pharmacy=self.pharmacy,
+            name='Men vi sinh',
+            price=70000,
+            quantity=4,
+            unit='Hộp',
+        )
+        order = Order.objects.create(
+            user=self.customer,
+            full_name='Khách Test',
+            phone='0900000002',
+            address_text='1 Nguyễn Huệ, Quận 1',
+            pharmacy=self.pharmacy,
+            total_product_price=140000,
+            final_total_price=155000,
+            status=Order.STATUS_SHIPPING,
+        )
+        OrderItem.objects.create(
+            order=order,
+            medicine=medicine,
+            medicine_name=medicine.name,
+            price=medicine.price,
+            quantity=2,
+        )
+
+        order.status = Order.STATUS_FAILED_DELIVERY
+        order.save()
+
+        medicine.refresh_from_db()
+        self.assertEqual(medicine.quantity, 6)
+
+    def test_checkout_requires_prescription_image_for_prescription_medicine(self):
+        medicine = Medicine.objects.create(
+            pharmacy=self.pharmacy,
+            name='Kháng sinh kê đơn',
+            price=120000,
+            quantity=10,
+            unit='Hộp',
+            prescription_required=True,
+        )
+        cart = Cart.objects.create(user=self.customer)
+        CartItem.objects.create(cart=cart, medicine=medicine, quantity=1)
+
+        self.client.force_login(self.customer)
+        response = self.client.post(
+            reverse('checkout'),
+            {
+                'full_name': 'Khách Test',
+                'phone': '0900000002',
+                'address_text': '1 Nguyễn Huệ, Quận 1',
+                'note': '',
+                'delivery_lat': '10.7750',
+                'delivery_lng': '106.7000',
+                'pharmacy_id': str(self.pharmacy.pk),
+                'payment_method': Order.PAYMENT_COD,
+            },
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertFalse(Order.objects.exists())
+
+    def test_checkout_stores_prescription_image_and_marks_pending_review(self):
+        medicine = Medicine.objects.create(
+            pharmacy=self.pharmacy,
+            name='Thuốc kê đơn',
+            price=90000,
+            quantity=5,
+            unit='Hộp',
+            prescription_required=True,
+        )
+        cart = Cart.objects.create(user=self.customer)
+        CartItem.objects.create(cart=cart, medicine=medicine, quantity=1)
+
+        self.client.force_login(self.customer)
+        response = self.client.post(
+            reverse('checkout'),
+            {
+                'full_name': 'Khách Test',
+                'phone': '0900000002',
+                'address_text': '1 Nguyễn Huệ, Quận 1',
+                'note': '',
+                'delivery_lat': '10.7750',
+                'delivery_lng': '106.7000',
+                'pharmacy_id': str(self.pharmacy.pk),
+                'payment_method': Order.PAYMENT_COD,
+                'prescription_proof_image': SimpleUploadedFile('toa.png', __import__('base64').b64decode(self.TINY_PNG), content_type='image/png'),
+            },
+        )
+
+        self.assertEqual(response.status_code, 302)
+        order = Order.objects.get()
+        self.assertEqual(order.prescription_status, Order.PRESCRIPTION_STATUS_PENDING)
+        self.assertTrue(order.prescription_proof_image)
+
+    def test_checkout_rechecks_prescription_requirement_on_allocated_branch_medicine(self):
+        other_pharmacy = Pharmacy.objects.create(
+            name='Nhà thuốc kê đơn',
+            address='789 Đường Toa',
+            phone='0900000088',
+            opening_hours='08:00 - 22:00',
+            lat=10.78,
+            lng=106.7,
+        )
+        cart_medicine = Medicine.objects.create(
+            pharmacy=self.pharmacy,
+            name='Thuốc đồng bộ lệch',
+            price=90000,
+            quantity=0,
+            unit='Hộp',
+            manufacturer='GIS',
+            origin='Việt Nam',
+            prescription_required=False,
+        )
+        Medicine.objects.create(
+            pharmacy=other_pharmacy,
+            name='Thuốc đồng bộ lệch',
+            price=90000,
+            quantity=5,
+            unit='Hộp',
+            manufacturer='GIS',
+            origin='Việt Nam',
+            prescription_required=True,
+        )
+        cart = Cart.objects.create(user=self.customer)
+        CartItem.objects.create(cart=cart, medicine=cart_medicine, quantity=1)
+
+        self.client.force_login(self.customer)
+        response = self.client.post(
+            reverse('checkout'),
+            {
+                'full_name': 'Khách Test',
+                'phone': '0900000002',
+                'address_text': '1 Nguyễn Huệ, Quận 1',
+                'note': '',
+                'delivery_lat': '10.7750',
+                'delivery_lng': '106.7000',
+                'pharmacy_id': str(other_pharmacy.pk),
+                'payment_method': Order.PAYMENT_COD,
+            },
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertFalse(Order.objects.exists())
+
+
+@override_settings(EMAIL_BACKEND='django.core.mail.backends.locmem.EmailBackend')
 class PaymentExperienceTest(TestCase):
+    TINY_PNG = (
+        b'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAIAAACQd1PeAAAADElEQVR4nGP4//8/AAX+Av4N70a4AAAAAElFTkSuQmCC'
+    )
+
     def setUp(self):
         self.pharmacy = Pharmacy.objects.create(
             name='Nhà thuốc Thanh Toán',
@@ -193,6 +460,7 @@ class PaymentExperienceTest(TestCase):
         self.customer = User.objects.create_user(
             username='payment_user',
             password='Test@123456',
+            email='payment_user@example.com',
         )
 
     def test_payment_preview_api_returns_qr_data_for_bank(self):
@@ -274,10 +542,153 @@ class PaymentExperienceTest(TestCase):
         self.assertContains(response, 'HÓA ĐƠN BÁN HÀNG')
         self.assertContains(response, 'Nhân viên Test')
 
+    def test_customer_can_upload_transfer_payment_proof(self):
+        order = Order.objects.create(
+            user=self.customer,
+            full_name='Khách Payment',
+            phone='0900000010',
+            address_text='1 Nguyễn Huệ',
+            pharmacy=self.pharmacy,
+            total_product_price=125000,
+            shipping_fee=15000,
+            final_total_price=140000,
+            payment_method=Order.PAYMENT_BANK,
+            payment_status=Order.PAYMENT_STATUS_AWAITING_TRANSFER,
+            payment_reference='DH000321-0604',
+        )
+
+        self.client.force_login(self.customer)
+        response = self.client.post(
+            reverse('upload_payment_proof', args=[order.pk]),
+            {
+                'payment_proof_image': SimpleUploadedFile('proof.png', __import__('base64').b64decode(self.TINY_PNG), content_type='image/png'),
+                'payment_note': 'Đã chuyển khoản lúc 09:00',
+            },
+        )
+
+        self.assertEqual(response.status_code, 302)
+        order.refresh_from_db()
+        self.assertTrue(order.payment_proof_image)
+        self.assertEqual(order.payment_note, 'Đã chuyển khoản lúc 09:00')
+        self.assertEqual(order.payment_status, Order.PAYMENT_STATUS_AWAITING_TRANSFER)
+
+    def test_payment_proof_rejects_renamed_non_image_file(self):
+        order = Order.objects.create(
+            user=self.customer,
+            full_name='Khách Payment',
+            phone='0900000010',
+            address_text='1 Nguyễn Huệ',
+            pharmacy=self.pharmacy,
+            total_product_price=125000,
+            shipping_fee=15000,
+            final_total_price=140000,
+            payment_method=Order.PAYMENT_BANK,
+            payment_status=Order.PAYMENT_STATUS_AWAITING_TRANSFER,
+            payment_reference='DH000322-0604',
+        )
+
+        form = PaymentProofUploadForm(
+            data={'payment_note': 'File giả ảnh'},
+            files={
+                'payment_proof_image': SimpleUploadedFile(
+                    'proof.png',
+                    b'not a real image',
+                    content_type='image/png',
+                )
+            },
+            instance=order,
+        )
+
+        self.assertFalse(form.is_valid())
+        self.assertIn('payment_proof_image', form.errors)
+
+    def test_admin_cannot_ship_transfer_order_before_payment_confirmed(self):
+        admin_user = User.objects.create_user(username='payment_admin', password='Test@123456', is_staff=True)
+        order = Order.objects.create(
+            user=self.customer,
+            full_name='Khách Payment',
+            phone='0900000010',
+            address_text='1 Nguyễn Huệ',
+            pharmacy=self.pharmacy,
+            total_product_price=125000,
+            shipping_fee=15000,
+            final_total_price=140000,
+            payment_method=Order.PAYMENT_BANK,
+            payment_status=Order.PAYMENT_STATUS_AWAITING_TRANSFER,
+            status=Order.STATUS_PENDING,
+        )
+
+        self.client.force_login(admin_user)
+        response = self.client.post(
+            reverse('custom_admin_order_detail', args=[order.pk]),
+            {
+                'pharmacy': str(self.pharmacy.pk),
+                'status': Order.STATUS_SHIPPING,
+                'payment_status': Order.PAYMENT_STATUS_AWAITING_TRANSFER,
+                'prescription_status': Order.PRESCRIPTION_STATUS_NOT_REQUIRED,
+            },
+        )
+
+        self.assertEqual(response.status_code, 200)
+        order.refresh_from_db()
+        self.assertEqual(order.status, Order.STATUS_PENDING)
+
+    def test_admin_can_confirm_transfer_payment_then_move_order_forward(self):
+        admin_user = User.objects.create_user(username='payment_admin_ok', password='Test@123456', is_staff=True)
+        order = Order.objects.create(
+            user=self.customer,
+            full_name='Khách Payment',
+            phone='0900000010',
+            address_text='1 Nguyễn Huệ',
+            pharmacy=self.pharmacy,
+            total_product_price=125000,
+            shipping_fee=15000,
+            final_total_price=140000,
+            payment_method=Order.PAYMENT_BANK,
+            payment_status=Order.PAYMENT_STATUS_AWAITING_TRANSFER,
+            status=Order.STATUS_PENDING,
+        )
+
+        self.client.force_login(admin_user)
+        with self.captureOnCommitCallbacks(execute=True):
+            response = self.client.post(
+                reverse('custom_admin_order_detail', args=[order.pk]),
+                {
+                    'pharmacy': str(self.pharmacy.pk),
+                    'status': Order.STATUS_PENDING,
+                    'payment_status': Order.PAYMENT_STATUS_PAID,
+                    'prescription_status': Order.PRESCRIPTION_STATUS_NOT_REQUIRED,
+                },
+            )
+
+        self.assertEqual(response.status_code, 302)
+        order.refresh_from_db()
+        self.assertEqual(order.status, Order.STATUS_PENDING)
+        self.assertEqual(order.payment_status, Order.PAYMENT_STATUS_PAID)
+        self.assertIsNotNone(order.payment_confirmed_at)
+        self.assertEqual(order.payment_confirmed_by, admin_user)
+        self.assertEqual(len(mail.outbox), 1)
+        self.assertIn(order.order_code, mail.outbox[0].subject)
+        self.assertIn('thanh toán', mail.outbox[0].subject.lower())
+
+        for next_status in (Order.STATUS_CONFIRMED, Order.STATUS_PACKING, Order.STATUS_SHIPPING):
+            response = self.client.post(
+                reverse('custom_admin_order_detail', args=[order.pk]),
+                {
+                    'pharmacy': str(self.pharmacy.pk),
+                    'status': next_status,
+                    'payment_status': Order.PAYMENT_STATUS_PAID,
+                    'prescription_status': Order.PRESCRIPTION_STATUS_NOT_REQUIRED,
+                },
+            )
+            self.assertEqual(response.status_code, 302)
+            order.refresh_from_db()
+            self.assertEqual(order.status, next_status)
+
 
 class OrderPostPurchaseWorkflowTest(TestCase):
     TINY_PNG = (
-        b'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAusB9s2u8xQAAAAASUVORK5CYII='
+        b'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAIAAACQd1PeAAAADElEQVR4nGP4//8/AAX+Av4N70a4AAAAAElFTkSuQmCC'
     )
 
 
@@ -637,16 +1048,16 @@ class EmailNotificationWorkflowTest(TestCase):
                 reverse('custom_admin_order_detail', args=[order.pk]),
                 {
                     'pharmacy': str(self.pharmacy.pk),
-                    'status': Order.STATUS_SHIPPING,
+                    'status': Order.STATUS_CONFIRMED,
                 },
             )
 
         self.assertEqual(response.status_code, 302)
         order.refresh_from_db()
-        self.assertEqual(order.status, Order.STATUS_SHIPPING)
+        self.assertEqual(order.status, Order.STATUS_CONFIRMED)
         self.assertEqual(len(mail.outbox), 1)
         self.assertIn(order.order_code, mail.outbox[0].subject)
-        self.assertIn('Đang giao hàng', mail.outbox[0].body)
+        self.assertIn('Đã xác nhận', mail.outbox[0].body)
         self.assertEqual(mail.outbox[0].to, [self.customer.email])
 
     def test_return_request_status_change_sends_email(self):
@@ -673,7 +1084,7 @@ class EmailNotificationWorkflowTest(TestCase):
         request_obj.refresh_from_db()
         order.refresh_from_db()
         self.assertEqual(request_obj.status, ReturnRefundRequest.STATUS_APPROVED)
-        self.assertEqual(order.status, Order.STATUS_CANCELLED)
+        self.assertEqual(order.status, Order.STATUS_COMPLETED)
         self.assertEqual(len(mail.outbox), 1)
         self.assertIn(order.order_code, mail.outbox[0].subject)
         self.assertIn('Đã duyệt hoàn tiền cho khách.', mail.outbox[0].body)

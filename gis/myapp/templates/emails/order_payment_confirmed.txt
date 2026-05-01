@@ -1,0 +1,17 @@
+{% load currency_filters %}
+{{ recipient_name }} thân mến,
+
+{{ site_name }} đã xác nhận khoản thanh toán cho đơn hàng {{ order.order_code }}.
+
+Số tiền: {{ order.final_total_price|vnd }}
+Phương thức: {{ order.get_payment_method_display }}
+Trạng thái thanh toán: {{ payment_status_label }}
+Nội dung thanh toán: {{ order.resolved_payment_reference }}
+
+Bạn có thể xem lại chi tiết đơn hàng tại:
+{{ order_detail_url }}
+
+Xem hóa đơn:
+{{ invoice_url }}
+
+Nếu thông tin trên chưa đúng, vui lòng liên hệ {{ support_email }}.

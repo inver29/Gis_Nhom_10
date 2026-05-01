@@ -1,0 +1,1 @@
+{{ site_name }} | Đã xác nhận thanh toán cho đơn {{ order.order_code }}

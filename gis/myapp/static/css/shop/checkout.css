@@ -34,6 +34,9 @@
     .checkout-summary-box--accent{background:linear-gradient(135deg,#f1f6ff 0%,#eef4ff 100%)}
     .checkout-summary-box--total strong{color:#d62839;font-size:1.14rem}
     .checkout-payment-panel{display:grid;gap:14px}
+    .checkout-prescription-card{margin-bottom:16px;padding:16px 18px;border-radius:20px;background:#fff8e8;border:1px solid rgba(245,158,11,.25);color:#7a5200}
+    .checkout-prescription-card strong{display:block;margin-bottom:8px;color:#7a5200}
+    .checkout-prescription-card ul{margin:0;padding-left:20px;line-height:1.7}
     .checkout-payment-panel__lead{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap}
     .checkout-payment-panel__lead h3{margin:0;font-size:1rem;font-weight:900;color:#163057}
     .checkout-payment-panel__lead span{display:inline-flex;align-items:center;gap:8px;padding:8px 12px;border-radius:999px;background:rgba(17,70,184,.07);color:#1146b8;font-size:.82rem;font-weight:700}

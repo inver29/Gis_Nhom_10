@@ -91,10 +91,16 @@
                     <td>
                         {% if order.status == 'pending' %}
                             <span class="admin-badge admin-badge-warning">Chờ xử lý</span>
+                        {% elif order.status == 'confirmed' %}
+                            <span class="admin-badge admin-badge-primary">Đã xác nhận</span>
+                        {% elif order.status == 'packing' %}
+                            <span class="admin-badge admin-badge-secondary">Đang chuẩn bị</span>
                         {% elif order.status == 'shipping' %}
                             <span class="admin-badge admin-badge-info">Đang giao</span>
                         {% elif order.status == 'completed' %}
                             <span class="admin-badge admin-badge-success">Hoàn thành</span>
+                        {% elif order.status == 'failed_delivery' %}
+                            <span class="admin-badge admin-badge-danger">Giao không thành công</span>
                         {% else %}
                             <span class="admin-badge admin-badge-danger">Đã hủy</span>
                         {% endif %}

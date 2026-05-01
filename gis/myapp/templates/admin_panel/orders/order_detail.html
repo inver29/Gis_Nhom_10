@@ -169,6 +169,29 @@
                     <div class="admin-meta-item__value">{{ order.get_payment_status_display }}</div>
                 </div>
                 <div class="admin-meta-item">
+                    <div class="admin-meta-item__label">Mã đối soát</div>
+                    <div class="admin-meta-item__value">{{ order.resolved_payment_reference }}</div>
+                </div>
+                {% if order.payment_confirmed_at %}
+                <div class="admin-meta-item">
+                    <div class="admin-meta-item__label">Xác nhận thanh toán</div>
+                    <div class="admin-meta-item__value">{{ order.payment_confirmed_at|date:"d/m/Y H:i" }}{% if order.payment_confirmed_by %} · {{ order.payment_confirmed_by.username }}{% endif %}</div>
+                </div>
+                {% endif %}
+                {% if order.payment_proof_image %}
+                <div class="admin-meta-item">
+                    <div class="admin-meta-item__label">Chứng từ khách gửi</div>
+                    <div class="admin-meta-item__value">
+                        <a href="{{ order.payment_proof_image.url }}" target="_blank" rel="noopener">Mở ảnh chứng từ</a>
+                        <div style="margin-top:10px;">
+                            <a href="{{ order.payment_proof_image.url }}" target="_blank" rel="noopener">
+                                <img src="{{ order.payment_proof_image.url }}" alt="Chứng từ thanh toán {{ order.order_code }}" style="display:block;max-width:100%;max-height:260px;border-radius:16px;border:1px solid #d7deea;background:#f8fbff;object-fit:contain;">
+                            </a>
+                        </div>
+                    </div>
+                </div>
+                {% endif %}
+                <div class="admin-meta-item">
                     <div class="admin-meta-item__label">Mã hóa đơn</div>
                     <div class="admin-meta-item__value">{{ order.resolved_invoice_code }}</div>
                 </div>
@@ -181,10 +204,16 @@
                     <div class="admin-meta-item__value">
                         {% if order.status == 'pending' %}
                             <span class="admin-badge admin-badge-warning">Chờ xử lý</span>
+                        {% elif order.status == 'confirmed' %}
+                            <span class="admin-badge admin-badge-primary">Đã xác nhận</span>
+                        {% elif order.status == 'packing' %}
+                            <span class="admin-badge admin-badge-secondary">Đang chuẩn bị</span>
                         {% elif order.status == 'shipping' %}
                             <span class="admin-badge admin-badge-info">Đang giao</span>
                         {% elif order.status == 'completed' %}
                             <span class="admin-badge admin-badge-success">Hoàn thành</span>
+                        {% elif order.status == 'failed_delivery' %}
+                            <span class="admin-badge admin-badge-danger">Giao không thành công</span>
                         {% else %}
                             <span class="admin-badge admin-badge-danger">Đã hủy</span>
                         {% endif %}
@@ -192,6 +221,54 @@
                 </div>
             </div>
         </div>
+
+        {% if order.requires_prescription_review or order.prescription_proof_image %}
+        <div class="admin-surface admin-section mb-4">
+            <div class="admin-section-head">
+                <div>
+                    <h3>Đơn thuốc</h3>
+                    <p>Đơn có thuốc kê đơn cần được duyệt trước khi chuẩn bị hoặc giao hàng.</p>
+                </div>
+            </div>
+            <div class="admin-meta-grid">
+                <div class="admin-meta-item">
+                    <div class="admin-meta-item__label">Trạng thái</div>
+                    <div class="admin-meta-item__value">{{ order.get_prescription_status_display }}</div>
+                </div>
+                {% if order.prescription_reviewed_at %}
+                <div class="admin-meta-item">
+                    <div class="admin-meta-item__label">Người duyệt</div>
+                    <div class="admin-meta-item__value">{{ order.prescription_reviewed_by.username|default:"-" }} · {{ order.prescription_reviewed_at|date:"d/m/Y H:i" }}</div>
+                </div>
+                {% endif %}
+                {% if order.prescription_proof_image %}
+                <div class="admin-meta-item">
+                    <div class="admin-meta-item__label">Ảnh đơn thuốc</div>
+                    <div class="admin-meta-item__value">
+                        <a href="{{ order.prescription_proof_image.url }}" target="_blank" rel="noopener">Mở ảnh đơn thuốc</a>
+                        <div style="margin-top:10px;">
+                            <a href="{{ order.prescription_proof_image.url }}" target="_blank" rel="noopener">
+                                <img src="{{ order.prescription_proof_image.url }}" alt="Ảnh đơn thuốc {{ order.order_code }}" style="display:block;max-width:100%;max-height:260px;border-radius:16px;border:1px solid #d7deea;background:#f8fbff;object-fit:contain;">
+                            </a>
+                        </div>
+                    </div>
+                </div>
+                {% endif %}
+                {% if order.prescription_note %}
+                <div class="admin-meta-item">
+                    <div class="admin-meta-item__label">Ghi chú khách</div>
+                    <div class="admin-meta-item__value">{{ order.prescription_note }}</div>
+                </div>
+                {% endif %}
+                {% if order.prescription_admin_note %}
+                <div class="admin-meta-item">
+                    <div class="admin-meta-item__label">Ghi chú duyệt</div>
+                    <div class="admin-meta-item__value">{{ order.prescription_admin_note }}</div>
+                </div>
+                {% endif %}
+            </div>
+        </div>
+        {% endif %}
 
         {% if return_request %}
         <div class="admin-surface admin-section mb-4">
@@ -226,12 +303,15 @@
                 </div>
             </div>
 
-            <form method="post">
+            <form method="post" enctype="multipart/form-data">
                 {% csrf_token %}
                 {% for field in update_form %}
                 <div class="admin-field">
                     <label>{{ field.label }}</label>
                     {{ field }}
+                    {% if field.help_text %}
+                    <div class="admin-field-help">{{ field.help_text }}</div>
+                    {% endif %}
                     {% if field.errors %}
                     <div class="admin-field-error">{{ field.errors }}</div>
                     {% endif %}

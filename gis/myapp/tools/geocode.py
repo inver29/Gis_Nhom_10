@@ -237,6 +237,61 @@ def _rank_search_results(search_results, query_text, limit_value, bias_lat=None,
     return _copy_search_results(ranked[:limit_value])
 
 
+CENTRAL_MUNICIPALITY_ALIASES = {
+    'thanh pho ho chi minh',
+    'tp ho chi minh',
+    'ho chi minh',
+    'ho chi minh city',
+    'hcm',
+    'hcmc',
+    'tp hcm',
+    'tphcm',
+    'sai gon',
+    'ha noi',
+    'hanoi',
+    'thanh pho ha noi',
+    'da nang',
+    'thanh pho da nang',
+    'hai phong',
+    'thanh pho hai phong',
+    'can tho',
+    'thanh pho can tho',
+}
+
+INTERMEDIATE_ADMIN_PREFIXES = (
+    'thanh pho ',
+    'tp ',
+    'quan ',
+    'q ',
+    'huyen ',
+    'thi xa ',
+)
+
+
+def _is_central_municipality(component):
+    return _normalize_search_text(component) in CENTRAL_MUNICIPALITY_ALIASES
+
+
+def _looks_like_intermediate_admin(component):
+    normalized = _normalize_search_text(component)
+    if not normalized or _is_central_municipality(component):
+        return False
+    return normalized.startswith(INTERMEDIATE_ADMIN_PREFIXES)
+
+
+def _clean_address_part_list(parts):
+    cleaned_parts = []
+    central_parent = next((part for part in parts if _is_central_municipality(part)), None)
+    for part in parts:
+        text = _clean_reverse_component(part)
+        if not text:
+            continue
+        if central_parent and text != central_parent and _looks_like_intermediate_admin(text):
+            continue
+        _append_reverse_component(cleaned_parts, text)
+    return ', '.join(cleaned_parts)
+
+
 def _format_photon_display_name(properties, fallback_text):
     ordered_parts = [
         properties.get('name'),
@@ -247,18 +302,7 @@ def _format_photon_display_name(properties, fallback_text):
         properties.get('state'),
         properties.get('country'),
     ]
-    seen = set()
-    parts = []
-    for part in ordered_parts:
-        text = str(part or '').strip()
-        if not text:
-            continue
-        normalized = text.casefold()
-        if normalized in seen:
-            continue
-        seen.add(normalized)
-        parts.append(text)
-    return ', '.join(parts) or fallback_text
+    return _clean_address_part_list(ordered_parts) or fallback_text
 
 
 def _format_bigdatacloud_display_name(data, fallback_text):
@@ -268,18 +312,7 @@ def _format_bigdatacloud_display_name(data, fallback_text):
         data.get('principalSubdivision'),
         data.get('countryName'),
     ]
-    seen = set()
-    parts = []
-    for part in ordered_parts:
-        text = str(part or '').strip()
-        if not text:
-            continue
-        normalized = text.casefold()
-        if normalized in seen:
-            continue
-        seen.add(normalized)
-        parts.append(text)
-    return ', '.join(parts) or fallback_text
+    return _clean_address_part_list(ordered_parts) or fallback_text
 
 
 REVERSE_ADMIN_PARENT_OVERRIDES = {
@@ -348,17 +381,25 @@ def _is_reverse_tail_component(component):
 
 
 def _clean_reverse_display_name(display_name, fallback_text, lat=None, lng=None):
+    raw_components = [
+        _clean_reverse_component(component)
+        for component in str(display_name or '').split(',')
+    ]
+    raw_components = [component for component in raw_components if component]
+    central_parent = next(
+        (component for component in raw_components if _is_central_municipality(component)),
+        None,
+    )
     parts = []
     parents = []
     tail_parts = []
-    for component in str(display_name or '').split(','):
-        text = _clean_reverse_component(component)
-        if not text:
-            continue
+    for text in raw_components:
         if _is_reverse_admin_noise(text, lat=lat, lng=lng):
             parent = _reverse_parent_for_component(text, lat=lat, lng=lng)
             if parent:
                 parents.append(parent)
+            continue
+        if central_parent and text != central_parent and _looks_like_intermediate_admin(text):
             continue
         if _is_reverse_tail_component(text):
             _append_reverse_component(tail_parts, text)
@@ -401,10 +442,24 @@ def _format_nominatim_reverse_display_name(data, fallback_text):
     for key in ('neighbourhood', 'quarter', 'suburb', 'village'):
         _append_reverse_component(parts, address.get(key))
 
+    admin_keys = ('city_district', 'district', 'county', 'city', 'town', 'state', 'province')
+    central_parent = next(
+        (
+            _clean_reverse_component(address.get(key))
+            for key in admin_keys
+            if _is_central_municipality(address.get(key))
+        ),
+        None,
+    )
     parent_components = []
-    for key in ('city_district', 'district', 'county', 'city', 'town', 'state', 'province'):
+    for key in admin_keys:
         component = _clean_reverse_component(address.get(key))
         if not component:
+            continue
+        if central_parent and component != central_parent and (
+            key in {'city_district', 'district', 'county'}
+            or _looks_like_intermediate_admin(component)
+        ):
             continue
         if key in {'city_district', 'district', 'county', 'city', 'town'} and _is_reverse_admin_noise(component, lat=result_lat, lng=result_lng):
             parent = _reverse_parent_for_component(component, lat=result_lat, lng=result_lng)
@@ -422,9 +477,12 @@ def _format_nominatim_reverse_display_name(data, fallback_text):
     return ', '.join(parts) or _clean_reverse_display_name(data.get('display_name'), fallback_text, lat=result_lat, lng=result_lng)
 
 
-CITY_HINT_KEYWORDS = (
-    "việt nam", "viet nam",
-    "hồ chí minh", "ho chi minh", "tphcm", "tp hcm", "tp.hcm", "tp. hcm", "sài gòn", "sai gon",
+COUNTRY_HINT_KEYWORDS = (
+    "việt nam", "viet nam", "vietnam",
+)
+
+REGION_HINT_KEYWORDS = (
+    "hồ chí minh", "ho chi minh", "ho chi minh city", "hcmc", "tphcm", "tp hcm", "tp.hcm", "tp. hcm", "sài gòn", "sai gon",
     "hà nội", "ha noi",
     "đà nẵng", "da nang",
     "hải phòng", "hai phong",
@@ -432,6 +490,14 @@ CITY_HINT_KEYWORDS = (
     "biên hòa", "bien hoa",
     "nha trang", "huế", "hue", "vũng tàu", "vung tau",
     "bình dương", "binh duong", "đồng nai", "dong nai",
+)
+
+BIAS_REGION_HINTS = (
+    ("Hồ Chí Minh", 10.7769, 106.7008, 80),
+    ("Hà Nội", 21.0285, 105.8542, 70),
+    ("Đà Nẵng", 16.0471, 108.2068, 55),
+    ("Hải Phòng", 20.8449, 106.6881, 55),
+    ("Cần Thơ", 10.0452, 105.7469, 55),
 )
 
 
@@ -442,7 +508,39 @@ def _coerce_float(value):
         return None
 
 
-def _build_search_variants(normalized_query):
+def _has_country_hint(query_text):
+    folded = query_text.casefold()
+    normalized = _normalize_search_text(query_text)
+    return any(keyword in folded or _normalize_search_text(keyword) in normalized for keyword in COUNTRY_HINT_KEYWORDS)
+
+
+def _has_region_hint(query_text):
+    folded = query_text.casefold()
+    normalized = _normalize_search_text(query_text)
+    return any(keyword in folded or _normalize_search_text(keyword) in normalized for keyword in REGION_HINT_KEYWORDS)
+
+
+def _bias_region_hint(bias_lat, bias_lng):
+    if bias_lat is None or bias_lng is None:
+        return None
+    nearest = None
+    for label, center_lat, center_lng, radius_km in BIAS_REGION_HINTS:
+        distance = _distance_km(center_lat, center_lng, bias_lat, bias_lng)
+        if distance is None or distance > radius_km:
+            continue
+        if nearest is None or distance < nearest[0]:
+            nearest = (distance, label)
+    return nearest[1] if nearest else None
+
+
+def _without_postal_codes(query_text):
+    cleaned = re.sub(r'(^|,)\s*\d{4,6}\s*(?=,|$)', r'\1', query_text)
+    cleaned = re.sub(r'\s*,\s*', ', ', cleaned)
+    cleaned = re.sub(r',\s*,+', ', ', cleaned)
+    return cleaned.strip(' ,')
+
+
+def _build_search_variants(normalized_query, bias_lat=None, bias_lng=None):
     """
     Sinh các biến thể truy vấn theo thứ tự ưu tiên:
     biến thể có hậu tố thành phố/quốc gia chạy TRƯỚC, biến thể trần
@@ -451,6 +549,9 @@ def _build_search_variants(normalized_query):
     Lợi tại HCM thay vì một đường trùng tên ở tỉnh khác).
     """
     core_variants = [normalized_query]
+    without_postcode = _without_postal_codes(normalized_query)
+    if without_postcode and without_postcode != normalized_query:
+        core_variants.append(without_postcode)
 
     if "/" in normalized_query:
         compact_variant = re.sub(r"\s*/\s*", "/", normalized_query)
@@ -464,15 +565,15 @@ def _build_search_variants(normalized_query):
             if cleaned_candidate and cleaned_candidate not in core_variants:
                 core_variants.append(cleaned_candidate)
 
-    has_city_hint = any(
-        keyword in normalized_query.casefold()
-        for keyword in CITY_HINT_KEYWORDS
-    )
+    has_country_hint = _has_country_hint(normalized_query)
+    has_region_hint = _has_region_hint(normalized_query)
+    bias_region = None if has_region_hint else _bias_region_hint(bias_lat, bias_lng)
 
     ordered = []
-    if not has_city_hint:
+    if bias_region:
         for core in core_variants:
-            ordered.append(f"{core}, Hồ Chí Minh, Việt Nam")
+            ordered.append(f"{core}, {bias_region}, Việt Nam")
+    if not has_country_hint:
         for core in core_variants:
             ordered.append(f"{core}, Việt Nam")
     ordered.extend(core_variants)
@@ -537,8 +638,13 @@ def search_address_candidates(query, limit=5, country_codes='vn', bias_lat=None,
         return _copy_search_results(cached_results)
 
     normalized_query = re.sub(r"\s+", " ", query_text).strip()
-    variants = _build_search_variants(normalized_query)
-    viewbox = _build_viewbox(bias_lat_value, bias_lng_value)
+    use_bias_for_query = not _has_region_hint(normalized_query)
+    variants = _build_search_variants(
+        normalized_query,
+        bias_lat=bias_lat_value if use_bias_for_query else None,
+        bias_lng=bias_lng_value if use_bias_for_query else None,
+    )
+    viewbox = _build_viewbox(bias_lat_value, bias_lng_value) if use_bias_for_query else None
 
     search_results = []
     seen_keys = set()
@@ -588,7 +694,7 @@ def search_address_candidates(query, limit=5, country_codes='vn', bias_lat=None,
                 seen_keys,
                 lat=item.get('lat'),
                 lng=item.get('lon'),
-                display_name=item.get('display_name', query_text),
+                display_name=_format_nominatim_reverse_display_name(item, item.get('display_name') or query_text),
                 type_label=item.get('type') or item.get('class') or 'location',
                 raw_type=item.get('type'),
                 raw_class=item.get('class'),
@@ -601,8 +707,8 @@ def search_address_candidates(query, limit=5, country_codes='vn', bias_lat=None,
             search_results,
             normalized_query,
             limit_value,
-            bias_lat=bias_lat_value,
-            bias_lng=bias_lng_value,
+            bias_lat=bias_lat_value if use_bias_for_query else None,
+            bias_lng=bias_lng_value if use_bias_for_query else None,
         )
         if not _extract_number_tokens(normalized_query):
             GEOCODE_SEARCH_CACHE[cache_key] = _copy_search_results(ranked_results)
@@ -614,7 +720,7 @@ def search_address_candidates(query, limit=5, country_codes='vn', bias_lat=None,
             'q': variant,
             'limit': limit_value,
         }
-        if bias_lat_value is not None and bias_lng_value is not None:
+        if use_bias_for_query and bias_lat_value is not None and bias_lng_value is not None:
             photon_params['lat'] = bias_lat_value
             photon_params['lon'] = bias_lng_value
             photon_params['zoom'] = 12
@@ -656,8 +762,8 @@ def search_address_candidates(query, limit=5, country_codes='vn', bias_lat=None,
         search_results,
         normalized_query,
         limit_value,
-        bias_lat=bias_lat_value,
-        bias_lng=bias_lng_value,
+        bias_lat=bias_lat_value if use_bias_for_query else None,
+        bias_lng=bias_lng_value if use_bias_for_query else None,
     )
     GEOCODE_SEARCH_CACHE[cache_key] = _copy_search_results(ranked_results)
     return _copy_search_results(ranked_results)

@@ -47,6 +47,7 @@ from .forms import (
     AboutFeaturedBranchItemFormSet,
     AboutPageSlideFormSet,
     CheckoutForm,
+    PaymentProofUploadForm,
     HomeCategorySpotlightItemFormSet,
     HomeHeroSlideFormSet,
     HomePageContentForm,
@@ -76,6 +77,7 @@ from .emails import (
     send_order_cancelled_email,
     send_order_confirmation_email,
     send_order_invoice_email,
+    send_order_payment_confirmed_email,
     send_order_status_update_email,
     send_return_request_received_email,
     send_return_request_status_update_email,
@@ -104,6 +106,7 @@ from .models import (
     NewsArticle,
     Order,
     OrderItem,
+    OrderPrescriptionProof,
     Pharmacy,
     PharmacyReview,
     ReturnRefundEvidence,
@@ -1014,6 +1017,8 @@ def complete_order_workflow(order, *, completed_by_customer=False, auto_complete
 
         if order.payment_method == Order.PAYMENT_COD:
             order.payment_status = Order.PAYMENT_STATUS_PAID
+            if order.payment_confirmed_at is None:
+                order.payment_confirmed_at = now
 
         order.save()
 
@@ -1023,6 +1028,9 @@ def complete_order_workflow(order, *, completed_by_customer=False, auto_complete
 def auto_complete_order_if_due(order, now=None):
     now = now or timezone.now()
     if order.status != Order.STATUS_SHIPPING:
+        return False
+
+    if order.requires_payment_confirmation and order.payment_status != Order.PAYMENT_STATUS_PAID:
         return False
 
     deadline = order.auto_complete_deadline_at
@@ -1070,6 +1078,16 @@ def get_customer_order_status_meta(order):
             "badge_class": "history-status--pending",
             "short_label": order.get_status_display(),
         },
+        Order.STATUS_CONFIRMED: {
+            "label": order.get_status_display(),
+            "badge_class": "history-status--confirmed",
+            "short_label": order.get_status_display(),
+        },
+        Order.STATUS_PACKING: {
+            "label": order.get_status_display(),
+            "badge_class": "history-status--packing",
+            "short_label": order.get_status_display(),
+        },
         Order.STATUS_SHIPPING: {
             "label": order.get_status_display(),
             "badge_class": "history-status--shipping",
@@ -1083,6 +1101,11 @@ def get_customer_order_status_meta(order):
         Order.STATUS_CANCELLED: {
             "label": order.get_status_display(),
             "badge_class": "history-status--cancelled",
+            "short_label": order.get_status_display(),
+        },
+        Order.STATUS_FAILED_DELIVERY: {
+            "label": order.get_status_display(),
+            "badge_class": "history-status--failed-delivery",
             "short_label": order.get_status_display(),
         },
     }
@@ -1104,7 +1127,7 @@ def decorate_order_for_customer_display(order):
 
 def get_order_for_customer_or_404(user, order_id):
     order = get_object_or_404(
-        Order.objects.select_related('pharmacy', 'user').prefetch_related('items__medicine', 'return_request'),
+        Order.objects.select_related('pharmacy', 'user').prefetch_related('items__medicine', 'return_request', 'prescription_proof_images'),
         pk=order_id,
         user=user,
     )
@@ -1112,9 +1135,9 @@ def get_order_for_customer_or_404(user, order_id):
 
 
 def build_order_history_queryset_for_user(user, filter_state=None):
-    base_queryset = Order.objects.filter(user=user).select_related('pharmacy').prefetch_related('items__medicine', 'return_request').order_by('-created_at', '-id')
+    base_queryset = Order.objects.filter(user=user).select_related('pharmacy').prefetch_related('items__medicine', 'return_request', 'prescription_proof_images').order_by('-created_at', '-id')
     auto_complete_overdue_shipping_orders(base_queryset)
-    queryset = Order.objects.filter(user=user).select_related('pharmacy').prefetch_related('items__medicine', 'return_request').order_by('-created_at', '-id')
+    queryset = Order.objects.filter(user=user).select_related('pharmacy').prefetch_related('items__medicine', 'return_request', 'prescription_proof_images').order_by('-created_at', '-id')
     if filter_state:
         queryset = apply_order_history_filters(queryset, filter_state)
     orders = list(queryset)
@@ -3341,6 +3364,41 @@ def build_cart_requirements(cart):
     return list(grouped_requirements.values())
 
 
+def build_cart_prescription_context(cart):
+    prescription_items = []
+    for cart_item in cart.items.select_related('medicine', 'medicine__pharmacy').order_by('id'):
+        medicine = getattr(cart_item, 'medicine', None)
+        if medicine and medicine.prescription_required:
+            prescription_items.append(cart_item)
+    return {
+        'requires_prescription': bool(prescription_items),
+        'items': prescription_items,
+    }
+
+
+def build_order_prescription_proof_cards(order):
+    proof_cards = []
+    if order and getattr(order, "pk", None):
+        try:
+            related_images = list(order.prescription_proof_images.all())
+        except Exception:
+            related_images = []
+        for index, proof in enumerate(related_images, start=1):
+            if getattr(proof, "image", None):
+                proof_cards.append({
+                    "url": proof.image.url,
+                    "label": f"Ảnh đơn thuốc {index}",
+                })
+
+    legacy_image = getattr(order, "prescription_proof_image", None)
+    if legacy_image and not proof_cards:
+        proof_cards.append({
+            "url": legacy_image.url,
+            "label": "Ảnh đơn thuốc",
+        })
+    return proof_cards
+
+
 def allocate_requirements_to_medicines(requirements, medicines):
     medicines_by_key = {}
 
@@ -3415,8 +3473,9 @@ def sync_inventory_for_order_status_transition(order, previous_status, next_stat
     if previous_status == next_status:
         return
 
-    should_restore_inventory = previous_status != Order.STATUS_CANCELLED and next_status == Order.STATUS_CANCELLED
-    should_deduct_inventory_again = previous_status == Order.STATUS_CANCELLED and next_status != Order.STATUS_CANCELLED
+    inventory_released_statuses = set(Order.INVENTORY_RELEASED_STATUSES)
+    should_restore_inventory = previous_status not in inventory_released_statuses and next_status in inventory_released_statuses
+    should_deduct_inventory_again = previous_status in inventory_released_statuses and next_status not in inventory_released_statuses
 
     if not (should_restore_inventory or should_deduct_inventory_again):
         return
@@ -4887,6 +4946,7 @@ def checkout(request):
     saved_address = build_saved_address_payload(profile) if profile and is_customer_user(request.user) else None
     cart_pricing = build_cart_pricing_snapshot(cart, request.user)
     loyalty_context = cart_pricing['loyalty']
+    prescription_context = build_cart_prescription_context(cart)
     requested_address = (request.POST.get('address_text') or request.GET.get('address') or '').strip()
     requested_pharmacy_id = (request.POST.get('pharmacy_id') or request.GET.get('pharmacy_id') or '').strip()
     requested_lat = (request.POST.get('delivery_lat') or request.GET.get('delivery_lat') or '').strip()
@@ -4919,13 +4979,20 @@ def checkout(request):
             'preselected_delivery': preselected_delivery,
             'preselected_pharmacy_id': requested_pharmacy_id,
             'departure_time_value': requested_departure_time,
+            'prescription_context': prescription_context,
         }
 
     if request.method == 'POST':
-        form = CheckoutForm(request.POST)
+        form = CheckoutForm(request.POST, request.FILES)
 
         if not form.is_valid():
             messages.error(request, 'Thông tin chưa hợp lệ. Vui lòng kiểm tra lại biểu mẫu.')
+            return render(request, 'shop/checkout.html', build_checkout_context(form))
+
+        uploaded_prescription_images = form.cleaned_data.get('prescription_proof_image') or []
+        if prescription_context['requires_prescription'] and not uploaded_prescription_images:
+            form.add_error('prescription_proof_image', 'Giỏ hàng có thuốc cần kê đơn. Vui lòng tải lên ảnh đơn thuốc.')
+            messages.error(request, 'Giỏ hàng có thuốc cần kê đơn. Vui lòng bổ sung ảnh đơn thuốc trước khi đặt hàng.')
             return render(request, 'shop/checkout.html', build_checkout_context(form))
 
         delivery_lat = request.POST.get('delivery_lat', '').strip()
@@ -5014,6 +5081,19 @@ def checkout(request):
                         'quantity': quantity,
                     })
 
+                allocated_requires_prescription = any(
+                    allocation['medicine'].prescription_required
+                    for allocation in finalized_allocations
+                )
+                requires_prescription_for_order = (
+                    prescription_context['requires_prescription']
+                    or allocated_requires_prescription
+                )
+                if requires_prescription_for_order and not uploaded_prescription_images:
+                    form.add_error('prescription_proof_image', 'Đơn có thuốc cần kê đơn. Vui lòng tải lên ảnh đơn thuốc.')
+                    messages.error(request, 'Đơn có thuốc cần kê đơn. Vui lòng bổ sung ảnh đơn thuốc trước khi đặt hàng.')
+                    return render(request, 'shop/checkout.html', build_checkout_context(form))
+
                 selected_total_product_price_before_loyalty = sum(
                     allocation['medicine'].current_price * allocation['quantity']
                     for allocation in finalized_allocations
@@ -5044,6 +5124,11 @@ def checkout(request):
                 order.customer_tier_discount_total = selected_loyalty_discount_total
                 order.payment_method = payment_method
                 order.payment_status = determine_initial_payment_status(payment_method)
+                order.prescription_status = (
+                    Order.PRESCRIPTION_STATUS_PENDING
+                    if requires_prescription_for_order
+                    else Order.PRESCRIPTION_STATUS_NOT_REQUIRED
+                )
                 order.invoice_requested = invoice_requested
                 order.invoice_staff_name = get_invoice_staff_name_for_pharmacy(selected_pharmacy)
                 order.estimated_delivery_at = build_order_estimated_delivery_at(
@@ -5052,6 +5137,8 @@ def checkout(request):
                     selected_route.get('duration_min'),
                 )
                 order.save()
+                for uploaded_image in uploaded_prescription_images[:3]:
+                    OrderPrescriptionProof.objects.create(order=order, image=uploaded_image)
                 order.invoice_code = build_order_invoice_code(order)
                 order.payment_reference = build_order_payment_reference(order)
                 order.save(update_fields=['invoice_code', 'payment_reference'])
@@ -5083,6 +5170,10 @@ def checkout(request):
             return redirect('checkout')
 
         messages.success(request, 'Đặt hàng thành công.')
+        if payment_method in {Order.PAYMENT_BANK, Order.PAYMENT_MOMO}:
+            messages.info(request, 'Vui lòng thanh toán theo mã đơn thật và gửi ảnh chứng từ trong chi tiết đơn hàng để nhân viên đối soát.')
+        if order.requires_prescription_review:
+            messages.info(request, 'Đơn có thuốc kê đơn sẽ được dược sĩ duyệt trước khi chuẩn bị giao.')
         if best_delivery_result.get('notice'):
             messages.info(request, best_delivery_result['notice'])
         return redirect('order_history_detail', order_id=order.pk)
@@ -5305,7 +5396,7 @@ def account_view(request):
     context = {
         'account_role': get_user_role_label(request.user),
         'orders_total': user_orders.count(),
-        'orders_pending': user_orders.filter(status=Order.STATUS_PENDING).count(),
+        'orders_pending': user_orders.filter(status__in=[Order.STATUS_PENDING, Order.STATUS_CONFIRMED, Order.STATUS_PACKING]).count(),
         'orders_completed': user_orders.filter(status=Order.STATUS_COMPLETED).count(),
         'recent_orders': recent_orders,
         'cart_items_total': get_cart_items_count(cart),
@@ -5357,8 +5448,37 @@ def order_history_detail(request, order_id):
         'order': order,
         'order_items': order_items,
         'return_request': return_request,
+        'prescription_proof_cards': build_order_prescription_proof_cards(order),
     }
     return render(request, 'account/orders/detail.html', context)
+
+
+@login_required(login_url='/login/')
+def upload_payment_proof(request, order_id):
+    order = get_order_for_customer_or_404(request.user, order_id)
+    auto_complete_order_if_due(order)
+    order.refresh_from_db()
+
+    if not order.can_upload_payment_proof:
+        messages.error(request, 'Đơn hàng này không còn ở trạng thái cần bổ sung chứng từ thanh toán.')
+        return redirect('order_history_detail', order_id=order.pk)
+
+    if request.method == 'POST':
+        form = PaymentProofUploadForm(request.POST, request.FILES, instance=order)
+        if form.is_valid():
+            form.save()
+            messages.success(request, 'Đã gửi chứng từ thanh toán. Nhân viên sẽ đối soát và xác nhận sớm.')
+            return redirect('order_history_detail', order_id=order.pk)
+        messages.error(request, 'Chứng từ thanh toán chưa hợp lệ. Vui lòng kiểm tra lại.')
+    else:
+        form = PaymentProofUploadForm(instance=order)
+
+    context = {
+        'order': order,
+        'form': form,
+        'payment_preview': build_order_payment_preview(order),
+    }
+    return render(request, 'account/orders/payment_proof_form.html', context)
 
 
 @login_required(login_url='/login/')
@@ -5393,15 +5513,15 @@ def cancel_order(request, order_id):
     auto_complete_order_if_due(order)
     order.refresh_from_db()
 
-    if order.status != Order.STATUS_PENDING:
-        messages.error(request, 'Chỉ đơn đang ở trạng thái chờ xử lý mới có thể hủy.')
+    if not order.can_customer_cancel:
+        messages.error(request, 'Chỉ đơn chưa giao mới có thể hủy.')
         return redirect('order_history_detail', order_id=order.pk)
 
     try:
         with transaction.atomic():
             locked_order = Order.objects.select_for_update().get(pk=order.pk, user=request.user)
-            if locked_order.status != Order.STATUS_PENDING:
-                raise ValueError('Đơn hàng không còn ở trạng thái chờ xử lý.')
+            if not locked_order.can_customer_cancel:
+                raise ValueError('Đơn hàng không còn ở trạng thái có thể hủy.')
             locked_order.status = Order.STATUS_CANCELLED
             locked_order.cancelled_at = timezone.now()
             locked_order.save()
@@ -5435,11 +5555,18 @@ def confirm_order_received(request, order_id):
         messages.error(request, 'Chỉ đơn đang giao mới có thể xác nhận đã nhận hàng.')
         return redirect('order_history')
 
+    if order.requires_payment_confirmation and order.payment_status != Order.PAYMENT_STATUS_PAID:
+        messages.error(request, 'Đơn chuyển khoản/MoMo cần được xác nhận thanh toán trước khi hoàn thành.')
+        return redirect('order_history_detail', order_id=order.pk)
+
     with transaction.atomic():
         locked_order = Order.objects.select_for_update().get(pk=order.pk, user=request.user)
         if locked_order.status != Order.STATUS_SHIPPING:
             messages.error(request, 'Đơn hàng không còn ở trạng thái đang giao.')
             return redirect('order_history')
+        if locked_order.requires_payment_confirmation and locked_order.payment_status != Order.PAYMENT_STATUS_PAID:
+            messages.error(request, 'Đơn chuyển khoản/MoMo cần được xác nhận thanh toán trước khi hoàn thành.')
+            return redirect('order_history_detail', order_id=order.pk)
         complete_order_workflow(locked_order, completed_by_customer=True)
 
     messages.success(request, f'Đã xác nhận nhận hàng cho đơn {order.order_code}.')
@@ -6009,9 +6136,12 @@ def render_prescription_badge(required):
 def render_order_status_badge(status):
     mapping = {
         Order.STATUS_PENDING: ('Chờ xử lý', 'warning'),
+        Order.STATUS_CONFIRMED: ('Đã xác nhận', 'primary'),
+        Order.STATUS_PACKING: ('Đang chuẩn bị', 'secondary'),
         Order.STATUS_SHIPPING: ('Đang giao', 'info'),
         Order.STATUS_COMPLETED: ('Hoàn thành', 'success'),
         Order.STATUS_CANCELLED: ('Đã hủy', 'danger'),
+        Order.STATUS_FAILED_DELIVERY: ('Giao không thành công', 'danger'),
     }
     label, tone = mapping.get(status, ('Không xác định', 'secondary'))
     return render_badge(label, tone)
@@ -6435,9 +6565,13 @@ def build_admin_reports_context(request, *, paginate=True):
 
     total_orders = len(filtered_orders)
     completed_order_count = len(filtered_completed_orders)
-    pending_order_count = sum(1 for order in filtered_orders if order.status == Order.STATUS_PENDING)
-    shipping_order_count = sum(1 for order in filtered_orders if order.status == Order.STATUS_SHIPPING)
-    cancelled_order_count = sum(1 for order in filtered_orders if order.status == Order.STATUS_CANCELLED)
+    status_counts = {
+        status_key: sum(1 for order in filtered_orders if order.status == status_key)
+        for status_key, _status_label in Order.STATUS_CHOICES
+    }
+    pending_order_count = status_counts.get(Order.STATUS_PENDING, 0)
+    shipping_order_count = status_counts.get(Order.STATUS_SHIPPING, 0)
+    cancelled_order_count = status_counts.get(Order.STATUS_CANCELLED, 0)
 
     total_completed_revenue = sum(int(order.final_total_price or 0) for order in filtered_completed_orders)
     previous_completed_revenue = sum(int(order.final_total_price or 0) for order in previous_completed_orders)
@@ -6519,15 +6653,12 @@ def build_admin_reports_context(request, *, paginate=True):
 
     status_meta = {
         Order.STATUS_PENDING: {'label': 'Chờ xử lý', 'tone': 'warning', 'icon': 'fas fa-hourglass-half'},
+        Order.STATUS_CONFIRMED: {'label': 'Đã xác nhận', 'tone': 'primary', 'icon': 'fas fa-clipboard-check'},
+        Order.STATUS_PACKING: {'label': 'Đang chuẩn bị', 'tone': 'secondary', 'icon': 'fas fa-box-open'},
         Order.STATUS_SHIPPING: {'label': 'Đang giao', 'tone': 'info', 'icon': 'fas fa-shipping-fast'},
         Order.STATUS_COMPLETED: {'label': 'Hoàn thành', 'tone': 'success', 'icon': 'fas fa-check-circle'},
         Order.STATUS_CANCELLED: {'label': 'Đã hủy', 'tone': 'danger', 'icon': 'fas fa-times-circle'},
-    }
-    status_counts = {
-        Order.STATUS_PENDING: pending_order_count,
-        Order.STATUS_SHIPPING: shipping_order_count,
-        Order.STATUS_COMPLETED: completed_order_count,
-        Order.STATUS_CANCELLED: cancelled_order_count,
+        Order.STATUS_FAILED_DELIVERY: {'label': 'Giao không thành công', 'tone': 'danger', 'icon': 'fas fa-exclamation-circle'},
     }
     max_status_count = max(status_counts.values(), default=0)
     status_breakdown = []
@@ -8833,10 +8964,10 @@ def build_list_data(model_key, request):
         queryset = apply_admin_sort(queryset, model_key, request.GET.get('sort', 'newest'))
         columns = ['Mã đơn', 'Khách hàng', 'Chi nhánh xử lý', 'Tổng tiền', 'Trạng thái']
         summary_cards = [
-            {'label': 'Đơn chờ xử lý', 'value': base_queryset.filter(status=Order.STATUS_PENDING).count(), 'tone': 'warning'},
+            {'label': 'Đơn cần xử lý', 'value': base_queryset.filter(status__in=[Order.STATUS_PENDING, Order.STATUS_CONFIRMED, Order.STATUS_PACKING]).count(), 'tone': 'warning'},
             {'label': 'Đang giao', 'value': base_queryset.filter(status=Order.STATUS_SHIPPING).count(), 'tone': 'info'},
             {'label': 'Hoàn thành', 'value': base_queryset.filter(status=Order.STATUS_COMPLETED).count(), 'tone': 'success'},
-            {'label': 'Đã hủy', 'value': base_queryset.filter(status=Order.STATUS_CANCELLED).count(), 'tone': 'danger'},
+            {'label': 'Đã hủy / giao lỗi', 'value': base_queryset.filter(status__in=[Order.STATUS_CANCELLED, Order.STATUS_FAILED_DELIVERY]).count(), 'tone': 'danger'},
         ]
         filter_options = get_order_filter_options(request, pharmacy_queryset=pharmacy_queryset, selected_pharmacy_id=pharmacy_id)
 
@@ -9337,7 +9468,7 @@ def custom_admin_dashboard(request):
             'current_model': 'dashboard',
             'pharmacy_count': pharmacy_count,
             'medicine_count': medicines_base.count(),
-            'pending_order_count': orders_base.filter(status=Order.STATUS_PENDING).count(),
+            'pending_order_count': orders_base.filter(status__in=[Order.STATUS_PENDING, Order.STATUS_CONFIRMED, Order.STATUS_PACKING]).count(),
             'shipping_order_count': orders_base.filter(status=Order.STATUS_SHIPPING).count(),
             'low_stock_count': medicines_base.filter(quantity__gt=0, quantity__lte=LOW_STOCK_THRESHOLD).count(),
             'out_of_stock_count': medicines_base.filter(quantity__lte=0).count(),
@@ -10031,7 +10162,7 @@ def custom_admin_order_detail(request, pk):
         return denied_response
 
     order = get_object_or_404(
-        Order.objects.select_related('pharmacy', 'user').prefetch_related('items__medicine', 'items__lot_allocations__lot', 'return_request'),
+        Order.objects.select_related('pharmacy', 'user').prefetch_related('items__medicine', 'items__lot_allocations__lot', 'return_request', 'prescription_proof_images'),
         pk=pk,
     )
     auto_complete_order_if_due(order)
@@ -10043,17 +10174,26 @@ def custom_admin_order_detail(request, pk):
         if not can_update_order:
             raise PermissionDenied('Tài khoản hiện tại không có quyền cập nhật đơn hàng.')
         previous_status = order.status
-        form = OrderStatusUpdateForm(request.POST, instance=order, admin_user=request.user)
+        previous_payment_status = order.payment_status
+        form = OrderStatusUpdateForm(request.POST, request.FILES, instance=order, admin_user=request.user)
         if form.is_valid():
             try:
                 with transaction.atomic():
                     updated_order = form.save(commit=False)
                     status_changed = previous_status != updated_order.status
+                    payment_confirmed = (
+                        previous_payment_status != Order.PAYMENT_STATUS_PAID
+                        and updated_order.payment_status == Order.PAYMENT_STATUS_PAID
+                    )
                     if status_changed and updated_order.status == Order.STATUS_COMPLETED:
                         if updated_order.payment_method == Order.PAYMENT_COD:
                             updated_order.payment_status = Order.PAYMENT_STATUS_PAID
+                            payment_confirmed = previous_payment_status != Order.PAYMENT_STATUS_PAID
+                            if updated_order.payment_confirmed_at is None:
+                                updated_order.payment_confirmed_at = timezone.now()
+                                updated_order.payment_confirmed_by = request.user
                         updated_order.completed_at = timezone.now()
-                    if status_changed and updated_order.status == Order.STATUS_CANCELLED:
+                    if status_changed and updated_order.status in {Order.STATUS_CANCELLED, Order.STATUS_FAILED_DELIVERY}:
                         updated_order.cancelled_at = timezone.now()
                     updated_order.save()
                     if status_changed:
@@ -10061,6 +10201,13 @@ def custom_admin_order_detail(request, pk):
                             lambda changed_order=updated_order, old_status=previous_status, current_request=request: send_order_status_update_email(
                                 changed_order,
                                 old_status,
+                                request=current_request,
+                            )
+                        )
+                    if payment_confirmed and updated_order.payment_method in {Order.PAYMENT_BANK, Order.PAYMENT_MOMO}:
+                        transaction.on_commit(
+                            lambda paid_order=updated_order, current_request=request: send_order_payment_confirmed_email(
+                                paid_order,
                                 request=current_request,
                             )
                         )
@@ -10082,6 +10229,7 @@ def custom_admin_order_detail(request, pk):
         'update_form': form,
         'order_items': order_items,
         'return_request': getattr(order, 'return_request', None),
+        'prescription_proof_cards': build_order_prescription_proof_cards(order),
         'can_delete_order': can_delete_object(request.user, 'order', order),
         'can_update_order': can_update_order,
     }
@@ -10103,8 +10251,6 @@ def apply_return_request_status_change(*, updated_request, new_status, actor):
         updated_request.save(update_fields=["admin_note", "processed_at", "processed_by", "updated_at"])
         return updated_request
 
-    related_order = Order.objects.select_for_update().get(pk=updated_request.order_id)
-
     updated_request.status = new_status
     if new_status == ReturnRefundRequest.STATUS_PROCESSING:
         updated_request.processed_at = None
@@ -10112,18 +10258,6 @@ def apply_return_request_status_change(*, updated_request, new_status, actor):
     else:
         updated_request.processed_at = now
         updated_request.processed_by = actor
-
-    if new_status == ReturnRefundRequest.STATUS_APPROVED:
-        if related_order.status != Order.STATUS_CANCELLED:
-            related_order.status = Order.STATUS_CANCELLED
-            related_order.cancelled_at = now
-            related_order.save()
-    elif previous_status == ReturnRefundRequest.STATUS_APPROVED and related_order.status == Order.STATUS_CANCELLED:
-        related_order.status = Order.STATUS_COMPLETED
-        related_order.cancelled_at = None
-        if related_order.completed_at is None:
-            related_order.completed_at = now
-        related_order.save()
 
     updated_request.save()
     return updated_request
