@@ -79,7 +79,7 @@ DATABASES = {
         'ENGINE': 'django.db.backends.postgresql',
         'NAME': 'gis_db',
         'USER': 'postgres',
-        'PASSWORD': '12345',  # Mật khẩu của bạn
+        'PASSWORD': '2906',  # Mật khẩu của bạn
         'HOST': 'localhost',
         'PORT': '5432',
     }
@@ -120,8 +120,8 @@ SITE_BASE_URL = os.getenv('SITE_BASE_URL', 'http://127.0.0.1:8000')
 
 MAILTRAP_HOST = os.getenv('MAILTRAP_HOST', 'sandbox.smtp.mailtrap.io')
 MAILTRAP_PORT = int(os.getenv('MAILTRAP_PORT', '587'))
-MAILTRAP_USERNAME = os.getenv('MAILTRAP_USERNAME', os.getenv('EMAIL_HOST_USER', 'fe43f21885cccd'))
-MAILTRAP_PASSWORD = os.getenv('MAILTRAP_PASSWORD', os.getenv('EMAIL_HOST_PASSWORD', 'f003d051485341'))
+MAILTRAP_USERNAME = os.getenv('MAILTRAP_USERNAME', os.getenv('EMAIL_HOST_USER', '9f1e2bd170c1d3'))
+MAILTRAP_PASSWORD = os.getenv('MAILTRAP_PASSWORD', os.getenv('EMAIL_HOST_PASSWORD', '6d206e5892afa0'))
 MAILTRAP_USE_TLS = os.getenv('MAILTRAP_USE_TLS', 'true').lower() in {'1', 'true', 'yes'}
 
 if MAILTRAP_USERNAME and MAILTRAP_PASSWORD:
