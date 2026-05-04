@@ -1,0 +1,1 @@
+Mã OTP kích hoạt tài khoản - {{ site_name|default:"GIS Pharma" }}

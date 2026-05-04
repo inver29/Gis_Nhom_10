@@ -49,6 +49,7 @@ from .orders import (
     CartItem,
     Order,
     OrderItem,
+    OrderPrescriptionProof,
     ReturnRefundEvidence,
     ReturnRefundRequest,
 )
@@ -77,6 +78,7 @@ __all__ = [
     'Order',
     'OrderItem',
     'OrderItemLotAllocation',
+    'OrderPrescriptionProof',
     'Pharmacy',
     'PharmacyReview',
     'PurchaseImportBatch',

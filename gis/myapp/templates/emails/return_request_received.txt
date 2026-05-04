@@ -1,0 +1,16 @@
+Xin chào {{ recipient_name }},
+
+{{ site_name }} đã {{ action_label }} yêu cầu trả hàng / hoàn tiền của bạn cho đơn {{ order.order_code }}.
+
+Trạng thái hiện tại: {{ current_status_label }}
+Đơn hàng liên quan: {{ order.order_code }}
+Email liên hệ: {{ return_request.contact_email|default:"-" }}
+Số điện thoại liên hệ: {{ return_request.contact_phone|default:"-" }}
+
+Bộ phận xử lý sẽ kiểm tra yêu cầu và phản hồi khi trạng thái thay đổi.
+
+Xem chi tiết đơn hàng: {{ order_detail_url }}
+Lịch sử đơn hàng: {{ order_history_url }}
+
+Trân trọng,
+{{ site_name }}

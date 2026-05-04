@@ -121,10 +121,10 @@
                             <span>Xem ngoài site</span>
                         </a>
                         {% endif %}
-                        <a href="{{ card.edit_url }}" class="btn-admin btn-admin-primary">
+                        {% if card.edit_url %}<a href="{{ card.edit_url }}" class="btn-admin btn-admin-primary">
                             <i class="fas fa-pen"></i>
                             <span>Chỉnh sửa</span>
-                        </a>
+                        </a>{% endif %}
                         {% if card.delete_url %}
                         <a href="{{ card.delete_url }}" class="btn-admin btn-admin-danger">
                             <i class="fas fa-trash"></i>

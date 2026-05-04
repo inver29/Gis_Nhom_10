@@ -1,0 +1,109 @@
+{% extends "base.html" %}
+{% load currency_filters %}
+{% block title %}Bổ sung chứng từ thanh toán{% endblock %}
+{% block body_class %}site-page history-page{% endblock %}
+
+{% block content_wrapper %}
+<div class="history-layout">
+    <div class="container">
+        <section class="section-shell mb-4">
+            <div class="section-heading">
+                <div>
+                    <div class="section-heading__eyebrow"><i class="fas fa-receipt"></i> Đối soát thanh toán</div>
+                    <h1>{{ order.order_code }}</h1>
+                </div>
+                <a href="{% url 'order_history_detail' order.id %}" class="pharma-outline-btn" style="max-width:220px;">
+                    <i class="fas fa-arrow-left"></i>
+                    <span>Quay lại đơn hàng</span>
+                </a>
+            </div>
+        </section>
+
+        <section class="content-card history-card">
+            <div class="history-meta-grid">
+                <div class="history-meta-box">
+                    <small>Tổng cần thanh toán</small>
+                    <strong class="text-danger">{{ order.final_total_price|vnd }}</strong>
+                </div>
+                <div class="history-meta-box">
+                    <small>Phương thức</small>
+                    <strong>{{ order.get_payment_method_display }}</strong>
+                </div>
+                <div class="history-meta-box">
+                    <small>Nội dung chuyển khoản</small>
+                    <strong>{{ order.resolved_payment_reference }}</strong>
+                </div>
+                <div class="history-meta-box">
+                    <small>Trạng thái</small>
+                    <strong>{{ order.get_payment_status_display }}</strong>
+                </div>
+            </div>
+
+            {% if payment_preview.show_qr %}
+            <div class="history-payment-proof mt-4">
+                <div>
+                    <h3>Thông tin nhận thanh toán</h3>
+                    <p><strong>{{ payment_preview.recipient_name }}</strong> · {{ payment_preview.provider_name }}</p>
+                    <p>Tài khoản / ví nhận: <strong>{{ payment_preview.account_number }}</strong></p>
+                    <p>Số tiền: <strong>{{ payment_preview.amount_text }}</strong></p>
+                </div>
+                <div class="history-payment-proof__qr">
+                    <img src="{{ payment_preview.qr_image }}" alt="Mã QR thanh toán {{ payment_preview.payment_label }}">
+                </div>
+            </div>
+            {% endif %}
+
+            <form method="post" enctype="multipart/form-data" class="account-form mt-4">
+                {% csrf_token %}
+                <div class="account-form__field">
+                    <label>{{ form.payment_proof_image.label }}</label>
+                    {{ form.payment_proof_image }}
+                    {% if order.payment_proof_image %}
+                    <p class="text-muted mt-2">Đã có chứng từ trước đó. Tải ảnh mới nếu cần thay thế.</p>
+                    <div style="margin-top:12px;">
+                        <a href="{{ order.payment_proof_image.url }}" target="_blank" rel="noopener">
+                            <img src="{{ order.payment_proof_image.url }}" alt="Chứng từ thanh toán đã gửi" style="display:block;max-width:100%;max-height:280px;border-radius:18px;border:1px solid #d7deea;background:#f8fbff;object-fit:contain;">
+                        </a>
+                    </div>
+                    {% endif %}
+                    <div id="payment-proof-preview" style="display:none;margin-top:12px;">
+                        <p class="text-muted mb-2">Ảnh vừa chọn để gửi:</p>
+                        <img alt="Xem trước chứng từ thanh toán" style="display:block;max-width:100%;max-height:280px;border-radius:18px;border:1px solid #d7deea;background:#f8fbff;object-fit:contain;">
+                    </div>
+                    {% if form.payment_proof_image.errors %}<div class="text-danger">{{ form.payment_proof_image.errors }}</div>{% endif %}
+                </div>
+                <div class="account-form__field">
+                    <label>{{ form.payment_note.label }}</label>
+                    {{ form.payment_note }}
+                    {% if form.payment_note.errors %}<div class="text-danger">{{ form.payment_note.errors }}</div>{% endif %}
+                </div>
+                {% if form.non_field_errors %}<div class="alert alert-danger">{{ form.non_field_errors }}</div>{% endif %}
+                <button type="submit" class="pharma-btn" style="max-width:260px;">
+                    <i class="fas fa-upload"></i>
+                    <span>Gửi chứng từ</span>
+                </button>
+            </form>
+        </section>
+    </div>
+</div>
+<script>
+document.addEventListener('DOMContentLoaded', function () {
+    const input = document.querySelector('input[name="payment_proof_image"]');
+    const preview = document.getElementById('payment-proof-preview');
+    if (!input || !preview) {
+        return;
+    }
+    const image = preview.querySelector('img');
+    input.addEventListener('change', function () {
+        const file = input.files && input.files[0];
+        if (!file) {
+            preview.style.display = 'none';
+            image.removeAttribute('src');
+            return;
+        }
+        image.src = URL.createObjectURL(file);
+        preview.style.display = 'block';
+    });
+});
+</script>
+{% endblock %}

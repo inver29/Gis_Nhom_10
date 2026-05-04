@@ -21,11 +21,15 @@
     <link rel="stylesheet" href="{% static 'css/layout/base.css' %}">
 
     <script>
+        // Sử dụng tile Google Maps với locale Việt Nam (hl=vi, gl=vn) để
+        // tên các đảo, biển, địa danh được hiển thị bằng tiếng Việt theo
+        // chuẩn chủ quyền Việt Nam (Quần đảo Hoàng Sa, Quần đảo Trường Sa,
+        // Biển Đông, ...).
         window.leafletBaseLayerConfig = {
-            url: "https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png",
+            url: "https://mt{s}.google.com/vt/lyrs=m&hl=vi&gl=vn&x={x}&y={y}&z={z}",
             options: {
-                attribution: "&copy; OpenStreetMap contributors &copy; CARTO",
-                subdomains: "abcd",
+                attribution: "&copy; Google Maps",
+                subdomains: ["0", "1", "2", "3"],
                 maxZoom: 20
             }
         };
@@ -184,7 +188,17 @@
                     setStatus("Đang tìm địa chỉ...");
 
                     try {
-                        var response = await fetch(`/api/search-address/?q=${encodeURIComponent(keyword)}`);
+                        var params = new URLSearchParams({ q: keyword });
+                        try {
+                            var center = leafletMap.getCenter();
+                            if (center && Number.isFinite(center.lat) && Number.isFinite(center.lng)) {
+                                params.set("lat", center.lat.toFixed(6));
+                                params.set("lng", center.lng.toFixed(6));
+                            }
+                        } catch (e) {
+                            /* Map chưa sẵn sàng, tìm không dùng bias. */
+                        }
+                        var response = await fetch(`/api/search-address/?${params.toString()}`);
                         var data = await response.json();
 
                         if (!response.ok) {

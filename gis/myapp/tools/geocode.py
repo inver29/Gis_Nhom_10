@@ -1,4 +1,6 @@
+import math
 import re
+import unicodedata
 
 try:
     import requests
@@ -23,10 +25,28 @@ def _build_geocode_headers(context_label):
 
 
 def _copy_search_results(results):
-    return [dict(item) for item in (results or [])]
+    return [
+        {
+            key: value
+            for key, value in dict(item).items()
+            if not str(key).startswith('_')
+        }
+        for item in (results or [])
+    ]
 
 
-def _append_search_result(search_results, seen_keys, *, lat, lng, display_name, type_label, limit_value):
+def _append_search_result(
+    search_results,
+    seen_keys,
+    *,
+    lat,
+    lng,
+    display_name,
+    type_label,
+    raw_type=None,
+    raw_class=None,
+    source_label='',
+):
     try:
         lat_value = float(lat)
         lng_value = float(lng)
@@ -45,13 +65,231 @@ def _append_search_result(search_results, seen_keys, *, lat, lng, display_name, 
             'lat': lat_value,
             'lng': lng_value,
             'type_label': (type_label or 'location'),
+            '_raw_type': (raw_type or type_label or ''),
+            '_raw_class': (raw_class or ''),
+            '_source': source_label,
+            '_order': len(search_results),
         }
     )
-    return len(search_results) >= limit_value
+    return False
 
 
 def _normalize_country_codes(country_codes):
     return {item.strip().casefold() for item in str(country_codes or '').split(',') if item.strip()}
+
+
+SEARCH_STOPWORDS = {
+    'duong', 'd', 'so', 'hem', 'ngo', 'ngach', 'pho', 'phuong', 'p',
+    'quan', 'q', 'huyen', 'tp', 'thanh', 'pho', 'tinh', 'viet', 'nam',
+}
+
+RESULT_TYPE_SCORES = {
+    'house': 95,
+    'building': 90,
+    'pharmacy': 88,
+    'hospital': 82,
+    'clinic': 80,
+    'street': 64,
+    'road': 74,
+    'residential': 72,
+    'service': 70,
+    'primary': 68,
+    'secondary': 66,
+    'tertiary': 64,
+    'unclassified': 60,
+    'living_street': 60,
+    'amenity': 50,
+    'shop': 48,
+    'commercial': 42,
+    'administrative': -35,
+    'suburb': -20,
+    'village': -25,
+    'hamlet': -25,
+    'city': -30,
+    'county': -35,
+    'state': -45,
+}
+
+
+def _normalize_search_text(value):
+    normalized = unicodedata.normalize('NFD', str(value or '').casefold())
+    normalized = ''.join(
+        char
+        for char in normalized
+        if unicodedata.category(char) != 'Mn'
+    )
+    normalized = normalized.replace('đ', 'd')
+    return re.sub(r'[^a-z0-9]+', ' ', normalized).strip()
+
+
+def _extract_search_tokens(value):
+    tokens = []
+    for token in _normalize_search_text(value).split():
+        if len(token) <= 1 or token in SEARCH_STOPWORDS:
+            continue
+        tokens.append(token)
+    return tokens
+
+
+def _extract_number_tokens(value):
+    return re.findall(r'\d+(?:/\d+)*[a-zA-Z]?', str(value or ''))
+
+
+def _distance_km(lat1, lng1, lat2, lng2):
+    if lat1 is None or lng1 is None:
+        return None
+    radius_km = 6371.0
+    lat1_rad = math.radians(float(lat1))
+    lat2_rad = math.radians(float(lat2))
+    delta_lat = math.radians(float(lat2) - float(lat1))
+    delta_lng = math.radians(float(lng2) - float(lng1))
+    a = (
+        math.sin(delta_lat / 2) ** 2
+        + math.cos(lat1_rad) * math.cos(lat2_rad) * math.sin(delta_lng / 2) ** 2
+    )
+    return radius_km * 2 * math.atan2(math.sqrt(a), math.sqrt(1 - a))
+
+
+def _score_search_result(item, query_text, bias_lat=None, bias_lng=None):
+    display_name = item.get('display_name', '')
+    display_normalized = _normalize_search_text(display_name)
+    display_tokens = set(display_normalized.split())
+    query_tokens = _extract_search_tokens(query_text)
+    number_tokens = _extract_number_tokens(query_text)
+
+    raw_type = _normalize_search_text(item.get('_raw_type') or item.get('type_label')).split()
+    raw_class = _normalize_search_text(item.get('_raw_class')).split()
+    type_key = raw_type[0] if raw_type else ''
+    class_key = raw_class[0] if raw_class else ''
+
+    score = RESULT_TYPE_SCORES.get(type_key, 25)
+    if class_key in {'highway', 'building', 'amenity', 'shop'}:
+        score += 14
+    elif class_key in {'boundary', 'place'}:
+        score -= 18
+
+    if query_tokens:
+        matched_tokens = sum(
+            1
+            for token in query_tokens
+            if token in display_tokens or token in display_normalized
+        )
+        score += 80 * (matched_tokens / len(query_tokens))
+
+    if number_tokens:
+        display_number_tokens = _extract_number_tokens(display_name)
+        has_matching_number = any(
+            number.casefold() in display_tokens or number.casefold() in display_normalized
+            for number in number_tokens
+        )
+        if has_matching_number:
+            score += 34
+        else:
+            score -= 18
+            if display_number_tokens:
+                score -= 24
+            if type_key in {'house', 'building'} or class_key in {'building', 'amenity', 'shop'}:
+                score -= 70
+
+    if 'ho chi minh' in display_normalized or 'hcm' in display_normalized:
+        score += 12
+    elif 'viet nam' in display_normalized:
+        score += 4
+
+    distance = _distance_km(bias_lat, bias_lng, item.get('lat'), item.get('lng'))
+    if distance is not None:
+        item['_distance_km'] = distance
+        if distance <= 2:
+            score += 35
+        elif distance <= 5:
+            score += 26
+        elif distance <= 15:
+            score += 16
+        elif distance <= 30:
+            score += 6
+        elif distance <= 60:
+            score -= 35
+        elif distance <= 120:
+            score -= 95
+        else:
+            score -= 180
+        score -= min(distance, 160) * 0.35
+
+    if item.get('_source') == 'photon':
+        score += 4
+
+    item['_score'] = score
+    return score
+
+
+def _rank_search_results(search_results, query_text, limit_value, bias_lat=None, bias_lng=None):
+    ranked = list(search_results or [])
+    for item in ranked:
+        _score_search_result(item, query_text, bias_lat=bias_lat, bias_lng=bias_lng)
+
+    ranked.sort(
+        key=lambda item: (
+            -item.get('_score', 0),
+            item.get('_distance_km', 999999),
+            item.get('_order', 999999),
+        )
+    )
+    return _copy_search_results(ranked[:limit_value])
+
+
+CENTRAL_MUNICIPALITY_ALIASES = {
+    'thanh pho ho chi minh',
+    'tp ho chi minh',
+    'ho chi minh',
+    'ho chi minh city',
+    'hcm',
+    'hcmc',
+    'tp hcm',
+    'tphcm',
+    'sai gon',
+    'ha noi',
+    'hanoi',
+    'thanh pho ha noi',
+    'da nang',
+    'thanh pho da nang',
+    'hai phong',
+    'thanh pho hai phong',
+    'can tho',
+    'thanh pho can tho',
+}
+
+INTERMEDIATE_ADMIN_PREFIXES = (
+    'thanh pho ',
+    'tp ',
+    'quan ',
+    'q ',
+    'huyen ',
+    'thi xa ',
+)
+
+
+def _is_central_municipality(component):
+    return _normalize_search_text(component) in CENTRAL_MUNICIPALITY_ALIASES
+
+
+def _looks_like_intermediate_admin(component):
+    normalized = _normalize_search_text(component)
+    if not normalized or _is_central_municipality(component):
+        return False
+    return normalized.startswith(INTERMEDIATE_ADMIN_PREFIXES)
+
+
+def _clean_address_part_list(parts):
+    cleaned_parts = []
+    central_parent = next((part for part in parts if _is_central_municipality(part)), None)
+    for part in parts:
+        text = _clean_reverse_component(part)
+        if not text:
+            continue
+        if central_parent and text != central_parent and _looks_like_intermediate_admin(text):
+            continue
+        _append_reverse_component(cleaned_parts, text)
+    return ', '.join(cleaned_parts)
 
 
 def _format_photon_display_name(properties, fallback_text):
@@ -64,18 +302,7 @@ def _format_photon_display_name(properties, fallback_text):
         properties.get('state'),
         properties.get('country'),
     ]
-    seen = set()
-    parts = []
-    for part in ordered_parts:
-        text = str(part or '').strip()
-        if not text:
-            continue
-        normalized = text.casefold()
-        if normalized in seen:
-            continue
-        seen.add(normalized)
-        parts.append(text)
-    return ', '.join(parts) or fallback_text
+    return _clean_address_part_list(ordered_parts) or fallback_text
 
 
 def _format_bigdatacloud_display_name(data, fallback_text):
@@ -85,23 +312,305 @@ def _format_bigdatacloud_display_name(data, fallback_text):
         data.get('principalSubdivision'),
         data.get('countryName'),
     ]
-    seen = set()
+    return _clean_address_part_list(ordered_parts) or fallback_text
+
+
+REVERSE_ADMIN_PARENT_OVERRIDES = {
+    'thanh pho thu duc': {
+        'parent': 'Thành phố Hồ Chí Minh',
+        'bounds': {
+            'lat_min': 10.35,
+            'lat_max': 11.20,
+            'lng_min': 106.35,
+            'lng_max': 107.05,
+        },
+    },
+}
+
+
+def _clean_reverse_component(value):
+    text = re.sub(r'\s+', ' ', str(value or '')).strip(' ,')
+    return text or None
+
+
+def _append_reverse_component(parts, value):
+    text = _clean_reverse_component(value)
+    if not text:
+        return
+    normalized = _normalize_search_text(text)
+    if not normalized:
+        return
+    if any(_normalize_search_text(part) == normalized for part in parts):
+        return
+    parts.append(text)
+
+
+def _is_within_bounds(lat, lng, bounds):
+    try:
+        lat_value = float(lat)
+        lng_value = float(lng)
+    except (TypeError, ValueError):
+        return False
+    return (
+        bounds['lat_min'] <= lat_value <= bounds['lat_max']
+        and bounds['lng_min'] <= lng_value <= bounds['lng_max']
+    )
+
+
+def _reverse_parent_for_component(component, lat=None, lng=None):
+    override = REVERSE_ADMIN_PARENT_OVERRIDES.get(_normalize_search_text(component))
+    if not override:
+        return None
+    if not _is_within_bounds(lat, lng, override['bounds']):
+        return None
+    return override['parent']
+
+
+def _is_reverse_admin_noise(component, lat=None, lng=None):
+    normalized = _normalize_search_text(component)
+    if not normalized:
+        return True
+    return _reverse_parent_for_component(component, lat=lat, lng=lng) is not None
+
+
+def _is_reverse_tail_component(component):
+    normalized = _normalize_search_text(component)
+    if normalized in {'viet nam', 'vietnam'}:
+        return True
+    return bool(re.fullmatch(r'\d{4,6}', str(component or '').strip()))
+
+
+def _clean_reverse_display_name(display_name, fallback_text, lat=None, lng=None):
+    raw_components = [
+        _clean_reverse_component(component)
+        for component in str(display_name or '').split(',')
+    ]
+    raw_components = [component for component in raw_components if component]
+    central_parent = next(
+        (component for component in raw_components if _is_central_municipality(component)),
+        None,
+    )
     parts = []
-    for part in ordered_parts:
-        text = str(part or '').strip()
-        if not text:
+    parents = []
+    tail_parts = []
+    for text in raw_components:
+        if _is_reverse_admin_noise(text, lat=lat, lng=lng):
+            parent = _reverse_parent_for_component(text, lat=lat, lng=lng)
+            if parent:
+                parents.append(parent)
             continue
-        normalized = text.casefold()
-        if normalized in seen:
+        if central_parent and text != central_parent and _looks_like_intermediate_admin(text):
             continue
-        seen.add(normalized)
-        parts.append(text)
+        if _is_reverse_tail_component(text):
+            _append_reverse_component(tail_parts, text)
+        else:
+            _append_reverse_component(parts, text)
+    for parent in parents:
+        _append_reverse_component(parts, parent)
+    for text in tail_parts:
+        _append_reverse_component(parts, text)
     return ', '.join(parts) or fallback_text
 
 
-def search_address_candidates(query, limit=5, country_codes='vn'):
+def _format_nominatim_reverse_display_name(data, fallback_text):
+    """
+    Nominatim reverse sometimes returns a raw `display_name` with an
+    unreliable intermediate administrative layer. Build the address from
+    structured fields so the UI shows a cleaner, less misleading label.
+    """
+    address = data.get('address') or {}
+    result_lat = data.get('lat')
+    result_lng = data.get('lon')
+    if not isinstance(address, dict) or not address:
+        return _clean_reverse_display_name(data.get('display_name'), fallback_text, lat=result_lat, lng=result_lng)
+
+    parts = []
+    road_name = (
+        address.get('road')
+        or address.get('pedestrian')
+        or address.get('residential')
+        or address.get('footway')
+        or address.get('path')
+    )
+    house_number = _clean_reverse_component(address.get('house_number'))
+    road_text = _clean_reverse_component(road_name)
+    if house_number and road_text and house_number not in road_text:
+        _append_reverse_component(parts, f'{house_number} {road_text}')
+    else:
+        _append_reverse_component(parts, road_text)
+
+    for key in ('neighbourhood', 'quarter', 'suburb', 'village'):
+        _append_reverse_component(parts, address.get(key))
+
+    admin_keys = ('city_district', 'district', 'county', 'city', 'town', 'state', 'province')
+    central_parent = next(
+        (
+            _clean_reverse_component(address.get(key))
+            for key in admin_keys
+            if _is_central_municipality(address.get(key))
+        ),
+        None,
+    )
+    parent_components = []
+    for key in admin_keys:
+        component = _clean_reverse_component(address.get(key))
+        if not component:
+            continue
+        if central_parent and component != central_parent and (
+            key in {'city_district', 'district', 'county'}
+            or _looks_like_intermediate_admin(component)
+        ):
+            continue
+        if key in {'city_district', 'district', 'county', 'city', 'town'} and _is_reverse_admin_noise(component, lat=result_lat, lng=result_lng):
+            parent = _reverse_parent_for_component(component, lat=result_lat, lng=result_lng)
+            if parent:
+                parent_components.append(parent)
+            continue
+        _append_reverse_component(parts, component)
+
+    for parent in parent_components:
+        _append_reverse_component(parts, parent)
+
+    _append_reverse_component(parts, address.get('postcode'))
+    _append_reverse_component(parts, address.get('country'))
+
+    return ', '.join(parts) or _clean_reverse_display_name(data.get('display_name'), fallback_text, lat=result_lat, lng=result_lng)
+
+
+COUNTRY_HINT_KEYWORDS = (
+    "việt nam", "viet nam", "vietnam",
+)
+
+REGION_HINT_KEYWORDS = (
+    "hồ chí minh", "ho chi minh", "ho chi minh city", "hcmc", "tphcm", "tp hcm", "tp.hcm", "tp. hcm", "sài gòn", "sai gon",
+    "hà nội", "ha noi",
+    "đà nẵng", "da nang",
+    "hải phòng", "hai phong",
+    "cần thơ", "can tho",
+    "biên hòa", "bien hoa",
+    "nha trang", "huế", "hue", "vũng tàu", "vung tau",
+    "bình dương", "binh duong", "đồng nai", "dong nai",
+)
+
+BIAS_REGION_HINTS = (
+    ("Hồ Chí Minh", 10.7769, 106.7008, 80),
+    ("Hà Nội", 21.0285, 105.8542, 70),
+    ("Đà Nẵng", 16.0471, 108.2068, 55),
+    ("Hải Phòng", 20.8449, 106.6881, 55),
+    ("Cần Thơ", 10.0452, 105.7469, 55),
+)
+
+
+def _coerce_float(value):
+    try:
+        return float(value)
+    except (TypeError, ValueError):
+        return None
+
+
+def _has_country_hint(query_text):
+    folded = query_text.casefold()
+    normalized = _normalize_search_text(query_text)
+    return any(keyword in folded or _normalize_search_text(keyword) in normalized for keyword in COUNTRY_HINT_KEYWORDS)
+
+
+def _has_region_hint(query_text):
+    folded = query_text.casefold()
+    normalized = _normalize_search_text(query_text)
+    return any(keyword in folded or _normalize_search_text(keyword) in normalized for keyword in REGION_HINT_KEYWORDS)
+
+
+def _bias_region_hint(bias_lat, bias_lng):
+    if bias_lat is None or bias_lng is None:
+        return None
+    nearest = None
+    for label, center_lat, center_lng, radius_km in BIAS_REGION_HINTS:
+        distance = _distance_km(center_lat, center_lng, bias_lat, bias_lng)
+        if distance is None or distance > radius_km:
+            continue
+        if nearest is None or distance < nearest[0]:
+            nearest = (distance, label)
+    return nearest[1] if nearest else None
+
+
+def _without_postal_codes(query_text):
+    cleaned = re.sub(r'(^|,)\s*\d{4,6}\s*(?=,|$)', r'\1', query_text)
+    cleaned = re.sub(r'\s*,\s*', ', ', cleaned)
+    cleaned = re.sub(r',\s*,+', ', ', cleaned)
+    return cleaned.strip(' ,')
+
+
+def _build_search_variants(normalized_query, bias_lat=None, bias_lng=None):
+    """
+    Sinh các biến thể truy vấn theo thứ tự ưu tiên:
+    biến thể có hậu tố thành phố/quốc gia chạy TRƯỚC, biến thể trần
+    chỉ chạy như fallback. Nhờ đó kết quả đầu tiên thường rơi vào
+    đúng địa phương người dùng kỳ vọng (ví dụ: "Lê Lợi" → đường Lê
+    Lợi tại HCM thay vì một đường trùng tên ở tỉnh khác).
+    """
+    core_variants = [normalized_query]
+    without_postcode = _without_postal_codes(normalized_query)
+    if without_postcode and without_postcode != normalized_query:
+        core_variants.append(without_postcode)
+
+    if "/" in normalized_query:
+        compact_variant = re.sub(r"\s*/\s*", "/", normalized_query)
+        spaced_variant = compact_variant.replace("/", " / ")
+        slash_as_space_variant = compact_variant.replace("/", " ")
+        hem_variant = compact_variant
+        if not compact_variant.casefold().startswith("hem "):
+            hem_variant = f"Hẻm {compact_variant}"
+        for candidate in (compact_variant, spaced_variant, slash_as_space_variant, hem_variant):
+            cleaned_candidate = re.sub(r"\s+", " ", candidate).strip()
+            if cleaned_candidate and cleaned_candidate not in core_variants:
+                core_variants.append(cleaned_candidate)
+
+    has_country_hint = _has_country_hint(normalized_query)
+    has_region_hint = _has_region_hint(normalized_query)
+    bias_region = None if has_region_hint else _bias_region_hint(bias_lat, bias_lng)
+
+    ordered = []
+    if bias_region:
+        for core in core_variants:
+            ordered.append(f"{core}, {bias_region}, Việt Nam")
+    if not has_country_hint:
+        for core in core_variants:
+            ordered.append(f"{core}, Việt Nam")
+    ordered.extend(core_variants)
+
+    seen = set()
+    deduped = []
+    for variant in ordered:
+        key = variant.casefold()
+        if key in seen:
+            continue
+        seen.add(key)
+        deduped.append(variant)
+    return deduped
+
+
+def _build_viewbox(bias_lat, bias_lng, half_span_deg=0.45):
+    """
+    Tạo `viewbox` dạng `lon_left,lat_top,lon_right,lat_bottom` quanh toạ
+    độ gợi ý. half_span_deg ~0.45° ≈ 50km — đủ rộng để bao toàn bộ một
+    đô thị lớn (HCM, HN, ĐN) nhưng vẫn đủ hẹp để loại các tỉnh xa.
+    """
+    if bias_lat is None or bias_lng is None:
+        return None
+    lat_top = bias_lat + half_span_deg
+    lat_bottom = bias_lat - half_span_deg
+    lon_left = bias_lng - half_span_deg
+    lon_right = bias_lng + half_span_deg
+    return f"{lon_left:.4f},{lat_top:.4f},{lon_right:.4f},{lat_bottom:.4f}"
+
+
+def search_address_candidates(query, limit=5, country_codes='vn', bias_lat=None, bias_lng=None):
     """
     Tìm các địa điểm gần đúng theo từ khóa địa chỉ.
+
+    Tham số `bias_lat`, `bias_lng` (tuỳ chọn) — toạ độ trung tâm bản đồ
+    của trang đang gọi, dùng để ưu tiên kết quả gần khu vực user đang
+    xem (giải thuật `viewbox` của Nominatim, `lat/lon` của Photon).
     """
     query_text = (query or '').strip()
     if not query_text:
@@ -115,33 +624,27 @@ def search_address_candidates(query, limit=5, country_codes='vn'):
         limit_value = 5
 
     limit_value = max(1, min(limit_value, 8))
-    cache_key = (query_text.casefold(), limit_value, str(country_codes or '').casefold())
+    bias_lat_value = _coerce_float(bias_lat)
+    bias_lng_value = _coerce_float(bias_lng)
+    cache_key = (
+        query_text.casefold(),
+        limit_value,
+        str(country_codes or '').casefold(),
+        round(bias_lat_value, 2) if bias_lat_value is not None else None,
+        round(bias_lng_value, 2) if bias_lng_value is not None else None,
+    )
     cached_results = GEOCODE_SEARCH_CACHE.get(cache_key)
     if cached_results is not None:
         return _copy_search_results(cached_results)
 
     normalized_query = re.sub(r"\s+", " ", query_text).strip()
-    variants = [normalized_query]
-
-    if "/" in normalized_query:
-        compact_variant = re.sub(r"\s*/\s*", "/", normalized_query)
-        spaced_variant = compact_variant.replace("/", " / ")
-        slash_as_space_variant = compact_variant.replace("/", " ")
-        hem_variant = compact_variant
-        if not compact_variant.casefold().startswith("hem "):
-            hem_variant = f"Hẻm {compact_variant}"
-        for candidate in (compact_variant, spaced_variant, slash_as_space_variant, hem_variant):
-            cleaned_candidate = re.sub(r"\s+", " ", candidate).strip()
-            if cleaned_candidate and cleaned_candidate not in variants:
-                variants.append(cleaned_candidate)
-
-    if not any(keyword in normalized_query.casefold() for keyword in ("việt nam", "ho chi minh", "hồ chí minh", "tphcm", "tp hcm")):
-        variants.extend(
-            [
-                f"{normalized_query}, Hồ Chí Minh, Việt Nam",
-                f"{normalized_query}, Việt Nam",
-            ]
-        )
+    use_bias_for_query = not _has_region_hint(normalized_query)
+    variants = _build_search_variants(
+        normalized_query,
+        bias_lat=bias_lat_value if use_bias_for_query else None,
+        bias_lng=bias_lng_value if use_bias_for_query else None,
+    )
+    viewbox = _build_viewbox(bias_lat_value, bias_lng_value) if use_bias_for_query else None
 
     search_results = []
     seen_keys = set()
@@ -153,16 +656,21 @@ def search_address_candidates(query, limit=5, country_codes='vn'):
         if not nominatim_available:
             break
 
+        nominatim_params = {
+            'q': variant,
+            'format': 'json',
+            'limit': limit_value,
+            'countrycodes': country_codes,
+            'addressdetails': 1,
+        }
+        if viewbox:
+            nominatim_params['viewbox'] = viewbox
+            nominatim_params['bounded'] = 0  # ưu tiên mềm, không loại tuyệt đối
+
         try:
             response = requests.get(
                 NOMINATIM_SEARCH_URL,
-                params={
-                    'q': variant,
-                    'format': 'json',
-                    'limit': limit_value,
-                    'countrycodes': country_codes,
-                    'addressdetails': 1,
-                },
+                params=nominatim_params,
                 headers=request_headers,
                 timeout=10,
             )
@@ -186,26 +694,40 @@ def search_address_candidates(query, limit=5, country_codes='vn'):
                 seen_keys,
                 lat=item.get('lat'),
                 lng=item.get('lon'),
-                display_name=item.get('display_name', query_text),
+                display_name=_format_nominatim_reverse_display_name(item, item.get('display_name') or query_text),
                 type_label=item.get('type') or item.get('class') or 'location',
-                limit_value=limit_value,
+                raw_type=item.get('type'),
+                raw_class=item.get('class'),
+                source_label='nominatim',
             ):
-                GEOCODE_SEARCH_CACHE[cache_key] = _copy_search_results(search_results)
-                return _copy_search_results(search_results)
+                break
 
     if search_results:
-        GEOCODE_SEARCH_CACHE[cache_key] = _copy_search_results(search_results)
-        return _copy_search_results(search_results)
+        ranked_results = _rank_search_results(
+            search_results,
+            normalized_query,
+            limit_value,
+            bias_lat=bias_lat_value if use_bias_for_query else None,
+            bias_lng=bias_lng_value if use_bias_for_query else None,
+        )
+        if not _extract_number_tokens(normalized_query):
+            GEOCODE_SEARCH_CACHE[cache_key] = _copy_search_results(ranked_results)
+            return _copy_search_results(ranked_results)
 
     photon_headers = _build_geocode_headers('Photon address search fallback')
     for variant in variants:
+        photon_params = {
+            'q': variant,
+            'limit': limit_value,
+        }
+        if use_bias_for_query and bias_lat_value is not None and bias_lng_value is not None:
+            photon_params['lat'] = bias_lat_value
+            photon_params['lon'] = bias_lng_value
+            photon_params['zoom'] = 12
         try:
             response = requests.get(
                 PHOTON_SEARCH_URL,
-                params={
-                    'q': variant,
-                    'limit': limit_value,
-                },
+                params=photon_params,
                 headers=photon_headers,
                 timeout=10,
             )
@@ -230,13 +752,21 @@ def search_address_candidates(query, limit=5, country_codes='vn'):
                 lng=coordinates[0],
                 display_name=_format_photon_display_name(properties, query_text),
                 type_label=properties.get('type') or properties.get('osm_value') or 'location',
-                limit_value=limit_value,
+                raw_type=properties.get('type') or properties.get('osm_value'),
+                raw_class=properties.get('osm_key'),
+                source_label='photon',
             ):
-                GEOCODE_SEARCH_CACHE[cache_key] = _copy_search_results(search_results)
-                return _copy_search_results(search_results)
+                break
 
-    GEOCODE_SEARCH_CACHE[cache_key] = _copy_search_results(search_results)
-    return _copy_search_results(search_results)
+    ranked_results = _rank_search_results(
+        search_results,
+        normalized_query,
+        limit_value,
+        bias_lat=bias_lat_value if use_bias_for_query else None,
+        bias_lng=bias_lng_value if use_bias_for_query else None,
+    )
+    GEOCODE_SEARCH_CACHE[cache_key] = _copy_search_results(ranked_results)
+    return _copy_search_results(ranked_results)
 
 
 def reverse_geocode_coordinates(lat, lng):
@@ -277,7 +807,7 @@ def reverse_geocode_coordinates(lat, lng):
             response.raise_for_status()
             data = response.json()
             payload = {
-                'display_name': data.get('display_name', '') or fallback_payload['display_name'],
+                'display_name': _format_nominatim_reverse_display_name(data, fallback_payload['display_name']),
                 'lat': float(data.get('lat', lat)),
                 'lng': float(data.get('lon', lng)),
             }

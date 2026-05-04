@@ -108,10 +108,10 @@
                     {% if field.errors %}<div class="admin-field-error">{{ field.errors }}</div>{% endif %}
                 </div>
                 {% endfor %}
-                <button type="submit" class="btn-admin btn-admin-primary">
+                {% if can_update_return_request %}<button type="submit" class="btn-admin btn-admin-primary">
                     <i class="fas fa-save"></i>
                     <span>Lưu cập nhật</span>
-                </button>
+                </button>{% else %}<span class="admin-badge admin-badge-warning">Tai khoan hien tai chi co quyen xem yeu cau nay.</span>{% endif %}
             </form>
         </div>
 

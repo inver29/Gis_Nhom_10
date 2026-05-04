@@ -43,10 +43,10 @@
                             {{ item.pharmacy_name }} • {{ item.source_label }}<br>
                             HSD {{ item.expiry_label }} • Còn {{ item.quantity }}
                         </small>
-                        <a href="{{ item.cta_url }}" class="btn-admin btn-admin-light mt-3">
+                        {% if item.cta_url %}<a href="{{ item.cta_url }}" class="btn-admin btn-admin-light mt-3">
                             <i class="fas fa-file-export"></i>
                             <span>Đi tới phiếu xử lý</span>
-                        </a>
+                        </a>{% endif %}
                     </div>
                     {% endfor %}
                 </div>

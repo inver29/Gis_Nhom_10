@@ -44,6 +44,12 @@ from .models import (
     UserProfile,
 )
 
+try:
+    from PIL import Image, UnidentifiedImageError
+except ImportError:  # pragma: no cover
+    Image = None
+    UnidentifiedImageError = OSError
+
 
 class MultipleImageInput(forms.ClearableFileInput):
     allow_multiple_selected = True
@@ -69,12 +75,46 @@ def validate_image_like_upload(uploaded_file):
 
     content_type = str(getattr(uploaded_file, "content_type", "") or "").lower()
     filename = str(getattr(uploaded_file, "name", "") or "").lower()
-    if content_type.startswith("image/") or filename.endswith(
-        (".png", ".jpg", ".jpeg", ".gif", ".webp", ".bmp", ".svg")
-    ):
-        return uploaded_file
+    allowed_extensions = (".png", ".jpg", ".jpeg", ".gif", ".webp", ".bmp")
+    allowed_content_types = {
+        "image/png",
+        "image/jpeg",
+        "image/jpg",
+        "image/gif",
+        "image/webp",
+        "image/bmp",
+        "image/x-ms-bmp",
+    }
 
-    raise ValidationError("Chi chap nhan tep anh hop le.")
+    if not filename.endswith(allowed_extensions) or (
+        content_type and content_type not in allowed_content_types
+    ):
+        raise ValidationError("Chỉ chấp nhận tệp ảnh PNG, JPG, JPEG, GIF, WEBP hoặc BMP.")
+
+    if Image is None:
+        raise ValidationError("Máy chủ chưa cài thư viện kiểm tra ảnh. Vui lòng liên hệ quản trị viên.")
+
+    try:
+        current_position = uploaded_file.tell()
+    except Exception:
+        current_position = 0
+
+    try:
+        uploaded_file.seek(0)
+        image = Image.open(uploaded_file)
+        image.verify()
+    except (UnidentifiedImageError, OSError, SyntaxError, ValueError):
+        raise ValidationError("Tệp tải lên không phải ảnh hợp lệ.")
+    finally:
+        try:
+            uploaded_file.seek(current_position)
+        except Exception:
+            try:
+                uploaded_file.seek(0)
+            except Exception:
+                pass
+
+    return uploaded_file
 
 
 class LooseMultipleImageField(forms.FileField):
@@ -84,6 +124,21 @@ class LooseMultipleImageField(forms.FileField):
         if not data:
             return []
         return [validate_image_like_upload(data)]
+
+
+class LimitedMultipleImageField(forms.FileField):
+    def __init__(self, *args, max_count=3, **kwargs):
+        self.max_count = max_count
+        super().__init__(*args, **kwargs)
+
+    def clean(self, data, initial=None):
+        if not data:
+            return []
+        files = data if isinstance(data, (list, tuple)) else [data]
+        files = [item for item in files if item]
+        if len(files) > self.max_count:
+            raise ValidationError(f"Tối đa chỉ được tải lên {self.max_count} ảnh.")
+        return [validate_image_like_upload(item) for item in files]
 
 
 def build_media_url(saved_name):
@@ -306,6 +361,23 @@ class PharmacyReviewForm(BaseReviewForm):
 
 
 class CheckoutForm(VietnameseValidationMixin, forms.ModelForm):
+    prescription_proof_image = LimitedMultipleImageField(
+        label="Ảnh đơn thuốc (tối đa 3 ảnh)",
+        required=False,
+        max_count=3,
+        widget=MultipleImageInput(attrs={"class": "form-control-file", "accept": "image/*", "multiple": True}),
+    )
+    prescription_note = forms.CharField(
+        label="Ghi chú đơn thuốc",
+        required=False,
+        widget=forms.Textarea(
+            attrs={
+                "class": "form-control",
+                "rows": 2,
+                "placeholder": "Ghi chú thêm cho dược sĩ nếu thuốc trong giỏ cần kê đơn",
+            }
+        ),
+    )
     payment_method = forms.ChoiceField(
         label="Phương thức thanh toán",
         choices=Order.PAYMENT_METHOD_CHOICES,
@@ -321,7 +393,7 @@ class CheckoutForm(VietnameseValidationMixin, forms.ModelForm):
 
     class Meta:
         model = Order
-        fields = ["full_name", "phone", "address_text", "note"]
+        fields = ["full_name", "phone", "address_text", "note", "prescription_note"]
         widgets = {
             "full_name": forms.TextInput(
                 attrs={"class": "form-control", "placeholder": "Họ và tên người nhận"}
@@ -345,6 +417,44 @@ class CheckoutForm(VietnameseValidationMixin, forms.ModelForm):
         super().__init__(*args, **kwargs)
         self.fields["payment_method"].widget.attrs.update({"class": "checkout-payment-radio"})
         self.fields["invoice_requested"].widget.attrs.update({"class": "checkout-invoice-checkbox"})
+
+
+class PaymentProofUploadForm(VietnameseValidationMixin, forms.ModelForm):
+    payment_proof_image = forms.ImageField(
+        label="Ảnh chứng từ thanh toán",
+        required=False,
+        widget=forms.FileInput(attrs={"class": "form-control-file", "accept": "image/*"}),
+    )
+
+    class Meta:
+        model = Order
+        fields = ["payment_proof_image", "payment_note"]
+        widgets = {
+            "payment_note": forms.Textarea(
+                attrs={
+                    "class": "form-control",
+                    "rows": 3,
+                    "placeholder": "Ghi chú nội dung chuyển khoản, số giao dịch hoặc thời gian thanh toán",
+                }
+            ),
+        }
+        labels = {
+            "payment_note": "Ghi chú thanh toán",
+        }
+
+    def clean_payment_proof_image(self):
+        payment_proof_image = self.cleaned_data.get("payment_proof_image")
+        if not payment_proof_image:
+            return payment_proof_image
+        return validate_image_like_upload(payment_proof_image)
+
+    def clean(self):
+        cleaned_data = super().clean()
+        payment_proof_image = cleaned_data.get("payment_proof_image")
+        existing_image = getattr(self.instance, "payment_proof_image", None)
+        if not payment_proof_image and not existing_image:
+            self.add_error("payment_proof_image", "Vui lòng tải lên ảnh chứng từ thanh toán.")
+        return cleaned_data
 
 
 
@@ -2170,25 +2280,70 @@ class PromotionAdminForm(BootstrapModelForm):
 
 
 class OrderStatusUpdateForm(BootstrapModelForm):
+    STATUS_TRANSITIONS = {
+        Order.STATUS_PENDING: {Order.STATUS_PENDING, Order.STATUS_CONFIRMED, Order.STATUS_CANCELLED},
+        Order.STATUS_CONFIRMED: {Order.STATUS_PENDING, Order.STATUS_CONFIRMED, Order.STATUS_PACKING, Order.STATUS_SHIPPING, Order.STATUS_CANCELLED},
+        Order.STATUS_PACKING: {Order.STATUS_CONFIRMED, Order.STATUS_PACKING, Order.STATUS_SHIPPING, Order.STATUS_CANCELLED},
+        Order.STATUS_SHIPPING: {Order.STATUS_PACKING, Order.STATUS_SHIPPING, Order.STATUS_COMPLETED, Order.STATUS_FAILED_DELIVERY, Order.STATUS_CANCELLED},
+        Order.STATUS_COMPLETED: {Order.STATUS_COMPLETED},
+        Order.STATUS_CANCELLED: {Order.STATUS_CANCELLED},
+        Order.STATUS_FAILED_DELIVERY: {Order.STATUS_PACKING, Order.STATUS_SHIPPING, Order.STATUS_FAILED_DELIVERY, Order.STATUS_CANCELLED},
+    }
+
     class Meta:
         model = Order
-        fields = ["pharmacy", "status"]
+        fields = [
+            "pharmacy",
+            "status",
+            "payment_status",
+            "payment_proof_image",
+            "payment_note",
+            "prescription_status",
+            "prescription_admin_note",
+        ]
         widgets = {
             "pharmacy": forms.Select(),
             "status": forms.Select(),
+            "payment_status": forms.Select(),
+            "payment_proof_image": forms.FileInput(attrs={"accept": "image/*"}),
+            "payment_note": forms.Textarea(attrs={"rows": 3, "placeholder": "Ghi chú đối soát thanh toán..."}),
+            "prescription_status": forms.Select(),
+            "prescription_admin_note": forms.Textarea(attrs={"rows": 3, "placeholder": "Ghi chú duyệt đơn thuốc..."}),
         }
         labels = {
             "pharmacy": "Chi nhánh xử lý",
             "status": "Trạng thái đơn",
+            "payment_status": "Trạng thái thanh toán",
+            "payment_proof_image": "Ảnh chứng từ thanh toán",
+            "payment_note": "Ghi chú thanh toán",
+            "prescription_status": "Trạng thái đơn thuốc",
+            "prescription_admin_note": "Ghi chú duyệt đơn thuốc",
         }
 
     def __init__(self, *args, **kwargs):
+        instance = kwargs.get("instance")
+        data = args[0] if args else kwargs.get("data")
+        if data is not None and hasattr(data, "copy") and instance is not None:
+            mutable_data = data.copy()
+            mutable_data.setdefault("payment_status", getattr(instance, "payment_status", Order.PAYMENT_STATUS_COD_WAITING))
+            mutable_data.setdefault("prescription_status", getattr(instance, "prescription_status", Order.PRESCRIPTION_STATUS_NOT_REQUIRED))
+            if args:
+                args = (mutable_data, *args[1:])
+            else:
+                kwargs["data"] = mutable_data
         super().__init__(*args, **kwargs)
         self.staff_managed_pharmacy = get_managed_pharmacy_for_user(self.admin_user)
         self.fields["pharmacy"].queryset = Pharmacy.objects.order_by("name")
         self.fields["pharmacy"].required = False
         self.fields["pharmacy"].empty_label = "Chưa gán chi nhánh"
+        if instance is not None and getattr(instance, "pk", None) and instance.items.exists():
+            self.fields["pharmacy"].help_text = (
+                "Đơn đã có chi tiết sản phẩm và tồn kho đã được phân bổ theo chi nhánh hiện tại. "
+                "Không đổi trực tiếp chi nhánh để tránh lệch tồn kho, phí giao hàng và lô FEFO."
+            )
         self.fields["status"].widget.attrs["class"] = "form-control form-control-lg"
+        self.fields["payment_status"].help_text = "Với chuyển khoản/MoMo, phải xác nhận đã thanh toán trước khi chuyển sang giao hàng."
+        self.fields["prescription_status"].help_text = "Đơn có thuốc kê đơn phải được duyệt trước khi chuẩn bị/giao hàng."
 
         if self.admin_user and self.admin_user.is_staff and not self.admin_user.is_superuser:
             if self.staff_managed_pharmacy:
@@ -2202,18 +2357,107 @@ class OrderStatusUpdateForm(BootstrapModelForm):
                 self.fields["pharmacy"].queryset = Pharmacy.objects.none()
                 self.fields["pharmacy"].help_text = "Tài khoản nhân viên chưa được gán chi nhánh quản lý."
 
+    def clean_payment_proof_image(self):
+        payment_proof_image = self.cleaned_data.get("payment_proof_image")
+        if not payment_proof_image:
+            return payment_proof_image
+        return validate_image_like_upload(payment_proof_image)
+
     def clean_pharmacy(self):
         pharmacy = self.cleaned_data.get("pharmacy")
         if self.admin_user and self.admin_user.is_staff and not self.admin_user.is_superuser:
             if not self.staff_managed_pharmacy:
                 raise forms.ValidationError("Tài khoản nhân viên chưa được cấp chi nhánh quản lý.")
             return self.staff_managed_pharmacy
+        if self.instance and getattr(self.instance, "pk", None):
+            current_pharmacy_id = getattr(self.instance, "pharmacy_id", None)
+            next_pharmacy_id = getattr(pharmacy, "pk", None)
+            if current_pharmacy_id != next_pharmacy_id and self.instance.items.exists():
+                raise forms.ValidationError(
+                    "Không thể đổi chi nhánh xử lý sau khi đơn đã có sản phẩm và tồn kho đã được phân bổ. "
+                    "Nếu cần điều phối sang chi nhánh khác, hãy hủy đơn hiện tại rồi tạo đơn mới để hệ thống tính lại tồn kho, lô FEFO, phí giao hàng và hóa đơn."
+                )
         return pharmacy
+
+    def clean(self):
+        cleaned_data = super().clean()
+        status = cleaned_data.get("status")
+        payment_status = cleaned_data.get("payment_status")
+        prescription_status = cleaned_data.get("prescription_status")
+        current_status = getattr(self.instance, "status", Order.STATUS_PENDING)
+        payment_method = getattr(self.instance, "payment_method", Order.PAYMENT_COD)
+
+        allowed_statuses = self.STATUS_TRANSITIONS.get(current_status, {current_status})
+        if status and status not in allowed_statuses:
+            self.add_error(
+                "status",
+                f"Không thể chuyển trạng thái từ '{self.instance.get_status_display()}' sang '{dict(Order.STATUS_CHOICES).get(status, status)}'.",
+            )
+
+        if payment_method == Order.PAYMENT_COD and payment_status == Order.PAYMENT_STATUS_AWAITING_TRANSFER:
+            self.add_error("payment_status", "Đơn COD không dùng trạng thái chờ chuyển khoản.")
+        if payment_method in {Order.PAYMENT_BANK, Order.PAYMENT_MOMO} and payment_status == Order.PAYMENT_STATUS_COD_WAITING:
+            self.add_error("payment_status", "Đơn chuyển khoản/MoMo phải ở trạng thái chờ xác nhận hoặc đã thanh toán.")
+
+        shipping_like_statuses = {Order.STATUS_SHIPPING, Order.STATUS_COMPLETED}
+        if (
+            status in shipping_like_statuses
+            and payment_method in {Order.PAYMENT_BANK, Order.PAYMENT_MOMO}
+            and payment_status != Order.PAYMENT_STATUS_PAID
+        ):
+            self.add_error("payment_status", "Cần xác nhận đã thanh toán trước khi giao hoặc hoàn thành đơn non-COD.")
+
+        has_prescription_images = bool(getattr(self.instance, "prescription_proof_image", None))
+        if not has_prescription_images and getattr(self.instance, "pk", None):
+            try:
+                has_prescription_images = self.instance.prescription_proof_images.exists()
+            except Exception:
+                has_prescription_images = False
+
+        prescription_required = (
+            getattr(self.instance, "requires_prescription_review", False)
+            or has_prescription_images
+            or prescription_status != Order.PRESCRIPTION_STATUS_NOT_REQUIRED
+        )
+        if status in {Order.STATUS_PACKING, Order.STATUS_SHIPPING, Order.STATUS_COMPLETED}:
+            if prescription_required and prescription_status != Order.PRESCRIPTION_STATUS_APPROVED:
+                self.add_error("prescription_status", "Đơn có thuốc kê đơn phải được duyệt hợp lệ trước khi chuẩn bị hoặc giao hàng.")
+
+        return cleaned_data
 
     def save(self, commit=True):
         order = super().save(commit=False)
+        previous_payment_status = None
+        previous_prescription_status = None
+        if self.instance and self.instance.pk:
+            previous_payment_status = getattr(self.instance, "_loaded_payment_status", None) or Order.objects.filter(pk=self.instance.pk).values_list("payment_status", flat=True).first()
+            previous_prescription_status = getattr(self.instance, "_loaded_prescription_status", None) or Order.objects.filter(pk=self.instance.pk).values_list("prescription_status", flat=True).first()
+
         if getattr(self, 'staff_managed_pharmacy', None):
             order.pharmacy = self.staff_managed_pharmacy
+        now = timezone.now()
+        if order.payment_status == Order.PAYMENT_STATUS_PAID:
+            if previous_payment_status != Order.PAYMENT_STATUS_PAID or order.payment_confirmed_at is None:
+                order.payment_confirmed_at = now
+                if self.admin_user and getattr(self.admin_user, "is_authenticated", False):
+                    order.payment_confirmed_by = self.admin_user
+        elif previous_payment_status == Order.PAYMENT_STATUS_PAID:
+            order.payment_confirmed_at = None
+            order.payment_confirmed_by = None
+
+        if order.prescription_status in {Order.PRESCRIPTION_STATUS_APPROVED, Order.PRESCRIPTION_STATUS_REJECTED}:
+            if previous_prescription_status != order.prescription_status or order.prescription_reviewed_at is None:
+                order.prescription_reviewed_at = now
+                if self.admin_user and getattr(self.admin_user, "is_authenticated", False):
+                    order.prescription_reviewed_by = self.admin_user
+        elif order.prescription_status == Order.PRESCRIPTION_STATUS_PENDING:
+            order.prescription_reviewed_at = None
+            order.prescription_reviewed_by = None
+        elif order.prescription_status == Order.PRESCRIPTION_STATUS_NOT_REQUIRED:
+            order.prescription_reviewed_at = None
+            order.prescription_reviewed_by = None
+            order.prescription_admin_note = ""
+
         if commit:
             order.save()
         return order
@@ -2602,6 +2846,29 @@ class PasswordResetOtpVerificationForm(VietnameseValidationMixin, PasswordReuseV
 
 
 class UsernameRecoveryOtpVerificationForm(VietnameseValidationMixin, forms.Form):
+    otp_code = forms.CharField(
+        label="Mã OTP",
+        min_length=6,
+        max_length=6,
+        widget=forms.TextInput(
+            attrs={
+                "class": "form-control",
+                "inputmode": "numeric",
+                "autocomplete": "one-time-code",
+                "placeholder": "Nhập 6 số OTP",
+                "maxlength": "6",
+            }
+        ),
+    )
+
+    def clean_otp_code(self):
+        otp_code = re.sub(r"\D+", "", (self.cleaned_data.get("otp_code") or "").strip())
+        if len(otp_code) != 6:
+            raise ValidationError("Mã OTP phải gồm đúng 6 chữ số.")
+        return otp_code
+
+
+class RegistrationOtpVerificationForm(VietnameseValidationMixin, forms.Form):
     otp_code = forms.CharField(
         label="Mã OTP",
         min_length=6,

@@ -1,0 +1,20 @@
+Xin chào {{ recipient_name }},
+
+Thông tin tài khoản của bạn trên {{ site_name }} vừa được cập nhật.
+
+{% if changed_fields %}Nội dung thay đổi:
+{% for field in changed_fields %}- {{ field }}
+{% endfor %}{% endif %}
+{% if email_changed %}
+Email cũ: {{ previous_email }}
+Email hiện tại: {{ current_email }}
+Thông báo này được gửi đến cả email cũ và email mới để bảo vệ tài khoản của bạn.
+{% endif %}
+
+Nếu chính bạn thực hiện thao tác này thì không cần làm gì thêm.
+Nếu bạn không thực hiện thay đổi, hãy mở lại trang tài khoản và liên hệ ngay {{ support_email }}.
+
+Trang tài khoản: {{ account_url }}
+
+Trân trọng,
+{{ site_name }}

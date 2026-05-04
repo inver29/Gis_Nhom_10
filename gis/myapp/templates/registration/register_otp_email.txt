@@ -1,0 +1,14 @@
+Xin chào {{ recipient_name }},
+
+Bạn vừa đăng ký tài khoản trên {{ site_name|default:"GIS Pharma" }}.
+
+Mã OTP kích hoạt tài khoản của bạn là: {{ otp_code }}
+
+Mã này có hiệu lực trong {{ otp_valid_minutes }} phút.
+
+Sau khi quay lại web, hãy nhập mã OTP để hoàn tất kích hoạt tài khoản.
+
+Trang nhập OTP:
+{{ verify_url }}
+
+Nếu bạn không thực hiện yêu cầu này, hãy bỏ qua email.

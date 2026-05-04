@@ -43,6 +43,7 @@
                     <p>Nhân viên phụ trách: <strong>{{ invoice_staff_display_name|default:order.resolved_invoice_staff_name|default:"Nhân viên quầy thuốc" }}</strong></p>
                     <p>Phương thức thanh toán: <strong>{{ order.get_payment_method_display }}</strong></p>
                     <p>Trạng thái thanh toán: <strong>{{ order.get_payment_status_display }}</strong></p>
+                    {% if order.requires_prescription_review %}<p>Đơn thuốc: <strong>{{ order.get_prescription_status_display }}</strong></p>{% endif %}
                 </div>
             </div>
 
@@ -60,6 +61,24 @@
                     <strong>{{ order.resolved_payment_reference }}</strong>
                 </div>
             </div>
+
+            {% if payment_preview.show_qr and order.payment_status != 'paid' %}
+            <div class="invoice-payment-box">
+                <div>
+                    <h3>Thanh toán chuyển khoản</h3>
+                    <p>Chủ tài khoản: <strong>{{ payment_preview.recipient_name }}</strong></p>
+                    <p>Đơn vị nhận: <strong>{{ payment_preview.provider_name }}</strong></p>
+                    <p>Tài khoản / ví: <strong>{{ payment_preview.account_number }}</strong></p>
+                    <p>Nội dung: <strong>{{ order.resolved_payment_reference }}</strong></p>
+                    {% if order.can_upload_payment_proof %}
+                    <p><a href="{% url 'upload_payment_proof' order.id %}">Gửi ảnh chứng từ thanh toán</a></p>
+                    {% endif %}
+                </div>
+                <div class="invoice-payment-box__qr">
+                    <img src="{{ payment_preview.qr_image }}" alt="Mã QR thanh toán {{ payment_preview.payment_label }}">
+                </div>
+            </div>
+            {% endif %}
 
             <div class="invoice-table-wrap">
                 <table>

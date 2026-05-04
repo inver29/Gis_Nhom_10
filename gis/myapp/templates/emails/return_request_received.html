@@ -1,0 +1,41 @@
+{% load currency_filters %}
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Đã {{ action_label }} yêu cầu trả hàng / hoàn tiền</title>
+</head>
+<body style="margin:0;padding:24px;background:#eef4ff;font-family:Arial,sans-serif;color:#163057;">
+  <div style="max-width:680px;margin:0 auto;background:#ffffff;border-radius:24px;overflow:hidden;border:1px solid #dbe8ff;box-shadow:0 22px 46px rgba(17,70,184,0.12);">
+    <div style="padding:28px;background:linear-gradient(145deg,#0f4fbf 0%,#1f64e0 54%,#0ea5a4 100%);color:#ffffff;">
+      <div style="display:inline-block;padding:8px 14px;border-radius:999px;background:rgba(255,255,255,0.16);font-size:12px;font-weight:800;letter-spacing:.04em;text-transform:uppercase;">Trả hàng / hoàn tiền</div>
+      <h1 style="margin:16px 0 8px;font-size:27px;line-height:1.2;">Đã {{ action_label }} yêu cầu của bạn</h1>
+      <p style="margin:0;color:rgba(255,255,255,0.9);line-height:1.7;">Yêu cầu liên quan đến đơn {{ order.order_code }} đang ở trạng thái <strong>{{ current_status_label }}</strong>.</p>
+    </div>
+    <div style="padding:28px;">
+      <p style="margin-top:0;font-size:16px;">{{ recipient_name }} thân mến,</p>
+      <p style="margin:0 0 20px;line-height:1.75;color:#4f6285;">Bộ phận xử lý đã ghi nhận thông tin yêu cầu trả hàng / hoàn tiền. Khi trạng thái thay đổi, hệ thống sẽ tiếp tục gửi email thông báo cho bạn.</p>
+      <table style="width:100%;border-collapse:collapse;margin:0 0 18px;">
+        <tr>
+          <td style="padding:10px 0;color:#5d7090;border-bottom:1px solid #e7eefc;">Đơn hàng</td>
+          <td style="padding:10px 0;text-align:right;font-weight:800;color:#163057;border-bottom:1px solid #e7eefc;">{{ order.order_code }}</td>
+        </tr>
+        <tr>
+          <td style="padding:10px 0;color:#5d7090;border-bottom:1px solid #e7eefc;">Tổng thanh toán</td>
+          <td style="padding:10px 0;text-align:right;font-weight:900;color:#d62839;border-bottom:1px solid #e7eefc;">{{ order.final_total_price|vnd }}</td>
+        </tr>
+        <tr>
+          <td style="padding:10px 0;color:#5d7090;">Trạng thái yêu cầu</td>
+          <td style="padding:10px 0;text-align:right;font-weight:900;color:#0f8c7e;">{{ current_status_label }}</td>
+        </tr>
+      </table>
+      <div style="display:flex;flex-wrap:wrap;gap:12px;margin-bottom:18px;">
+        <a href="{{ order_detail_url }}" style="display:inline-flex;align-items:center;justify-content:center;padding:13px 20px;border-radius:14px;background:#1f64e0;color:#ffffff;text-decoration:none;font-weight:800;">Xem chi tiết đơn hàng</a>
+        <a href="{{ order_history_url }}" style="display:inline-flex;align-items:center;justify-content:center;padding:13px 20px;border-radius:14px;background:#edf4ff;color:#1146b8;text-decoration:none;font-weight:800;border:1px solid #d6e4ff;">Mở lịch sử đơn hàng</a>
+      </div>
+      <p style="margin:0;color:#5d7090;line-height:1.7;">Nếu cần hỗ trợ thêm, vui lòng liên hệ <strong style="color:#163057;">{{ support_email }}</strong>.</p>
+    </div>
+  </div>
+</body>
+</html>

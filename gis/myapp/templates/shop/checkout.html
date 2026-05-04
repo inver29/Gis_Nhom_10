@@ -35,7 +35,7 @@
                     {% endif %}
                 </div>
                 <div class="checkout-card-body">
-                    <form method="POST" id="checkout-form" class="checkout-stack">
+                    <form method="POST" enctype="multipart/form-data" id="checkout-form" class="checkout-stack">
                         {% csrf_token %}
 
                         <section class="checkout-section">
@@ -60,6 +60,36 @@
                             <input type="hidden" name="pharmacy_id" id="selected-pharmacy-id" value="{{ preselected_pharmacy_id }}">
                             <input type="hidden" name="departure_time" id="checkout-departure-time-hidden" value="{{ departure_time_value }}">
                         </section>
+
+                        {% if prescription_context.requires_prescription %}
+                        <section class="checkout-section">
+                            <div class="checkout-section__title">
+                                <div>
+                                    <h3>Đơn thuốc bắt buộc</h3>
+                                    <p>Giỏ hàng có thuốc cần kê đơn. Dược sĩ sẽ duyệt ảnh đơn thuốc trước khi chuẩn bị giao.</p>
+                                </div>
+                            </div>
+                            <div class="checkout-prescription-card">
+                                <strong>Các sản phẩm cần kê đơn</strong>
+                                <ul>
+                                    {% for item in prescription_context.items %}
+                                    <li>{{ item.medicine.name }} · SL {{ item.quantity }}</li>
+                                    {% endfor %}
+                                </ul>
+                            </div>
+                            <div class="form-group">
+                                <label class="font-weight-bold">{{ form.prescription_proof_image.label }}</label>
+                                {{ form.prescription_proof_image }}
+                                <div class="text-muted small mt-2">Có thể chọn tối đa 3 ảnh. Nếu chọn sai ảnh, bấm dấu x trên ảnh để xóa ảnh đó trước khi đặt hàng.</div>
+                                <div id="checkout-prescription-preview" class="checkout-prescription-preview upload-preview-grid mt-3" hidden></div>
+                                {% if form.prescription_proof_image.errors %}<div class="text-danger mt-2">{{ form.prescription_proof_image.errors }}</div>{% endif %}
+                            </div>
+                            <div class="form-group mb-0">
+                                <label class="font-weight-bold">{{ form.prescription_note.label }}</label>
+                                {{ form.prescription_note }}
+                            </div>
+                        </section>
+                        {% endif %}
 
                         <section class="checkout-section">
                             <div class="checkout-section__title">
@@ -266,10 +296,15 @@ const checkoutMapSearchResultAddress = document.getElementById("checkout-map-sea
 const checkoutMapSearchResultMeta = document.getElementById("checkout-map-search-result-meta");
 const checkoutMapSearchUseButton = document.getElementById("checkout-map-search-use");
 const checkoutMapSearchClearButton = document.getElementById("checkout-map-search-clear");
+const prescriptionInput = document.querySelector('input[name="prescription_proof_image"]');
+const prescriptionPreview = document.getElementById("checkout-prescription-preview");
 
 let deliveryMarker = null, deliveryRouteLayer = null, addressLookupRequestId = 0, bestPharmacyRequestId = 0, checkoutSearchPreviewMarker = null, checkoutSearchPreview = null;
 let checkoutGrandTotalValue = cartTotalValue;
 let routeInfoVisible = true;
+let selectedPrescriptionFiles = [];
+let prescriptionPreviewUrls = [];
+const prescriptionMaxFiles = 3;
 const pharmacyIcon = new L.Icon({ iconUrl:"https://cdn-icons-png.flaticon.com/512/169/169869.png", iconSize:[30,30], popupAnchor:[0,-15] });
 const checkoutSearchPreviewIcon = L.divIcon({ className:"checkout-map-search-preview-icon", html:'<span class="checkout-map-search-preview-pin"></span>', iconSize:[18,18], iconAnchor:[9,9] });
 const pharmacyMarkers = {};
@@ -309,6 +344,59 @@ pharmacyList.forEach(function(pharmacy){
 function showCheckoutLoading(){ document.getElementById("checkout-loading-overlay").style.display = "flex"; }
 function hideCheckoutLoading(){ document.getElementById("checkout-loading-overlay").style.display = "none"; }
 function showSiteNotice(message, tone){ if(window.siteUtils && typeof window.siteUtils.showToast === "function"){ window.siteUtils.showToast(message, tone || "info"); return; } window.alert(message); }
+function revokePrescriptionPreviewUrls(){ prescriptionPreviewUrls.forEach(function(url){ URL.revokeObjectURL(url); }); prescriptionPreviewUrls = []; }
+function syncPrescriptionInputFiles(){
+    if(!prescriptionInput || typeof DataTransfer === "undefined"){ return; }
+    const transfer = new DataTransfer();
+    selectedPrescriptionFiles.forEach(function(file){ transfer.items.add(file); });
+    prescriptionInput.files = transfer.files;
+}
+function renderPrescriptionPreviews(){
+    if(!prescriptionPreview){ return; }
+    revokePrescriptionPreviewUrls();
+    if(!selectedPrescriptionFiles.length){
+        prescriptionPreview.hidden = true;
+        prescriptionPreview.innerHTML = "";
+        return;
+    }
+    const cards = selectedPrescriptionFiles.map(function(file, index){
+        const objectUrl = URL.createObjectURL(file);
+        prescriptionPreviewUrls.push(objectUrl);
+        const fileName = escapeCheckoutHtml(file.name || `Ảnh đơn thuốc ${index + 1}`);
+        return `<figure class="upload-preview-card checkout-prescription-preview__item"><button type="button" class="checkout-prescription-preview__remove" data-prescription-remove="${index}" aria-label="Xóa ảnh đơn thuốc ${index + 1}"><i class="fas fa-times"></i></button><img src="${objectUrl}" alt="${fileName}"><figcaption><span>Ảnh đơn thuốc ${index + 1}</span><small>${fileName}</small></figcaption></figure>`;
+    });
+    prescriptionPreview.innerHTML = cards.join("");
+    prescriptionPreview.hidden = false;
+}
+function handlePrescriptionFileChange(){
+    if(!prescriptionInput){ return; }
+    const incomingFiles = Array.from(prescriptionInput.files || []);
+    if(!incomingFiles.length){
+        syncPrescriptionInputFiles();
+        renderPrescriptionPreviews();
+        return;
+    }
+    const availableSlots = prescriptionMaxFiles - selectedPrescriptionFiles.length;
+    if(availableSlots <= 0){
+        showSiteNotice(`Chỉ được tải tối đa ${prescriptionMaxFiles} ảnh đơn thuốc.`, "error");
+        syncPrescriptionInputFiles();
+        renderPrescriptionPreviews();
+        return;
+    }
+    if(incomingFiles.length > availableSlots){
+        showSiteNotice(`Chỉ nhận thêm ${availableSlots} ảnh. Tối đa ${prescriptionMaxFiles} ảnh đơn thuốc cho mỗi đơn.`, "error");
+    }
+    selectedPrescriptionFiles = selectedPrescriptionFiles.concat(incomingFiles.slice(0, availableSlots));
+    syncPrescriptionInputFiles();
+    renderPrescriptionPreviews();
+    updateSubmitButtonState();
+}
+function removePrescriptionFile(index){
+    selectedPrescriptionFiles.splice(index, 1);
+    syncPrescriptionInputFiles();
+    renderPrescriptionPreviews();
+    updateSubmitButtonState();
+}
 function getGeoErrorMessage(error){ if(!error || typeof error.code === "undefined"){ return "Không thể lấy vị trí hiện tại."; } if(error.code === 1){ return "Bạn đã từ chối cấp quyền truy cập vị trí."; } if(error.code === 2){ return "Không thể xác định vị trí hiện tại."; } if(error.code === 3){ return "Yêu cầu lấy vị trí đã hết thời gian chờ."; } return "Không thể lấy vị trí hiện tại."; }
 function refreshCheckoutMap(){ window.setTimeout(function(){ checkoutMap.invalidateSize(); }, 0); window.setTimeout(function(){ checkoutMap.invalidateSize(); }, 180); }
 function hasValue(value){ return value && value.trim() !== ""; }
@@ -319,7 +407,9 @@ function setCheckoutSearchStatus(message, tone){ if(!checkoutMapSearchStatus){ r
 function clearCheckoutSearchPreview(options){ options = options || {}; checkoutSearchPreview = null; if(checkoutSearchPreviewMarker && checkoutMap.hasLayer(checkoutSearchPreviewMarker)){ checkoutMap.removeLayer(checkoutSearchPreviewMarker); } checkoutSearchPreviewMarker = null; if(checkoutMapSearchResult){ checkoutMapSearchResult.classList.add("is-hidden"); } if(checkoutMapSearchResultAddress){ checkoutMapSearchResultAddress.textContent = "Chưa có kết quả nào."; } if(checkoutMapSearchResultMeta){ checkoutMapSearchResultMeta.textContent = ""; } if(!options.keepStatus){ setCheckoutSearchStatus('Ô này chỉ dùng để tìm trước vị trí trên bản đồ, chưa đổi địa chỉ giao hàng cho tới khi bạn bấm "Dùng vị trí này".'); } }
 function setCheckoutSearchPreview(result){ const lat = Number(result.lat); const lng = Number(result.lng); if(!Number.isFinite(lat) || !Number.isFinite(lng)){ throw new Error("Tọa độ kết quả tìm kiếm không hợp lệ."); } checkoutSearchPreview = { lat:lat, lng:lng, addressText: result.display_name || "", sourceLabel: result.type_label || "Địa chỉ tìm kiếm" }; if(!checkoutSearchPreviewMarker){ checkoutSearchPreviewMarker = L.marker([lat, lng], { icon: checkoutSearchPreviewIcon }).addTo(checkoutMap); } else { checkoutSearchPreviewMarker.setLatLng([lat, lng]); if(!checkoutMap.hasLayer(checkoutSearchPreviewMarker)){ checkoutMap.addLayer(checkoutSearchPreviewMarker); } } checkoutSearchPreviewMarker.bindPopup(checkoutSearchPreview.addressText || "Kết quả tìm kiếm", { autoPan:false }); if(checkoutMapSearchResult){ checkoutMapSearchResult.classList.remove("is-hidden"); } if(checkoutMapSearchResultAddress){ checkoutMapSearchResultAddress.textContent = checkoutSearchPreview.addressText || "Đã tìm thấy một vị trí trên bản đồ."; } if(checkoutMapSearchResultMeta){ checkoutMapSearchResultMeta.textContent = `${checkoutSearchPreview.sourceLabel} • Chưa áp dụng làm vị trí giao hàng cho tới khi bạn bấm "Dùng vị trí này".`; } checkoutMap.stop(); checkoutMap.setView([lat, lng], 16); checkoutSearchPreviewMarker.openPopup(); }
 function applyCheckoutSearchPreview(){ if(!checkoutSearchPreview){ setCheckoutSearchStatus("Chưa có kết quả tìm kiếm nào để sử dụng.", "error"); return; } setDeliveryLocation(checkoutSearchPreview.lat, checkoutSearchPreview.lng, { addressText: checkoutSearchPreview.addressText || "Địa chỉ vừa tìm", lookupAddress:false, recenter:true, zoom:16 }); clearCheckoutSearchPreview({ keepStatus:true }); setCheckoutSearchStatus("Đã áp dụng kết quả tìm kiếm làm vị trí giao hàng.", "success"); }
-async function searchCheckoutAddress(){ const keyword = checkoutMapSearchInput ? String(checkoutMapSearchInput.value || "").trim() : ""; if(!keyword){ setCheckoutSearchStatus("Hãy nhập địa chỉ cần tìm trước khi ghim lên bản đồ.", "error"); return; } setCheckoutSearchStatus("Đang tìm vị trí phù hợp..."); try { const response = await fetch(`/api/search-address/?q=${encodeURIComponent(keyword)}`); const data = await response.json(); if(!response.ok || !data.results || !data.results.length){ throw new Error(data.error || "Không tìm thấy vị trí phù hợp."); } setCheckoutSearchPreview(data.results[0]); setCheckoutSearchStatus('Đã tìm thấy vị trí. Kiểm tra kết quả bên dưới rồi bấm "Dùng vị trí này" nếu muốn áp dụng.', "success"); } catch (error){ clearCheckoutSearchPreview({ keepStatus:true }); setCheckoutSearchStatus(error.message || "Không thể tìm địa chỉ này.", "error"); } }
+function getCheckoutSearchBiasPoint(){ const selectedLat = Number(deliveryLatInput ? deliveryLatInput.value : ""); const selectedLng = Number(deliveryLngInput ? deliveryLngInput.value : ""); if(Number.isFinite(selectedLat) && Number.isFinite(selectedLng)){ return { lat:selectedLat, lng:selectedLng }; } try { const center = checkoutMap.getCenter(); if(center && Number.isFinite(center.lat) && Number.isFinite(center.lng)){ return { lat:center.lat, lng:center.lng }; } } catch (e) { /* map chưa sẵn sàng — bỏ qua bias */ } return null; }
+function buildCheckoutSearchUrl(keyword){ const params = new URLSearchParams({ q: keyword }); const bias = getCheckoutSearchBiasPoint(); if(bias){ params.set('lat', Number(bias.lat).toFixed(6)); params.set('lng', Number(bias.lng).toFixed(6)); } return `/api/search-address/?${params.toString()}`; }
+async function searchCheckoutAddress(){ const keyword = checkoutMapSearchInput ? String(checkoutMapSearchInput.value || "").trim() : ""; if(!keyword){ setCheckoutSearchStatus("Hãy nhập địa chỉ cần tìm trước khi ghim lên bản đồ.", "error"); return; } setCheckoutSearchStatus("Đang tìm vị trí phù hợp..."); try { const response = await fetch(buildCheckoutSearchUrl(keyword)); const data = await response.json(); if(!response.ok || !data.results || !data.results.length){ throw new Error(data.error || "Không tìm thấy vị trí phù hợp."); } setCheckoutSearchPreview(data.results[0]); setCheckoutSearchStatus('Đã tìm thấy vị trí. Kiểm tra kết quả bên dưới rồi bấm "Dùng vị trí này" nếu muốn áp dụng.', "success"); } catch (error){ clearCheckoutSearchPreview({ keepStatus:true }); setCheckoutSearchStatus(error.message || "Không thể tìm địa chỉ này.", "error"); } }
 async function syncAddressFromCoordinates(lat, lng, fallbackAddress){ const requestId = ++addressLookupRequestId; const fallbackText = fallbackAddress || `Tọa độ: ${Number(lat).toFixed(5)}, ${Number(lng).toFixed(5)}`; if(fallbackAddress){ addressInput.value = fallbackAddress; } updateCheckoutSelectedAddress(fallbackText); try { const response = await fetch(`/api/reverse-address/?lat=${encodeURIComponent(lat)}&lng=${encodeURIComponent(lng)}`); const data = await response.json(); if(requestId !== addressLookupRequestId){ return; } if(!response.ok){ throw new Error(data.error || "Không thể cập nhật địa chỉ."); } const addressText = data.address || fallbackAddress || addressInput.value || fallbackText; addressInput.value = addressText; updateCheckoutSelectedAddress(addressText); } catch (error){ if(requestId === addressLookupRequestId && fallbackAddress){ addressInput.value = fallbackAddress; } updateCheckoutSelectedAddress(addressInput.value || fallbackText); } finally { updateSubmitButtonState(); } }
 function getClientDepartureTime(){ const now = new Date(); const hours = String(now.getHours()).padStart(2, "0"); const minutes = String(now.getMinutes()).padStart(2, "0"); return `${hours}:${minutes}`; }
 function getCheckoutDepartureTime(){ const currentTime = getClientDepartureTime(); if(departureTimeHiddenInput){ departureTimeHiddenInput.value = currentTime; return departureTimeHiddenInput.value; } return currentTime; }
@@ -344,7 +434,7 @@ function renderPaymentPreview(data){
         paymentPreviewPanel.innerHTML = `<div class="checkout-payment-preview__header"><h3>${data.payment_label}</h3><span class="checkout-payment-preview__badge"><i class="fas fa-hand-holding-usd"></i> Thanh toán trực tiếp</span></div><p class="checkout-payment-preview__helper">${data.helper_text}</p><div class="checkout-payment-preview__rows"><div class="checkout-payment-preview__row checkout-payment-preview__row--wide"><small>Tổng cần thu</small><strong>${data.amount_text}</strong></div><div class="checkout-payment-preview__row"><small>Thời điểm thanh toán</small><strong>Khi nhân viên giao hàng bàn giao đơn</strong></div><div class="checkout-payment-preview__row"><small>Chi nhánh xử lý</small><strong>${data.branch_name || "Sẽ cập nhật sau khi chọn địa chỉ"}</strong></div><div class="checkout-payment-preview__row checkout-payment-preview__row--wide"><small>Mã đối soát</small><strong>${data.transfer_note}</strong></div></div><div class="checkout-payment-preview__tip">${timingNote}</div>`;
         return;
     }
-    paymentPreviewPanel.innerHTML = `<div class="checkout-payment-preview__header"><h3>${data.payment_label}</h3><span class="checkout-payment-preview__badge"><i class="fas fa-qrcode"></i> Quét để thanh toán</span></div><p class="checkout-payment-preview__helper">${data.helper_text}</p><div class="checkout-payment-preview__rows"><div class="checkout-payment-preview__row checkout-payment-preview__row--wide"><small>Số tiền cần thanh toán</small><strong>${data.amount_text}</strong></div><div class="checkout-payment-preview__row"><small>Nội dung thanh toán</small><strong>${data.transfer_note}</strong></div><div class="checkout-payment-preview__row"><small>Chi nhánh xử lý</small><strong>${data.branch_name || "Sẽ cập nhật sau khi chọn địa chỉ"}</strong></div><div class="checkout-payment-preview__row"><small>Đơn vị nhận</small><strong>${data.provider_name}</strong></div><div class="checkout-payment-preview__row"><small>Tài khoản / ví nhận</small><strong>${data.account_number}</strong></div><div class="checkout-payment-preview__row checkout-payment-preview__row--wide"><small>Chủ tài khoản</small><strong>${data.recipient_name}</strong></div></div><div class="checkout-payment-preview__qr-block"><h4 class="checkout-payment-preview__qr-title">Mã QR thanh toán</h4><div class="checkout-payment-preview__qr"><img src="${data.qr_image}" alt="Mã QR thanh toán ${data.payment_label}"></div><p class="checkout-payment-preview__qr-caption">Mở ứng dụng phù hợp, quét mã QR bên dưới để điền sẵn số tiền và nội dung thanh toán.</p></div><div class="checkout-payment-preview__tip">${timingNote}</div>`;
+    paymentPreviewPanel.innerHTML = `<div class="checkout-payment-preview__header"><h3>${data.payment_label}</h3><span class="checkout-payment-preview__badge"><i class="fas fa-qrcode"></i> Xem trước thanh toán</span></div><p class="checkout-payment-preview__helper">${data.helper_text}</p><div class="checkout-payment-preview__rows"><div class="checkout-payment-preview__row checkout-payment-preview__row--wide"><small>Số tiền cần thanh toán</small><strong>${data.amount_text}</strong></div><div class="checkout-payment-preview__row"><small>Nội dung tạm tính</small><strong>${data.transfer_note}</strong></div><div class="checkout-payment-preview__row"><small>Chi nhánh xử lý</small><strong>${data.branch_name || "Sẽ cập nhật sau khi chọn địa chỉ"}</strong></div><div class="checkout-payment-preview__row"><small>Đơn vị nhận</small><strong>${data.provider_name}</strong></div><div class="checkout-payment-preview__row"><small>Tài khoản / ví nhận</small><strong>${data.account_number}</strong></div><div class="checkout-payment-preview__row checkout-payment-preview__row--wide"><small>Chủ tài khoản</small><strong>${data.recipient_name}</strong></div></div><div class="checkout-payment-preview__qr-block"><h4 class="checkout-payment-preview__qr-title">Mã QR thanh toán</h4><div class="checkout-payment-preview__qr"><img src="${data.qr_image}" alt="Mã QR thanh toán ${data.payment_label}"></div><p class="checkout-payment-preview__qr-caption">Đây là bản xem trước theo tổng tiền hiện tại. Sau khi đặt hàng, hãy dùng mã QR và nội dung thanh toán trong hóa đơn/chi tiết đơn để đối soát đúng mã đơn thật.</p></div><div class="checkout-payment-preview__tip">${timingNote}</div>`;
 }
 async function refreshPaymentPreview(){ if(!paymentPreviewPanel){ return; } refreshPaymentOptionState(); paymentPreviewPanel.classList.add("is-loading"); try { const params = new URLSearchParams({ payment_method: getSelectedPaymentMethod(), amount: String(checkoutGrandTotalValue || cartTotalValue || 0), pharmacy_id: selectedPharmacyInput.value || "", reference: `TAM-${selectedPharmacyInput.value || "X"}-${checkoutGrandTotalValue || cartTotalValue || 0}` }); const response = await fetch(`/api/payment-preview/?${params.toString()}`); const data = await response.json(); if(!response.ok){ throw new Error(data.error || "Không thể tạo xem trước thanh toán."); } renderPaymentPreview(data); } catch (error) { paymentPreviewPanel.innerHTML = `<div class="text-danger">${error.message || "Không thể tạo mã thanh toán."}</div>`; } finally { paymentPreviewPanel.classList.remove("is-loading"); } }
 function renderDeliverySummary(data){ const selectedPharmacy = data.pharmacy; const route = data.route; const productSubtotalValue = Number(data.product_total_before_loyalty || cartSubtotalValue || 0); const loyaltyDiscountValue = Number(data.loyalty_discount_total || customerTierDiscountValue || 0); const productTotalValue = Number(data.product_total_value || cartTotalValue); const grandTotalValue = productTotalValue + Number(route.shipping_fee_value || 0); checkoutGrandTotalValue = grandTotalValue; const notices = []; if(data.notice){ notices.push(data.notice); } if(route.traffic_notice && notices.indexOf(route.traffic_notice) === -1){ notices.push(route.traffic_notice); } const effectiveDepartureTime = route.departure_time || getCheckoutDepartureTime(); const estimatedDeliveryLabel = route.estimated_delivery_label || buildEstimatedDeliveryLabel(effectiveDepartureTime, route.duration_min); if(departureTimeHiddenInput){ departureTimeHiddenInput.value = effectiveDepartureTime; } selectedPharmacyInput.value = selectedPharmacy.id; document.getElementById("product-subtotal-text").innerText = productSubtotalValue.toLocaleString("vi-VN") + " đ"; if(customerTierDiscountElement){ customerTierDiscountElement.innerText = loyaltyDiscountValue > 0 ? `-${loyaltyDiscountValue.toLocaleString("vi-VN")} đ` : `0 đ`; } document.getElementById("shipping-fee-text").innerText = route.shipping_fee; document.getElementById("grand-total-text").innerText = grandTotalValue.toLocaleString("vi-VN") + " đ"; const noticeHtml = notices.map(function(item){ return `<div class="checkout-route-info__notice">${item}</div>`; }).join(""); const feeLabel = route.fee_increase_percent ? `${route.shipping_fee} · tăng ${route.fee_increase_percent}% so với mức cơ bản ${route.base_shipping_fee}` : route.shipping_fee; routeInfoBox.dataset.hasContent = "true"; routeInfoBox.innerHTML = `${noticeHtml}<div class="checkout-route-info__head"><div><div class="checkout-route-info__eyebrow"><i class="fas fa-store"></i> Chi nhánh xử lý</div><h3 class="checkout-route-info__title">${selectedPharmacy.name}</h3></div><button type="button" class="checkout-route-info__toggle" data-route-info-toggle="hide">Ẩn thông tin</button></div><div class="checkout-route-info__body"><div><p class="checkout-route-info__address">${selectedPharmacy.address}</p><div class="checkout-route-info__stats"><div class="checkout-route-info__stat"><small>Thời gian giao dự kiến</small><strong>${estimatedDeliveryLabel}</strong></div><div class="checkout-route-info__stat"><small>Quãng đường</small><strong>${route.distance_km} km • ${route.duration_min} phút</strong></div><div class="checkout-route-info__stat"><small>Phí giao hàng</small><strong>${feeLabel}</strong></div></div></div><div class="checkout-route-info__thumb"><img src="${selectedPharmacy.image}" alt="${selectedPharmacy.name}" onerror="this.onerror=null;this.src='/db-media/pharmacies/pm.jpg';"></div></div>`; bindRouteInfoActions(); setRouteInfoVisibility(routeInfoVisible); if(pharmacyMarkers[selectedPharmacy.id]){ pharmacyMarkers[selectedPharmacy.id].openPopup(); } refreshPaymentPreview(); updateSubmitButtonState(); }
@@ -356,6 +446,14 @@ function findMyLocation(){ if(!navigator.geolocation){ showSiteNotice("Trình du
 function useSavedAddress(){ if(!savedAddress || savedAddress.lat === null || savedAddress.lng === null){ return; } setDeliveryLocation(savedAddress.lat, savedAddress.lng, { addressText: savedAddress.address_text || "", lookupAddress:false, recenter:true, zoom:16 }); }
 
 fullNameInput.addEventListener("input", updateSubmitButtonState); phoneInput.addEventListener("input", updateSubmitButtonState); addressInput.addEventListener("input", function(){ updateSubmitButtonState(); if(hasValue(deliveryLatInput.value) && hasValue(deliveryLngInput.value)){ updateCheckoutSelectedAddress(addressInput.value || "Địa chỉ giao hàng đã chọn"); } }); if(noteInput){ noteInput.addEventListener("input", updateSubmitButtonState); } paymentMethodInputs.forEach(function(input){ input.addEventListener("change", function(){ refreshPaymentPreview(); updateSubmitButtonState(); }); });
+if(prescriptionInput){ prescriptionInput.addEventListener("change", handlePrescriptionFileChange); }
+if(prescriptionPreview){
+    prescriptionPreview.addEventListener("click", function(event){
+        const button = event.target.closest("[data-prescription-remove]");
+        if(!button){ return; }
+        removePrescriptionFile(Number(button.dataset.prescriptionRemove || 0));
+    });
+}
 if(routeInfoCollapsedButton){ routeInfoCollapsedButton.addEventListener("click", function(){ setRouteInfoVisibility(true); }); }
 if(departureTimeHiddenInput){ departureTimeHiddenInput.value = getClientDepartureTime(); }
 checkoutMap.on("click", function(event){ setDeliveryLocation(event.latlng.lat, event.latlng.lng, { recenter:false }); });

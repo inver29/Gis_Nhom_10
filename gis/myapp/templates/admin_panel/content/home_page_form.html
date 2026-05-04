@@ -19,6 +19,24 @@
         </a>
     </section>
 
+    <section class="home-editor__overview" aria-label="Tổng quan nội dung trang chủ">
+        <a href="#home-slides" class="home-editor__overview-card tone-blue">
+            <span><i class="fas fa-images"></i> Slider</span>
+            <strong>{{ hero_slide_formset.forms|length }}</strong>
+            <small>slide</small>
+        </a>
+        <a href="#home-categories" class="home-editor__overview-card tone-green">
+            <span><i class="fas fa-layer-group"></i> Danh mục</span>
+            <strong>{{ category_item_formset.forms|length }}</strong>
+            <small>mục</small>
+        </a>
+        <a href="#home-commitments" class="home-editor__overview-card tone-orange">
+            <span><i class="fas fa-certificate"></i> Cam kết</span>
+            <strong>{{ commitment_item_formset.forms|length }}</strong>
+            <small>thẻ</small>
+        </a>
+    </section>
+
     <form method="post" enctype="multipart/form-data" id="home-admin-form">
         {% csrf_token %}
         {% for hidden in form.hidden_fields %}{{ hidden }}{% endfor %}
@@ -73,7 +91,7 @@
         </section>
         {% endfor %}
 
-        <section class="home-editor__section" data-dynamic-formset data-prefix="hero_slides" data-item-label-singular="slide" data-item-label-plural="slide">
+        <section class="home-editor__section" id="home-slides" data-dynamic-formset data-prefix="hero_slides" data-item-label-singular="slide" data-item-label-plural="slide">
             <div class="home-editor__section-head">
                 <div>
                     <h3>Slider đầu trang</h3>
@@ -159,7 +177,7 @@
             </template>
         </section>
 
-        <section class="home-editor__section" data-dynamic-formset data-prefix="category_items" data-item-label-singular="mục" data-item-label-plural="mục">
+        <section class="home-editor__section" id="home-categories" data-dynamic-formset data-prefix="category_items" data-item-label-singular="mục" data-item-label-plural="mục">
             <div class="home-editor__section-head">
                 <div>
                     <h3>Danh mục nổi bật</h3>
@@ -239,7 +257,7 @@
             </template>
         </section>
 
-        <section class="home-editor__section" data-dynamic-formset data-prefix="commitment_items" data-item-label-singular="mục" data-item-label-plural="mục">
+        <section class="home-editor__section" id="home-commitments" data-dynamic-formset data-prefix="commitment_items" data-item-label-singular="mục" data-item-label-plural="mục">
             <div class="home-editor__section-head">
                 <div>
                     <h3>Cam kết dịch vụ</h3>

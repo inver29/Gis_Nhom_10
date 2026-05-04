@@ -4,6 +4,7 @@ from django.conf import settings
 from django.core.mail import EmailMultiAlternatives
 from django.template.loader import render_to_string
 from django.urls import reverse
+from django.utils import timezone
 
 
 logger = logging.getLogger(__name__)
@@ -11,9 +12,12 @@ logger = logging.getLogger(__name__)
 
 ORDER_STATUS_LABELS = {
     "pending": "Chờ xử lý",
+    "confirmed": "Đã xác nhận",
+    "packing": "Đang chuẩn bị",
     "shipping": "Đang giao hàng",
     "completed": "Hoàn thành",
     "cancelled": "Đã hủy",
+    "failed_delivery": "Giao không thành công",
 }
 
 RETURN_REQUEST_STATUS_LABELS = {
@@ -105,6 +109,23 @@ def build_return_request_email_context(return_request, previous_status, request=
     }
 
 
+def build_return_request_received_email_context(return_request, *, request=None, is_update=False):
+    order = return_request.order
+    return {
+        "site_name": getattr(settings, "SITE_NAME", "GIS Pharma"),
+        "support_email": getattr(settings, "SITE_SUPPORT_EMAIL", settings.DEFAULT_FROM_EMAIL),
+        "order": order,
+        "return_request": return_request,
+        "recipient_name": order.full_name or "Quý khách",
+        "current_status_label": get_return_request_status_label(return_request.status),
+        "order_detail_url": build_absolute_url("order_history_detail", request=request, args=[order.pk]),
+        "order_history_url": build_absolute_url("order_history", request=request),
+        "is_update": is_update,
+        "action_label": "cập nhật" if is_update else "tiếp nhận",
+        "created_at": timezone.localtime(return_request.created_at) if return_request.created_at else timezone.localtime(),
+    }
+
+
 def build_account_recovery_otp_context(*, user, challenge, otp_code, request=None):
     is_username_recovery = challenge.purpose == "username_recovery"
     verify_url = build_absolute_url(
@@ -126,6 +147,25 @@ def build_account_recovery_otp_context(*, user, challenge, otp_code, request=Non
     }
 
 
+def build_registration_otp_context(*, user, challenge, otp_code, request=None):
+    verify_url = build_absolute_url(
+        "register_verify_otp",
+        request=request,
+        args=[challenge.public_token],
+    )
+    return {
+        "site_name": getattr(settings, "SITE_NAME", "GIS Pharma"),
+        "support_email": getattr(settings, "SITE_SUPPORT_EMAIL", settings.DEFAULT_FROM_EMAIL),
+        "user": user,
+        "challenge": challenge,
+        "otp_code": otp_code,
+        "verify_url": verify_url,
+        "expires_at": challenge.expires_at,
+        "otp_valid_minutes": max(int((challenge.expires_at - challenge.created_at).total_seconds() // 60), 1),
+        "recipient_name": user.get_full_name().strip() or user.get_username(),
+    }
+
+
 def build_registration_confirmation_context(*, user, uid, token, request=None):
     activation_url = build_absolute_url("activate_account", request=request, args=[uid, token])
     return {
@@ -137,8 +177,36 @@ def build_registration_confirmation_context(*, user, uid, token, request=None):
     }
 
 
+def build_account_profile_updated_email_context(user, *, previous_email="", changed_fields=None, request=None):
+    changed_fields = changed_fields or []
+    current_email = (getattr(user, "email", "") or "").strip()
+    previous_email = (previous_email or "").strip()
+    return {
+        "site_name": getattr(settings, "SITE_NAME", "GIS Pharma"),
+        "support_email": getattr(settings, "SITE_SUPPORT_EMAIL", settings.DEFAULT_FROM_EMAIL),
+        "user": user,
+        "recipient_name": user.get_full_name().strip() or user.get_username(),
+        "account_url": build_absolute_url("account", request=request),
+        "previous_email": previous_email,
+        "current_email": current_email,
+        "email_changed": bool(previous_email and previous_email != current_email),
+        "changed_fields": changed_fields,
+        "changed_at": timezone.localtime(),
+    }
+
+
 def send_templated_email(subject_template, body_template, html_template, context, recipients):
-    recipient_list = [email for email in recipients if email]
+    recipient_list = []
+    seen_recipients = set()
+    for email in recipients:
+        normalized_email = (email or "").strip()
+        if not normalized_email:
+            continue
+        recipient_key = normalized_email.casefold()
+        if recipient_key in seen_recipients:
+            continue
+        seen_recipients.add(recipient_key)
+        recipient_list.append(normalized_email)
     if not recipient_list:
         return False
 
@@ -214,6 +282,19 @@ def send_order_status_update_email(order, previous_status, request=None):
     )
 
 
+def send_order_payment_confirmed_email(order, request=None):
+    recipient_email = get_order_recipient_email(order)
+    context = build_order_email_context(order, request=request)
+    context["payment_status_label"] = getattr(order, "get_payment_status_display", lambda: "")()
+    return send_templated_email(
+        "emails/order_payment_confirmed_subject.txt",
+        "emails/order_payment_confirmed.txt",
+        "emails/order_payment_confirmed.html",
+        context,
+        [recipient_email],
+    )
+
+
 def send_return_request_status_update_email(return_request, previous_status, request=None):
     if previous_status == return_request.status:
         return False
@@ -224,6 +305,22 @@ def send_return_request_status_update_email(return_request, previous_status, req
         "emails/return_request_status_updated_subject.txt",
         "emails/return_request_status_updated.txt",
         "emails/return_request_status_updated.html",
+        context,
+        [recipient_email],
+    )
+
+
+def send_return_request_received_email(return_request, *, request=None, is_update=False):
+    recipient_email = get_return_request_recipient_email(return_request)
+    context = build_return_request_received_email_context(
+        return_request,
+        request=request,
+        is_update=is_update,
+    )
+    return send_templated_email(
+        "emails/return_request_received_subject.txt",
+        "emails/return_request_received.txt",
+        "emails/return_request_received.html",
         context,
         [recipient_email],
     )
@@ -240,6 +337,22 @@ def send_account_recovery_otp_email(*, user, challenge, otp_code, request=None):
         "registration/recovery_otp_subject.txt",
         "registration/recovery_otp_email.txt",
         "registration/recovery_otp_email.html",
+        context,
+        [challenge.email],
+    )
+
+
+def send_registration_otp_email(*, user, challenge, otp_code, request=None):
+    context = build_registration_otp_context(
+        user=user,
+        challenge=challenge,
+        otp_code=otp_code,
+        request=request,
+    )
+    return send_templated_email(
+        "registration/register_otp_subject.txt",
+        "registration/register_otp_email.txt",
+        "registration/register_otp_email.html",
         context,
         [challenge.email],
     )
@@ -272,7 +385,7 @@ def build_password_changed_email_context(user, *, request=None, change_source="a
         "account_url": account_url,
         "change_source": change_source,
         "change_source_label": source_label,
-        "changed_at": settings.TIME_ZONE,
+        "changed_at": timezone.localtime(),
     }
 
 
@@ -285,4 +398,24 @@ def send_password_changed_email(user, *, request=None, change_source="account"):
         "emails/password_changed.html",
         context,
         [recipient_email],
+    )
+
+
+def send_account_profile_updated_email(user, *, previous_email="", changed_fields=None, request=None):
+    current_email = (getattr(user, "email", "") or "").strip()
+    context = build_account_profile_updated_email_context(
+        user,
+        previous_email=previous_email,
+        changed_fields=changed_fields or [],
+        request=request,
+    )
+    recipients = [current_email]
+    if context["email_changed"]:
+        recipients.append(context["previous_email"])
+    return send_templated_email(
+        "emails/account_profile_updated_subject.txt",
+        "emails/account_profile_updated.txt",
+        "emails/account_profile_updated.html",
+        context,
+        recipients,
     )
